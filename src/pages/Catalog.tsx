@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useConfig } from '@/contexts/ConfigContext';
 
 // Types for catalog items
 type CatalogItemType = 'service' | 'article';
@@ -186,19 +187,12 @@ const INITIAL_CATALOG: CatalogItem[] = [
   },
 ];
 
-const CATEGORIES = [
-  'Lavado',
-  'Planchado',
-  'Especializado',
-  'Ropa Superior',
-  'Ropa Inferior',
-  'Hogar',
-  'Accesorios',
-];
-
 type TabFilter = 'all' | 'service' | 'article';
 
 export default function Catalog() {
+  const { activeCategories } = useConfig();
+  const categoryNames = activeCategories.map(c => c.name);
+  
   const [items, setItems] = useState<CatalogItem[]>(INITIAL_CATALOG);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<TabFilter>('all');
@@ -510,7 +504,7 @@ export default function Catalog() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas</SelectItem>
-            {CATEGORIES.map(cat => (
+            {categoryNames.map(cat => (
               <SelectItem key={cat} value={cat}>{cat}</SelectItem>
             ))}
           </SelectContent>
@@ -724,7 +718,7 @@ export default function Catalog() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {CATEGORIES.map(cat => (
+                    {categoryNames.map(cat => (
                       <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                     ))}
                   </SelectContent>
