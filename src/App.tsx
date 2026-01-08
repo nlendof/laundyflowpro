@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
 import QuickSale from "./pages/QuickSale";
 import Operations from "./pages/Operations";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -141,10 +142,7 @@ function AppRoutes() {
           path="/settings"
           element={
             <ProtectedRoute>
-              <div className="p-8">
-                <h1 className="text-2xl font-bold">Configuración</h1>
-                <p className="text-muted-foreground">Módulo en desarrollo...</p>
-              </div>
+              <Settings />
             </ProtectedRoute>
           }
         />
