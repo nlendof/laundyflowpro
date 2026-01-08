@@ -58,22 +58,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useConfig, CatalogCategory, OperationStep, DeliveryZone, ExtraService, PaymentMethod, BusinessSettings } from '@/contexts/ConfigContext';
 
-// Types
-interface BusinessSettings {
-  name: string;
-  slogan: string;
-  phone: string;
-  email: string;
-  address: string;
-  website: string;
-  openTime: string;
-  closeTime: string;
-  workDays: string[];
-  taxRate: number;
-  currency: string;
-}
-
+// ServiceItem is local to Settings (not in context yet)
 interface ServiceItem {
   id: string;
   name: string;
@@ -83,60 +70,6 @@ interface ServiceItem {
   category: string;
 }
 
-interface ExtraService {
-  id: string;
-  name: string;
-  price: number;
-  isActive: boolean;
-}
-
-interface DeliveryZone {
-  id: string;
-  name: string;
-  price: number;
-  isActive: boolean;
-}
-
-interface PaymentMethod {
-  id: string;
-  name: string;
-  isActive: boolean;
-  commission: number;
-}
-
-interface OperationStep {
-  id: string;
-  key: string;
-  name: string;
-  icon: string;
-  color: string;
-  isActive: boolean;
-  isRequired: boolean;
-  order: number;
-}
-
-interface CatalogCategory {
-  id: string;
-  name: string;
-  order: number;
-  isActive: boolean;
-}
-
-// Initial mock data
-const INITIAL_BUSINESS: BusinessSettings = {
-  name: 'Luis Cap',
-  slogan: 'Lavandería Profesional',
-  phone: '+52 55 1234 5678',
-  email: 'contacto@luiscap.com',
-  address: 'Av. Principal #123, Col. Centro',
-  website: 'www.luiscap.com',
-  openTime: '08:00',
-  closeTime: '20:00',
-  workDays: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
-  taxRate: 16,
-  currency: 'MXN',
-};
-
 const INITIAL_SERVICES: ServiceItem[] = [
   { id: '1', name: 'Camisas', pricePerPiece: 3.00, pricePerKg: 8.00, isActive: true, category: 'ropa' },
   { id: '2', name: 'Pantalones', pricePerPiece: 4.00, pricePerKg: 9.00, isActive: true, category: 'ropa' },
@@ -145,51 +78,6 @@ const INITIAL_SERVICES: ServiceItem[] = [
   { id: '5', name: 'Cobijas', pricePerPiece: 15.00, pricePerKg: 10.00, isActive: true, category: 'hogar' },
   { id: '6', name: 'Ropa Mixta', pricePerPiece: 2.50, pricePerKg: 6.00, isActive: true, category: 'general' },
   { id: '7', name: 'Lavado en Seco', pricePerPiece: 12.00, pricePerKg: 20.00, isActive: true, category: 'especial' },
-];
-
-const INITIAL_EXTRAS: ExtraService[] = [
-  { id: '1', name: 'Desmanchado', price: 3.00, isActive: true },
-  { id: '2', name: 'Suavizante Premium', price: 2.00, isActive: true },
-  { id: '3', name: 'Express (24h)', price: 10.00, isActive: true },
-  { id: '4', name: 'Fragancia Especial', price: 1.50, isActive: true },
-  { id: '5', name: 'Planchado Premium', price: 5.00, isActive: true },
-];
-
-const INITIAL_ZONES: DeliveryZone[] = [
-  { id: '1', name: 'Centro', price: 0, isActive: true },
-  { id: '2', name: 'Zona Norte', price: 25, isActive: true },
-  { id: '3', name: 'Zona Sur', price: 30, isActive: true },
-  { id: '4', name: 'Zona Oriente', price: 35, isActive: true },
-  { id: '5', name: 'Zona Poniente', price: 40, isActive: false },
-];
-
-const INITIAL_PAYMENTS: PaymentMethod[] = [
-  { id: '1', name: 'Efectivo', isActive: true, commission: 0 },
-  { id: '2', name: 'Tarjeta de Crédito', isActive: true, commission: 3.5 },
-  { id: '3', name: 'Tarjeta de Débito', isActive: true, commission: 2.5 },
-  { id: '4', name: 'Transferencia', isActive: true, commission: 0 },
-  { id: '5', name: 'PayPal', isActive: false, commission: 4.0 },
-];
-
-const INITIAL_OPERATIONS: OperationStep[] = [
-  { id: '1', key: 'pending_pickup', name: 'Pendiente de Recogida', icon: 'Clock', color: 'bg-amber-500', isActive: true, isRequired: true, order: 0 },
-  { id: '2', key: 'in_store', name: 'En Local', icon: 'Store', color: 'bg-blue-500', isActive: true, isRequired: true, order: 1 },
-  { id: '3', key: 'washing', name: 'Lavando', icon: 'Waves', color: 'bg-cyan-500', isActive: true, isRequired: false, order: 2 },
-  { id: '4', key: 'drying', name: 'Secando', icon: 'Wind', color: 'bg-purple-500', isActive: true, isRequired: false, order: 3 },
-  { id: '5', key: 'ironing', name: 'Planchado', icon: 'Flame', color: 'bg-orange-500', isActive: true, isRequired: false, order: 4 },
-  { id: '6', key: 'ready_delivery', name: 'Listo para Entrega', icon: 'Package', color: 'bg-emerald-500', isActive: true, isRequired: true, order: 5 },
-  { id: '7', key: 'in_transit', name: 'En Camino', icon: 'Truck', color: 'bg-indigo-500', isActive: true, isRequired: false, order: 6 },
-  { id: '8', key: 'delivered', name: 'Entregado', icon: 'CheckCircle', color: 'bg-green-600', isActive: true, isRequired: true, order: 7 },
-];
-
-const INITIAL_CATEGORIES: CatalogCategory[] = [
-  { id: '1', name: 'Lavado', order: 0, isActive: true },
-  { id: '2', name: 'Planchado', order: 1, isActive: true },
-  { id: '3', name: 'Especializado', order: 2, isActive: true },
-  { id: '4', name: 'Ropa Superior', order: 3, isActive: true },
-  { id: '5', name: 'Ropa Inferior', order: 4, isActive: true },
-  { id: '6', name: 'Hogar', order: 5, isActive: true },
-  { id: '7', name: 'Accesorios', order: 6, isActive: true },
 ];
 
 const AVAILABLE_ICONS = [
@@ -220,14 +108,24 @@ const AVAILABLE_COLORS = [
 const WORK_DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 export default function SettingsPage() {
+  // Get shared config from context
+  const {
+    categories,
+    setCategories,
+    operations,
+    setOperations,
+    deliveryZones: zones,
+    setDeliveryZones: setZones,
+    extraServices: extras,
+    setExtraServices: setExtras,
+    paymentMethods: payments,
+    setPaymentMethods: setPayments,
+    business,
+    setBusiness,
+  } = useConfig();
+
   const [activeTab, setActiveTab] = useState('business');
-  const [business, setBusiness] = useState<BusinessSettings>(INITIAL_BUSINESS);
   const [services, setServices] = useState<ServiceItem[]>(INITIAL_SERVICES);
-  const [extras, setExtras] = useState<ExtraService[]>(INITIAL_EXTRAS);
-  const [zones, setZones] = useState<DeliveryZone[]>(INITIAL_ZONES);
-  const [payments, setPayments] = useState<PaymentMethod[]>(INITIAL_PAYMENTS);
-  const [operations, setOperations] = useState<OperationStep[]>(INITIAL_OPERATIONS);
-  const [categories, setCategories] = useState<CatalogCategory[]>(INITIAL_CATEGORIES);
   
   // Notification settings
   const [notifications, setNotifications] = useState({

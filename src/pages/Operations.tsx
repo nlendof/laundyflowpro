@@ -30,20 +30,25 @@ import {
   Timer,
   Play,
   Pause,
+  Truck,
+  Zap,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { useConfig } from '@/contexts/ConfigContext';
 
-// Only operation-relevant statuses
-const OPERATION_STATUSES: OrderStatus[] = ['in_store', 'washing', 'drying', 'ironing', 'ready_delivery'];
-
-const STATUS_ICONS: Record<string, React.ElementType> = {
-  in_store: Store,
-  washing: Waves,
-  drying: Wind,
-  ironing: Flame,
-  ready_delivery: Package,
+// Icon mapping
+const ICON_MAP: Record<string, React.ElementType> = {
+  Clock,
+  Store,
+  Waves,
+  Wind,
+  Flame,
+  Package,
+  Truck,
+  CheckCircle,
+  Zap,
 };
 
 interface OperationOrderCardProps {
@@ -250,6 +255,16 @@ function OrderDetailsDialog({ order, isOpen, onClose, onAdvance }: OrderDetailsD
 }
 
 export default function Operations() {
+  const { activeOperations, getOperationByKey } = useConfig();
+  
+  // Filter operation statuses that are active and between in_store and ready_delivery
+  const operationKeys = useMemo(() => {
+    const relevantKeys = ['in_store', 'washing', 'drying', 'ironing', 'ready_delivery'];
+    return activeOperations
+      .filter(op => relevantKeys.includes(op.key))
+      .map(op => op.key as OrderStatus);
+  }, [activeOperations]);
+  
   const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -257,8 +272,8 @@ export default function Operations() {
 
   // Filter orders for operations (only relevant statuses)
   const operationOrders = useMemo(() => {
-    return orders.filter(order => OPERATION_STATUSES.includes(order.status));
-  }, [orders]);
+    return orders.filter(order => operationKeys.includes(order.status));
+  }, [orders, operationKeys]);
 
   // Group by status
   const ordersByStatus = useMemo(() => {
@@ -359,9 +374,10 @@ export default function Operations() {
       {/* Kanban Board */}
       <div className="flex-1 overflow-x-auto">
         <div className="flex gap-4 min-w-max h-full pb-4">
-          {OPERATION_STATUSES.map((status) => {
+          {operationKeys.map((status) => {
             const config = ORDER_STATUS_CONFIG[status];
-            const Icon = STATUS_ICONS[status];
+            const operation = getOperationByKey(status);
+            const Icon = operation ? (ICON_MAP[operation.icon] || Package) : Package;
             const statusOrders = ordersByStatus[status];
 
             return (
@@ -372,12 +388,12 @@ export default function Operations() {
                 {/* Column Header */}
                 <div className={cn(
                   'p-4 rounded-t-2xl flex items-center justify-between',
-                  config.bgColor
+                  operation?.color || config.bgColor
                 )}>
-                  <div className="flex items-center gap-2">
-                    <Icon className={cn('w-5 h-5', config.color)} />
-                    <span className={cn('font-semibold', config.color)}>
-                      {config.labelEs}
+                  <div className="flex items-center gap-2 text-white">
+                    <Icon className="w-5 h-5" />
+                    <span className="font-semibold">
+                      {operation?.name || config.labelEs}
                     </span>
                   </div>
                   <Badge variant="secondary" className="h-6 min-w-6">
