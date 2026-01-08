@@ -41,6 +41,21 @@ export interface OrderItem {
   extras: string[];
 }
 
+// Delivery Service Types
+export type DeliveryServiceType = 'pickup' | 'delivery';
+export type DeliveryServiceStatus = 'pending' | 'assigned' | 'in_progress' | 'completed';
+
+export interface DeliveryService {
+  type: DeliveryServiceType;
+  status: DeliveryServiceStatus;
+  driverId?: string;
+  scheduledSlot?: 'morning' | 'afternoon';
+  scheduledDate?: Date;
+  completedAt?: Date;
+  address: string;
+  notes?: string;
+}
+
 // Orders
 export interface Order {
   id: string;
@@ -55,9 +70,15 @@ export interface Order {
   totalAmount: number;
   paidAmount: number;
   isPaid: boolean;
+  // Legacy field for backward compatibility
   isDelivery: boolean;
   deliverySlot?: 'morning' | 'afternoon';
   deliveryDriverId?: string;
+  // New delivery service fields
+  needsPickup: boolean;           // Customer wants pickup from home
+  needsDelivery: boolean;         // Customer wants delivery to home
+  pickupService?: DeliveryService;
+  deliveryService?: DeliveryService;
   createdAt: Date;
   updatedAt: Date;
   estimatedReadyAt?: Date;

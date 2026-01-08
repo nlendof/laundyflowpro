@@ -215,6 +215,15 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
       isPaid: false,
       isDelivery,
       deliverySlot: isDelivery ? deliverySlot : undefined,
+      needsPickup: false,
+      needsDelivery: isDelivery,
+      pickupService: undefined,
+      deliveryService: isDelivery ? {
+        type: 'delivery',
+        status: 'pending',
+        scheduledSlot: deliverySlot,
+        address: customerAddress,
+      } : undefined,
       createdAt: new Date(),
       updatedAt: new Date(),
       estimatedReadyAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // +24h
