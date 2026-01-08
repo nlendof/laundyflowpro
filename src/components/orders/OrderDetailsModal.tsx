@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Order, OrderStatus } from '@/types';
 import { ORDER_STATUS_CONFIG, ORDER_STATUS_FLOW } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -12,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { StatusBadge } from '@/components/StatusBadge';
 import { OrderStatusFlow } from '@/components/OrderStatusFlow';
+import { OrderQRCode } from '@/components/orders/OrderQRCode';
 import {
   Phone,
   MapPin,
@@ -43,6 +45,8 @@ export function OrderDetailsModal({
   onClose, 
   onAdvanceStatus 
 }: OrderDetailsModalProps) {
+  const [showQR, setShowQR] = useState(false);
+
   if (!order) return null;
 
   const statusConfig = ORDER_STATUS_CONFIG[order.status];
@@ -60,7 +64,7 @@ export function OrderDetailsModal({
               <span className="font-mono text-xl">{order.ticketCode}</span>
               <StatusBadge status={order.status} />
             </DialogTitle>
-            <Button variant="outline" size="sm" className="gap-2">
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowQR(true)}>
               <QrCode className="w-4 h-4" />
               QR
             </Button>
@@ -237,6 +241,14 @@ export function OrderDetailsModal({
             )}
           </div>
         </div>
+
+        {/* QR Code Modal */}
+        <OrderQRCode
+          ticketCode={order.ticketCode}
+          customerName={order.customerName}
+          isOpen={showQR}
+          onClose={() => setShowQR(false)}
+        />
       </DialogContent>
     </Dialog>
   );

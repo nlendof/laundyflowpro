@@ -1,10 +1,12 @@
 import { useState, useMemo } from 'react';
 import { Order, OrderStatus } from '@/types';
-import { MOCK_ORDERS, getOrderCountsByStatus } from '@/lib/mockData';
+import { MOCK_ORDERS } from '@/lib/mockData';
 import { ORDER_STATUS_FLOW } from '@/lib/constants';
 import { OrderStatusTabs } from '@/components/orders/OrderStatusTabs';
 import { OrderCard } from '@/components/orders/OrderCard';
 import { OrderDetailsModal } from '@/components/orders/OrderDetailsModal';
+import { NewOrderModal } from '@/components/orders/NewOrderModal';
+import { OrderQRCode } from '@/components/orders/OrderQRCode';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -34,6 +36,8 @@ export default function Orders() {
   const [showDeliveryOnly, setShowDeliveryOnly] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
+  const [qrOrder, setQrOrder] = useState<Order | null>(null);
 
   // Calculate counts
   const statusCounts = useMemo(() => {
@@ -126,6 +130,12 @@ export default function Orders() {
     }
   };
 
+  const handleCreateOrder = (newOrder: Order) => {
+    setOrders(prev => [newOrder, ...prev]);
+    setQrOrder(newOrder);
+    toast.success(`Pedido ${newOrder.ticketCode} creado exitosamente`);
+  };
+
   return (
     <div className="p-6 lg:p-8 space-y-6">
       {/* Header */}
@@ -136,7 +146,7 @@ export default function Orders() {
             Gestiona todos los pedidos de la lavandería
           </p>
         </div>
-        <Button className="gap-2 w-full sm:w-auto">
+        <Button className="gap-2 w-full sm:w-auto" onClick={() => setIsNewOrderModalOpen(true)}>
           <Plus className="w-5 h-5" />
           Nuevo Pedido
         </Button>
@@ -229,6 +239,23 @@ export default function Orders() {
         onClose={() => setIsModalOpen(false)}
         onAdvanceStatus={handleAdvanceStatus}
       />
+
+      {/* New Order Modal */}
+      <NewOrderModal
+        isOpen={isNewOrderModalOpen}
+        onClose={() => setIsNewOrderModalOpen(false)}
+        onCreateOrder={handleCreateOrder}
+      />
+
+      {/* QR Code Modal */}
+      {qrOrder && (
+        <OrderQRCode
+          ticketCode={qrOrder.ticketCode}
+          customerName={qrOrder.customerName}
+          isOpen={!!qrOrder}
+          onClose={() => setQrOrder(null)}
+        />
+      )}
     </div>
   );
 }
