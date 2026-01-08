@@ -66,7 +66,7 @@ export function SalaryManagement({ employees }: SalaryManagementProps) {
   const [formData, setFormData] = useState({
     salary_type: 'monthly' as Salary['salary_type'],
     base_salary: '',
-    currency: 'MXN',
+    currency: 'DOP',
     effective_date: format(new Date(), 'yyyy-MM-dd'),
     notes: '',
   });
@@ -132,7 +132,7 @@ export function SalaryManagement({ employees }: SalaryManagementProps) {
       setFormData({
         salary_type: 'monthly',
         base_salary: '',
-        currency: 'MXN',
+        currency: 'DOP',
         effective_date: format(new Date(), 'yyyy-MM-dd'),
         notes: '',
       });
@@ -341,8 +341,8 @@ export function SalaryManagement({ employees }: SalaryManagementProps) {
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="MXN">MXN</SelectItem>
+                <SelectContent>
+                    <SelectItem value="DOP">RD$ (Peso Dominicano)</SelectItem>
                     <SelectItem value="USD">USD</SelectItem>
                   </SelectContent>
                 </Select>
