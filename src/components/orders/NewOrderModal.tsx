@@ -103,6 +103,8 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
   const [deliveryType, setDeliveryType] = useState<DeliveryType>('in_store');
   const [selectedZone, setSelectedZone] = useState<string>('');
   const [deliverySlot, setDeliverySlot] = useState<'morning' | 'afternoon'>('morning');
+  const [pickupCost, setPickupCost] = useState<number>(100);
+  const [deliveryCostValue, setDeliveryCostValue] = useState<number>(100);
   
   // Items
   const [items, setItems] = useState<OrderItemDraft[]>([]);
@@ -134,21 +136,18 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
   }, [selectedExtras, activeExtraServices]);
 
   // Calculate delivery costs
-  const deliveryCost = useMemo(() => {
+  const totalDeliveryCost = useMemo(() => {
     let cost = 0;
-    const zone = activeDeliveryZones.find(z => z.id === selectedZone);
-    const zonePrice = zone?.price || 0;
-    
     if (receptionType === 'pickup') {
-      cost += zonePrice;
+      cost += pickupCost;
     }
     if (deliveryType === 'delivery') {
-      cost += zonePrice;
+      cost += deliveryCostValue;
     }
     return cost;
-  }, [receptionType, deliveryType, selectedZone, activeDeliveryZones]);
+  }, [receptionType, deliveryType, pickupCost, deliveryCostValue]);
 
-  const totalAmount = itemsTotal + extrasTotal + deliveryCost;
+  const totalAmount = itemsTotal + extrasTotal + totalDeliveryCost;
 
   // Generate ticket code
   const generateTicketCode = () => {
@@ -233,6 +232,8 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
     setDeliveryType('in_store');
     setSelectedZone('');
     setDeliverySlot('morning');
+    setPickupCost(100);
+    setDeliveryCostValue(100);
     setItems([]);
     setSelectedExtras([]);
     setItemChecks(Object.fromEntries(ITEM_CHECKS.map(c => [c.id, c.defaultChecked])));
@@ -456,19 +457,58 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
                   <SelectContent>
                     {activeDeliveryZones.map((zone) => (
                       <SelectItem key={zone.id} value={zone.id}>
-                        {zone.name} {zone.price > 0 ? `(+$${zone.price.toFixed(2)})` : '(Sin costo)'}
+                        {zone.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {deliveryCost > 0 && (
-                  <p className="text-sm text-amber-600 flex items-center gap-1">
-                    <Truck className="w-4 h-4" />
-                    Costo de envío: ${deliveryCost.toFixed(2)}
-                    {receptionType === 'pickup' && deliveryType === 'delivery' && ' (recogida + entrega)'}
-                  </p>
+              </div>
+
+              {/* Pickup and Delivery Costs */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                {receptionType === 'pickup' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="pickupCost">Costo de Recogida</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                      <Input
+                        id="pickupCost"
+                        type="number"
+                        min="0"
+                        step="10"
+                        value={pickupCost}
+                        onChange={(e) => setPickupCost(Number(e.target.value) || 0)}
+                        className="pl-8"
+                      />
+                    </div>
+                  </div>
+                )}
+                {deliveryType === 'delivery' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="deliveryCostValue">Costo de Entrega</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                      <Input
+                        id="deliveryCostValue"
+                        type="number"
+                        min="0"
+                        step="10"
+                        value={deliveryCostValue}
+                        onChange={(e) => setDeliveryCostValue(Number(e.target.value) || 0)}
+                        className="pl-8"
+                      />
+                    </div>
+                  </div>
                 )}
               </div>
+
+              {totalDeliveryCost > 0 && (
+                <p className="text-sm text-amber-600 flex items-center gap-1">
+                  <Truck className="w-4 h-4" />
+                  Costo total de servicio: ${totalDeliveryCost.toFixed(2)}
+                  {receptionType === 'pickup' && deliveryType === 'delivery' && ' (recogida + entrega)'}
+                </p>
+              )}
 
               <div className="space-y-2">
                 <Label>Franja Horaria</Label>
@@ -710,10 +750,10 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
                   <p className="font-medium">+${extrasTotal.toFixed(2)}</p>
                 </div>
               )}
-              {deliveryCost > 0 && (
+              {totalDeliveryCost > 0 && (
                 <div>
                   <p className="text-sm text-muted-foreground">Envío</p>
-                  <p className="font-medium">+${deliveryCost.toFixed(2)}</p>
+                  <p className="font-medium">+${totalDeliveryCost.toFixed(2)}</p>
                 </div>
               )}
               <div className="text-right">
