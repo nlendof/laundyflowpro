@@ -2,25 +2,176 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./hooks/useAuth";
+import { AppLayout } from "./components/layout/AppLayout";
 import Index from "./pages/Index";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+// Protected Route wrapper
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return <>{children}</>;
+}
+
+// Public Route wrapper (redirects to dashboard if already logged in)
+function PublicRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  return <>{children}</>;
+}
+
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<Index />} />
+      <Route
+        path="/login"
+        element={
+          <PublicRoute>
+            <Login />
+          </PublicRoute>
+        }
+      />
+      <Route element={<AppLayout />}>
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        {/* Placeholder routes for other modules */}
+        <Route
+          path="/pos"
+          element={
+            <ProtectedRoute>
+              <div className="p-8">
+                <h1 className="text-2xl font-bold">Venta Rápida</h1>
+                <p className="text-muted-foreground">Módulo en desarrollo...</p>
+              </div>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/orders"
+          element={
+            <ProtectedRoute>
+              <div className="p-8">
+                <h1 className="text-2xl font-bold">Pedidos</h1>
+                <p className="text-muted-foreground">Módulo en desarrollo...</p>
+              </div>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/operations"
+          element={
+            <ProtectedRoute>
+              <div className="p-8">
+                <h1 className="text-2xl font-bold">Operaciones</h1>
+                <p className="text-muted-foreground">Módulo en desarrollo...</p>
+              </div>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/deliveries"
+          element={
+            <ProtectedRoute>
+              <div className="p-8">
+                <h1 className="text-2xl font-bold">Entregas</h1>
+                <p className="text-muted-foreground">Módulo en desarrollo...</p>
+              </div>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cash-register"
+          element={
+            <ProtectedRoute>
+              <div className="p-8">
+                <h1 className="text-2xl font-bold">Caja</h1>
+                <p className="text-muted-foreground">Módulo en desarrollo...</p>
+              </div>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventory"
+          element={
+            <ProtectedRoute>
+              <div className="p-8">
+                <h1 className="text-2xl font-bold">Inventario</h1>
+                <p className="text-muted-foreground">Módulo en desarrollo...</p>
+              </div>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute>
+              <div className="p-8">
+                <h1 className="text-2xl font-bold">Reportes</h1>
+                <p className="text-muted-foreground">Módulo en desarrollo...</p>
+              </div>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employees"
+          element={
+            <ProtectedRoute>
+              <div className="p-8">
+                <h1 className="text-2xl font-bold">Empleados</h1>
+                <p className="text-muted-foreground">Módulo en desarrollo...</p>
+              </div>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <div className="p-8">
+                <h1 className="text-2xl font-bold">Configuración</h1>
+                <p className="text-muted-foreground">Módulo en desarrollo...</p>
+              </div>
+            </ProtectedRoute>
+          }
+        />
+      </Route>
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </TooltipProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 
