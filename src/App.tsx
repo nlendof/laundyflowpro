@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
+import QuickSale from "./pages/QuickSale";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -56,15 +57,11 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
-        {/* Placeholder routes for other modules */}
         <Route
           path="/pos"
           element={
             <ProtectedRoute>
-              <div className="p-8">
-                <h1 className="text-2xl font-bold">Venta Rápida</h1>
-                <p className="text-muted-foreground">Módulo en desarrollo...</p>
-              </div>
+              <QuickSale />
             </ProtectedRoute>
           }
         />
