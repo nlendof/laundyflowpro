@@ -260,23 +260,86 @@ export function useOrders() {
     fetchOrders();
   }, [fetchOrders]);
 
+  // Handle real-time order updates efficiently
+  const handleRealtimeUpdate = useCallback(async (payload: {
+    eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+    new: DbOrder | null;
+    old: { id: string } | null;
+  }) => {
+    const { eventType, new: newRecord, old: oldRecord } = payload;
+
+    if (eventType === 'DELETE' && oldRecord) {
+      setOrders(prev => prev.filter(order => order.id !== oldRecord.id));
+      return;
+    }
+
+    if (!newRecord) return;
+
+    // Fetch items for this order
+    const { data: itemsData } = await supabase
+      .from('order_items')
+      .select('*')
+      .eq('order_id', newRecord.id);
+
+    const mappedOrder = mapDbOrderToOrder(newRecord, itemsData || []);
+
+    if (eventType === 'INSERT') {
+      setOrders(prev => [mappedOrder, ...prev]);
+    } else if (eventType === 'UPDATE') {
+      setOrders(prev => prev.map(order => 
+        order.id === newRecord.id ? mappedOrder : order
+      ));
+    }
+  }, []);
+
   // Set up real-time subscription
   useEffect(() => {
     const channel = supabase
-      .channel('orders-changes')
+      .channel('orders-realtime')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders' },
-        () => {
-          fetchOrders();
+        { event: 'INSERT', schema: 'public', table: 'orders' },
+        (payload) => {
+          console.log('Realtime INSERT:', payload);
+          handleRealtimeUpdate({
+            eventType: 'INSERT',
+            new: payload.new as DbOrder,
+            old: null,
+          });
         }
       )
-      .subscribe();
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders' },
+        (payload) => {
+          console.log('Realtime UPDATE:', payload);
+          handleRealtimeUpdate({
+            eventType: 'UPDATE',
+            new: payload.new as DbOrder,
+            old: payload.old as { id: string },
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'orders' },
+        (payload) => {
+          console.log('Realtime DELETE:', payload);
+          handleRealtimeUpdate({
+            eventType: 'DELETE',
+            new: null,
+            old: payload.old as { id: string },
+          });
+        }
+      )
+      .subscribe((status) => {
+        console.log('Realtime subscription status:', status);
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchOrders]);
+  }, [handleRealtimeUpdate]);
 
   return {
     orders,
