@@ -33,6 +33,7 @@ import {
   Scale,
   Hash,
   Layers,
+  Search,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -83,8 +84,11 @@ export default function QuickSale() {
   const { activeServices, activeArticles } = useCatalog();
   const { activeExtraServices, activePaymentMethods } = useConfig();
   
-  // Tab selection
-  const [activeTab, setActiveTab] = useState<SaleTab>('services');
+  // Tab selection - default to articles
+  const [activeTab, setActiveTab] = useState<SaleTab>('articles');
+  
+  // Search
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Customer info
   const [customerName, setCustomerName] = useState('');
@@ -230,8 +234,19 @@ export default function QuickSale() {
     setCompletedOrder(null);
   };
 
-  // Get items for current tab
-  const currentItems = activeTab === 'services' ? activeServices : activeArticles;
+  // Get items for current tab with search filter
+  const currentItems = useMemo(() => {
+    const items = activeTab === 'services' ? activeServices : activeArticles;
+    if (!searchQuery.trim()) return items;
+    
+    const query = searchQuery.toLowerCase();
+    return items.filter(item => 
+      item.name.toLowerCase().includes(query) ||
+      item.category.toLowerCase().includes(query) ||
+      item.description?.toLowerCase().includes(query)
+    );
+  }, [activeTab, activeServices, activeArticles, searchQuery]);
+  
   const currentColors = activeTab === 'services' ? SERVICE_COLORS : ARTICLE_COLORS;
 
   return (
@@ -239,24 +254,37 @@ export default function QuickSale() {
       {/* Left Panel - Services/Articles */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <div className="mb-4">
-          <h1 className="text-2xl lg:text-3xl font-bold flex items-center gap-3">
-            <ShoppingCart className="w-8 h-8 text-primary" />
-            Venta Rápida
-          </h1>
-          <p className="text-muted-foreground">Selecciona servicios o artículos para crear un pedido</p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <div>
+            <h1 className="text-2xl lg:text-3xl font-bold flex items-center gap-3">
+              <ShoppingCart className="w-8 h-8 text-primary" />
+              Venta Rápida
+            </h1>
+            <p className="text-muted-foreground">Selecciona servicios o artículos para crear un pedido</p>
+          </div>
+          
+          {/* Search */}
+          <div className="relative w-full md:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
         </div>
 
         {/* Tab Selection */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as SaleTab)} className="mb-4">
           <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="services" className="gap-2">
-              <Sparkles className="w-4 h-4" />
-              Servicios ({activeServices.length})
-            </TabsTrigger>
             <TabsTrigger value="articles" className="gap-2">
               <Shirt className="w-4 h-4" />
               Artículos ({activeArticles.length})
+            </TabsTrigger>
+            <TabsTrigger value="services" className="gap-2">
+              <Sparkles className="w-4 h-4" />
+              Servicios ({activeServices.length})
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -266,8 +294,17 @@ export default function QuickSale() {
           {currentItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-center text-muted-foreground">
               <Layers className="w-12 h-12 mb-2 opacity-30" />
-              <p>No hay {activeTab === 'services' ? 'servicios' : 'artículos'} activos</p>
-              <p className="text-sm">Agrega desde el módulo de Catálogo</p>
+              {searchQuery ? (
+                <>
+                  <p>No se encontraron resultados para "{searchQuery}"</p>
+                  <p className="text-sm">Intenta con otro término de búsqueda</p>
+                </>
+              ) : (
+                <>
+                  <p>No hay {activeTab === 'services' ? 'servicios' : 'artículos'} activos</p>
+                  <p className="text-sm">Agrega desde el módulo de Catálogo</p>
+                </>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
