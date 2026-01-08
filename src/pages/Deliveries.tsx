@@ -29,22 +29,20 @@ import {
   CheckCircle,
   Navigation,
   User,
-  Calendar,
   ArrowRight,
   Play,
-  Ban,
   DollarSign,
-  Sunrise,
-  Sunset,
-  Route,
-  PackageCheck,
+  PackageOpen,
+  Home,
   AlertCircle,
+  ArrowDownToLine,
+  ArrowUpFromLine,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { MOCK_ORDERS } from '@/lib/mockData';
-import { Order } from '@/types';
-import { format, formatDistanceToNow } from 'date-fns';
+import { Order, DeliveryServiceStatus } from '@/types';
+import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 // Mock drivers data
@@ -92,127 +90,242 @@ const MOCK_DRIVERS = [
 ];
 
 type Driver = typeof MOCK_DRIVERS[0];
-type DeliveryFilter = 'all' | 'pending_pickup' | 'ready_delivery' | 'in_transit' | 'delivered';
+type ServiceTab = 'pickups' | 'deliveries' | 'all';
+
+interface DeliveryTask {
+  order: Order;
+  type: 'pickup' | 'delivery';
+  status: DeliveryServiceStatus;
+  address: string;
+  slot?: 'morning' | 'afternoon';
+  driverId?: string;
+  notes?: string;
+}
 
 export default function Deliveries() {
   const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS);
   const [drivers] = useState<Driver[]>(MOCK_DRIVERS);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<DeliveryFilter>('all');
+  const [activeTab, setActiveTab] = useState<ServiceTab>('all');
   const [selectedSlot, setSelectedSlot] = useState<'all' | 'morning' | 'afternoon'>('all');
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | DeliveryServiceStatus>('all');
+  const [selectedTask, setSelectedTask] = useState<DeliveryTask | null>(null);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
-  const [orderToAssign, setOrderToAssign] = useState<Order | null>(null);
+  const [taskToAssign, setTaskToAssign] = useState<DeliveryTask | null>(null);
 
-  // Filter only delivery orders
-  const deliveryOrders = useMemo(() => {
-    return orders.filter(order => {
-      // Only delivery orders
-      if (!order.isDelivery) return false;
+  // Build delivery tasks from orders
+  const deliveryTasks = useMemo((): DeliveryTask[] => {
+    const tasks: DeliveryTask[] = [];
+    
+    orders.forEach(order => {
+      // Add pickup task if order needs pickup
+      if (order.needsPickup && order.pickupService) {
+        tasks.push({
+          order,
+          type: 'pickup',
+          status: order.pickupService.status,
+          address: order.pickupService.address || order.customerAddress || '',
+          slot: order.pickupService.scheduledSlot,
+          driverId: order.pickupService.driverId,
+          notes: order.pickupService.notes,
+        });
+      }
+      
+      // Add delivery task if order needs delivery
+      if (order.needsDelivery && order.deliveryService) {
+        // Only show delivery task when order is ready or later
+        const readyStatuses = ['ready_delivery', 'in_transit', 'delivered'];
+        if (readyStatuses.includes(order.status) || order.deliveryService.status !== 'pending') {
+          tasks.push({
+            order,
+            type: 'delivery',
+            status: order.deliveryService.status,
+            address: order.deliveryService.address || order.customerAddress || '',
+            slot: order.deliveryService.scheduledSlot,
+            driverId: order.deliveryService.driverId,
+            notes: order.deliveryService.notes,
+          });
+        }
+      }
+    });
+    
+    return tasks;
+  }, [orders]);
+
+  // Filter tasks
+  const filteredTasks = useMemo(() => {
+    return deliveryTasks.filter(task => {
+      // Tab filter
+      if (activeTab === 'pickups' && task.type !== 'pickup') return false;
+      if (activeTab === 'deliveries' && task.type !== 'delivery') return false;
       
       // Status filter
-      const deliveryStatuses = ['pending_pickup', 'ready_delivery', 'in_transit', 'delivered'];
-      if (activeTab !== 'all' && order.status !== activeTab) return false;
-      if (activeTab === 'all' && !deliveryStatuses.includes(order.status)) return false;
+      if (statusFilter !== 'all' && task.status !== statusFilter) return false;
       
       // Slot filter
-      if (selectedSlot !== 'all' && order.deliverySlot !== selectedSlot) return false;
+      if (selectedSlot !== 'all' && task.slot !== selectedSlot) return false;
       
       // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         return (
-          order.ticketCode.toLowerCase().includes(query) ||
-          order.customerName.toLowerCase().includes(query) ||
-          order.customerPhone.includes(query) ||
-          order.customerAddress?.toLowerCase().includes(query)
+          task.order.ticketCode.toLowerCase().includes(query) ||
+          task.order.customerName.toLowerCase().includes(query) ||
+          task.order.customerPhone.includes(query) ||
+          task.address.toLowerCase().includes(query)
         );
       }
       
       return true;
     });
-  }, [orders, activeTab, selectedSlot, searchQuery]);
+  }, [deliveryTasks, activeTab, statusFilter, selectedSlot, searchQuery]);
 
   // Stats
   const stats = useMemo(() => {
-    const deliveryOnly = orders.filter(o => o.isDelivery);
+    const pickupTasks = deliveryTasks.filter(t => t.type === 'pickup');
+    const deliveryTasksOnly = deliveryTasks.filter(t => t.type === 'delivery');
+    
     return {
-      pendingPickup: deliveryOnly.filter(o => o.status === 'pending_pickup').length,
-      readyDelivery: deliveryOnly.filter(o => o.status === 'ready_delivery').length,
-      inTransit: deliveryOnly.filter(o => o.status === 'in_transit').length,
-      deliveredToday: deliveryOnly.filter(o => 
-        o.status === 'delivered' && 
-        o.deliveredAt && 
-        new Date(o.deliveredAt).toDateString() === new Date().toDateString()
-      ).length,
+      pendingPickups: pickupTasks.filter(t => t.status === 'pending').length,
+      inProgressPickups: pickupTasks.filter(t => t.status === 'in_progress' || t.status === 'assigned').length,
+      completedPickups: pickupTasks.filter(t => t.status === 'completed').length,
+      pendingDeliveries: deliveryTasksOnly.filter(t => t.status === 'pending').length,
+      inProgressDeliveries: deliveryTasksOnly.filter(t => t.status === 'in_progress' || t.status === 'assigned').length,
+      completedDeliveries: deliveryTasksOnly.filter(t => t.status === 'completed').length,
       availableDrivers: drivers.filter(d => d.status === 'available').length,
     };
-  }, [orders, drivers]);
+  }, [deliveryTasks, drivers]);
 
-  const handleAssignDriver = (order: Order) => {
-    setOrderToAssign(order);
+  const handleAssignDriver = (task: DeliveryTask) => {
+    setTaskToAssign(task);
     setShowAssignDialog(true);
   };
 
   const confirmAssignDriver = (driverId: string) => {
-    if (!orderToAssign) return;
+    if (!taskToAssign) return;
     
     const driver = drivers.find(d => d.id === driverId);
+    
     setOrders(prev => prev.map(o => {
-      if (o.id === orderToAssign.id) {
-        return {
-          ...o,
-          deliveryDriverId: driverId,
-          status: 'in_transit' as const,
-          updatedAt: new Date(),
-        };
+      if (o.id === taskToAssign.order.id) {
+        if (taskToAssign.type === 'pickup' && o.pickupService) {
+          return {
+            ...o,
+            pickupService: {
+              ...o.pickupService,
+              status: 'assigned' as const,
+              driverId,
+            },
+            updatedAt: new Date(),
+          };
+        } else if (taskToAssign.type === 'delivery' && o.deliveryService) {
+          return {
+            ...o,
+            deliveryService: {
+              ...o.deliveryService,
+              status: 'assigned' as const,
+              driverId,
+            },
+            deliveryDriverId: driverId,
+            updatedAt: new Date(),
+          };
+        }
       }
       return o;
     }));
     
-    toast.success(`Pedido asignado a ${driver?.name}`);
+    toast.success(`${taskToAssign.type === 'pickup' ? 'Recogida' : 'Entrega'} asignada a ${driver?.name}`);
     setShowAssignDialog(false);
-    setOrderToAssign(null);
+    setTaskToAssign(null);
   };
 
-  const handleStartPickup = (order: Order) => {
+  const handleStartTask = (task: DeliveryTask) => {
     setOrders(prev => prev.map(o => {
-      if (o.id === order.id) {
-        return {
-          ...o,
-          status: 'in_store' as const,
-          updatedAt: new Date(),
-        };
+      if (o.id === task.order.id) {
+        if (task.type === 'pickup' && o.pickupService) {
+          return {
+            ...o,
+            pickupService: {
+              ...o.pickupService,
+              status: 'in_progress' as const,
+            },
+            updatedAt: new Date(),
+          };
+        } else if (task.type === 'delivery' && o.deliveryService) {
+          return {
+            ...o,
+            status: 'in_transit' as const,
+            deliveryService: {
+              ...o.deliveryService,
+              status: 'in_progress' as const,
+            },
+            updatedAt: new Date(),
+          };
+        }
       }
       return o;
     }));
-    toast.success('Recogida iniciada');
+    toast.success(`${task.type === 'pickup' ? 'Recogida' : 'Entrega'} iniciada`);
   };
 
-  const handleMarkDelivered = (order: Order) => {
+  const handleCompleteTask = (task: DeliveryTask) => {
     setOrders(prev => prev.map(o => {
-      if (o.id === order.id) {
-        return {
-          ...o,
-          status: 'delivered' as const,
-          deliveredAt: new Date(),
-          updatedAt: new Date(),
-        };
+      if (o.id === task.order.id) {
+        if (task.type === 'pickup' && o.pickupService) {
+          return {
+            ...o,
+            status: 'in_store' as const,
+            pickupService: {
+              ...o.pickupService,
+              status: 'completed' as const,
+              completedAt: new Date(),
+            },
+            updatedAt: new Date(),
+          };
+        } else if (task.type === 'delivery' && o.deliveryService) {
+          return {
+            ...o,
+            status: 'delivered' as const,
+            deliveryService: {
+              ...o.deliveryService,
+              status: 'completed' as const,
+              completedAt: new Date(),
+            },
+            deliveredAt: new Date(),
+            updatedAt: new Date(),
+          };
+        }
       }
       return o;
     }));
-    toast.success('¡Entrega completada!');
-    setSelectedOrder(null);
+    toast.success(`¡${task.type === 'pickup' ? 'Recogida' : 'Entrega'} completada!`);
+    setSelectedTask(null);
   };
 
-  const getStatusConfig = (status: string) => {
-    const configs: Record<string, { label: string; color: string; icon: typeof Truck }> = {
-      pending_pickup: { label: 'Pendiente Recogida', color: 'bg-amber-500', icon: Clock },
-      ready_delivery: { label: 'Listo para Entregar', color: 'bg-emerald-500', icon: Package },
-      in_transit: { label: 'En Camino', color: 'bg-blue-500', icon: Truck },
-      delivered: { label: 'Entregado', color: 'bg-green-600', icon: CheckCircle },
+  const getStatusConfig = (status: DeliveryServiceStatus, type: 'pickup' | 'delivery') => {
+    const configs: Record<DeliveryServiceStatus, { label: string; color: string; icon: typeof Truck }> = {
+      pending: { 
+        label: 'Pendiente', 
+        color: 'bg-amber-500', 
+        icon: Clock 
+      },
+      assigned: { 
+        label: 'Asignado', 
+        color: 'bg-blue-500', 
+        icon: User 
+      },
+      in_progress: { 
+        label: type === 'pickup' ? 'Recogiendo' : 'En Camino', 
+        color: 'bg-purple-500', 
+        icon: type === 'pickup' ? ArrowDownToLine : Truck 
+      },
+      completed: { 
+        label: 'Completado', 
+        color: 'bg-green-600', 
+        icon: CheckCircle 
+      },
     };
-    return configs[status] || configs.pending_pickup;
+    return configs[status];
   };
 
   const getDriverById = (driverId?: string) => {
@@ -226,16 +339,16 @@ export default function Deliveries() {
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold flex items-center gap-3">
             <Truck className="w-8 h-8 text-primary" />
-            Entregas
+            Entregas y Recogidas
           </h1>
-          <p className="text-muted-foreground">Gestiona recogidas y entregas a domicilio</p>
+          <p className="text-muted-foreground">Gestiona servicios a domicilio</p>
         </div>
         
         <div className="flex items-center gap-3">
           <div className="relative w-full md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar pedido..."
+              placeholder="Buscar..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -243,7 +356,7 @@ export default function Deliveries() {
           </div>
           
           <Select value={selectedSlot} onValueChange={(v) => setSelectedSlot(v as any)}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[130px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -252,76 +365,103 @@ export default function Deliveries() {
               <SelectItem value="afternoon">🌆 Tarde</SelectItem>
             </SelectContent>
           </Select>
+
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+            <SelectTrigger className="w-[130px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="pending">Pendientes</SelectItem>
+              <SelectItem value="assigned">Asignados</SelectItem>
+              <SelectItem value="in_progress">En Curso</SelectItem>
+              <SelectItem value="completed">Completados</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-        <Card className="bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {/* Pickup Stats */}
+        <Card className="bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 border-orange-200 dark:border-orange-800">
           <CardContent className="pt-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-500 rounded-lg text-white">
-                <Clock className="w-5 h-5" />
+              <div className="p-2 bg-gradient-to-br from-orange-500 to-amber-500 rounded-lg text-white">
+                <ArrowDownToLine className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{stats.pendingPickup}</p>
-                <p className="text-xs text-amber-600 dark:text-amber-500">Por Recoger</p>
+                <p className="text-2xl font-bold text-orange-700 dark:text-orange-400">
+                  {stats.pendingPickups + stats.inProgressPickups}
+                </p>
+                <p className="text-xs text-orange-600 dark:text-orange-500">Recogidas Activas</p>
               </div>
+            </div>
+            <div className="flex gap-2 mt-2">
+              <Badge variant="secondary" className="text-xs">
+                {stats.pendingPickups} pendientes
+              </Badge>
+              <Badge variant="secondary" className="text-xs">
+                {stats.completedPickups} hoy
+              </Badge>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800">
+        {/* Delivery Stats */}
+        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
           <CardContent className="pt-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-500 rounded-lg text-white">
-                <Package className="w-5 h-5" />
+              <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg text-white">
+                <ArrowUpFromLine className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.readyDelivery}</p>
-                <p className="text-xs text-emerald-600 dark:text-emerald-500">Por Entregar</p>
+                <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">
+                  {stats.pendingDeliveries + stats.inProgressDeliveries}
+                </p>
+                <p className="text-xs text-blue-600 dark:text-blue-500">Entregas Activas</p>
               </div>
+            </div>
+            <div className="flex gap-2 mt-2">
+              <Badge variant="secondary" className="text-xs">
+                {stats.pendingDeliveries} pendientes
+              </Badge>
+              <Badge variant="secondary" className="text-xs">
+                {stats.completedDeliveries} hoy
+              </Badge>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+        {/* In Progress */}
+        <Card className="bg-gradient-to-br from-purple-50 to-fuchsia-50 dark:from-purple-950/30 dark:to-fuchsia-950/30 border-purple-200 dark:border-purple-800">
           <CardContent className="pt-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500 rounded-lg text-white">
+              <div className="p-2 bg-gradient-to-br from-purple-500 to-fuchsia-500 rounded-lg text-white">
                 <Truck className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">{stats.inTransit}</p>
-                <p className="text-xs text-blue-600 dark:text-blue-500">En Camino</p>
+                <p className="text-2xl font-bold text-purple-700 dark:text-purple-400">
+                  {stats.inProgressPickups + stats.inProgressDeliveries}
+                </p>
+                <p className="text-xs text-purple-600 dark:text-purple-500">En Ruta</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
+        {/* Drivers */}
+        <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800">
           <CardContent className="pt-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-600 rounded-lg text-white">
-                <CheckCircle className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-green-700 dark:text-green-400">{stats.deliveredToday}</p>
-                <p className="text-xs text-green-600 dark:text-green-500">Entregados Hoy</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800">
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-500 rounded-lg text-white">
+              <div className="p-2 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg text-white">
                 <User className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-purple-700 dark:text-purple-400">{stats.availableDrivers}</p>
-                <p className="text-xs text-purple-600 dark:text-purple-500">Repartidores</p>
+                <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
+                  {stats.availableDrivers}/{drivers.length}
+                </p>
+                <p className="text-xs text-emerald-600 dark:text-emerald-500">Disponibles</p>
               </div>
             </div>
           </CardContent>
@@ -329,78 +469,101 @@ export default function Deliveries() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Orders List */}
+        {/* Tasks List */}
         <div className="lg:col-span-2">
           <Card>
             <CardHeader className="pb-3">
-              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DeliveryFilter)}>
-                <TabsList className="grid grid-cols-5 w-full">
-                  <TabsTrigger value="all" className="text-xs">Todos</TabsTrigger>
-                  <TabsTrigger value="pending_pickup" className="text-xs">Recogida</TabsTrigger>
-                  <TabsTrigger value="ready_delivery" className="text-xs">Listos</TabsTrigger>
-                  <TabsTrigger value="in_transit" className="text-xs">En Camino</TabsTrigger>
-                  <TabsTrigger value="delivered" className="text-xs">Entregados</TabsTrigger>
+              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ServiceTab)}>
+                <TabsList className="grid grid-cols-3 w-full">
+                  <TabsTrigger value="all" className="gap-2">
+                    <Package className="w-4 h-4" />
+                    Todos
+                  </TabsTrigger>
+                  <TabsTrigger value="pickups" className="gap-2">
+                    <ArrowDownToLine className="w-4 h-4" />
+                    Recogidas
+                  </TabsTrigger>
+                  <TabsTrigger value="deliveries" className="gap-2">
+                    <ArrowUpFromLine className="w-4 h-4" />
+                    Entregas
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
             </CardHeader>
             <CardContent>
-              {deliveryOrders.length === 0 ? (
+              {filteredTasks.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
-                  <Truck className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                  <p>No hay entregas en esta categoría</p>
+                  <Package className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                  <p>No hay tareas en esta categoría</p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {deliveryOrders.map((order) => {
-                    const statusConfig = getStatusConfig(order.status);
+                  {filteredTasks.map((task, index) => {
+                    const statusConfig = getStatusConfig(task.status, task.type);
                     const StatusIcon = statusConfig.icon;
-                    const driver = getDriverById(order.deliveryDriverId);
+                    const driver = getDriverById(task.driverId);
+                    const isPickup = task.type === 'pickup';
                     
                     return (
                       <div
-                        key={order.id}
+                        key={`${task.order.id}-${task.type}-${index}`}
                         className={cn(
                           'p-4 rounded-xl border transition-all cursor-pointer hover:border-primary/50',
-                          selectedOrder?.id === order.id && 'border-primary bg-primary/5'
+                          selectedTask?.order.id === task.order.id && selectedTask?.type === task.type && 'border-primary bg-primary/5'
                         )}
-                        onClick={() => setSelectedOrder(order)}
+                        onClick={() => setSelectedTask(task)}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-start gap-3">
-                            <div className={cn('p-2 rounded-lg text-white', statusConfig.color)}>
-                              <StatusIcon className="w-5 h-5" />
+                            <div className={cn(
+                              'p-2 rounded-lg text-white',
+                              isPickup ? 'bg-gradient-to-br from-orange-500 to-amber-500' : 'bg-gradient-to-br from-blue-500 to-indigo-500'
+                            )}>
+                              {isPickup ? <ArrowDownToLine className="w-5 h-5" /> : <ArrowUpFromLine className="w-5 h-5" />}
                             </div>
                             <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono font-bold">{order.ticketCode}</span>
-                                <Badge variant="outline" className="text-xs">
-                                  {order.deliverySlot === 'morning' ? '🌅 Mañana' : '🌆 Tarde'}
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge variant="outline" className={cn(
+                                  'text-xs',
+                                  isPickup ? 'border-orange-300 text-orange-700 dark:text-orange-400' : 'border-blue-300 text-blue-700 dark:text-blue-400'
+                                )}>
+                                  {isPickup ? '📦 Recogida' : '🚚 Entrega'}
                                 </Badge>
+                                <span className="font-mono font-bold text-sm">{task.order.ticketCode}</span>
+                                {task.slot && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    {task.slot === 'morning' ? '🌅 Mañana' : '🌆 Tarde'}
+                                  </Badge>
+                                )}
                               </div>
-                              <p className="font-medium mt-1">{order.customerName}</p>
-                              {order.customerAddress && (
-                                <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                                  <MapPin className="w-3 h-3" />
-                                  {order.customerAddress}
-                                </p>
-                              )}
+                              <p className="font-medium mt-1">{task.order.customerName}</p>
+                              <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                                <MapPin className="w-3 h-3" />
+                                {task.address}
+                              </p>
                               {driver && (
                                 <p className="text-sm text-primary flex items-center gap-1 mt-1">
                                   <User className="w-3 h-3" />
                                   {driver.avatar} {driver.name}
                                 </p>
                               )}
+                              {task.notes && (
+                                <p className="text-xs text-muted-foreground mt-1 italic">
+                                  📝 {task.notes}
+                                </p>
+                              )}
                             </div>
                           </div>
                           
-                          <div className="text-right">
+                          <div className="text-right shrink-0">
                             <Badge className={cn('text-white', statusConfig.color)}>
+                              <StatusIcon className="w-3 h-3 mr-1" />
                               {statusConfig.label}
                             </Badge>
-                            {!order.isPaid && (
+                            {!task.order.isPaid && task.type === 'delivery' && (
                               <Badge variant="destructive" className="mt-2 flex items-center gap-1">
                                 <DollarSign className="w-3 h-3" />
-                                Pendiente
+                                Cobrar
                               </Badge>
                             )}
                           </div>
@@ -409,39 +572,40 @@ export default function Deliveries() {
                         {/* Quick Actions */}
                         <div className="flex items-center justify-between mt-3 pt-3 border-t">
                           <span className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(order.updatedAt, { locale: es, addSuffix: true })}
+                            {formatDistanceToNow(task.order.updatedAt, { locale: es, addSuffix: true })}
                           </span>
                           
                           <div className="flex gap-2">
-                            {order.status === 'pending_pickup' && (
+                            {task.status === 'pending' && (
                               <Button 
                                 size="sm" 
-                                onClick={(e) => { e.stopPropagation(); handleStartPickup(order); }}
+                                variant="outline"
+                                onClick={(e) => { e.stopPropagation(); handleAssignDriver(task); }}
+                                className="gap-1"
+                              >
+                                <User className="w-3 h-3" />
+                                Asignar
+                              </Button>
+                            )}
+                            {task.status === 'assigned' && (
+                              <Button 
+                                size="sm" 
+                                onClick={(e) => { e.stopPropagation(); handleStartTask(task); }}
                                 className="gap-1"
                               >
                                 <Play className="w-3 h-3" />
-                                Iniciar Recogida
+                                Iniciar
                               </Button>
                             )}
-                            {order.status === 'ready_delivery' && (
-                              <Button 
-                                size="sm" 
-                                onClick={(e) => { e.stopPropagation(); handleAssignDriver(order); }}
-                                className="gap-1"
-                              >
-                                <Truck className="w-3 h-3" />
-                                Asignar Repartidor
-                              </Button>
-                            )}
-                            {order.status === 'in_transit' && (
+                            {task.status === 'in_progress' && (
                               <Button 
                                 size="sm" 
                                 variant="default"
-                                onClick={(e) => { e.stopPropagation(); handleMarkDelivered(order); }}
+                                onClick={(e) => { e.stopPropagation(); handleCompleteTask(task); }}
                                 className="gap-1 bg-green-600 hover:bg-green-700"
                               >
                                 <CheckCircle className="w-3 h-3" />
-                                Marcar Entregado
+                                Completar
                               </Button>
                             )}
                           </div>
@@ -455,7 +619,7 @@ export default function Deliveries() {
           </Card>
         </div>
 
-        {/* Drivers Panel */}
+        {/* Side Panel */}
         <div className="space-y-6">
           {/* Drivers List */}
           <Card>
@@ -464,7 +628,7 @@ export default function Deliveries() {
                 <User className="w-5 h-5" />
                 Repartidores
               </CardTitle>
-              <CardDescription>Estado actual de los repartidores</CardDescription>
+              <CardDescription>Estado actual</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {drivers.map((driver) => (
@@ -492,13 +656,13 @@ export default function Deliveries() {
                       variant={driver.status === 'available' ? 'default' : 'secondary'}
                       className={driver.status === 'available' ? 'bg-green-600' : 'bg-blue-500 text-white'}
                     >
-                      {driver.status === 'available' ? 'Disponible' : 'En ruta'}
+                      {driver.status === 'available' ? 'Libre' : 'En ruta'}
                     </Badge>
                   </div>
                   
                   <div className="flex items-center gap-4 mt-2 pt-2 border-t border-dashed">
                     <span className="text-xs text-muted-foreground">
-                      🚚 {driver.currentOrders} activos
+                      📦 {driver.currentOrders} activos
                     </span>
                     <span className="text-xs text-muted-foreground">
                       ✅ {driver.completedToday} hoy
@@ -509,74 +673,91 @@ export default function Deliveries() {
             </CardContent>
           </Card>
 
-          {/* Order Details */}
-          {selectedOrder && (
+          {/* Task Details */}
+          {selectedTask && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  <Package className="w-5 h-5" />
-                  Detalle del Pedido
+                  {selectedTask.type === 'pickup' ? (
+                    <ArrowDownToLine className="w-5 h-5 text-orange-500" />
+                  ) : (
+                    <ArrowUpFromLine className="w-5 h-5 text-blue-500" />
+                  )}
+                  {selectedTask.type === 'pickup' ? 'Recogida' : 'Entrega'}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Ticket</p>
-                  <p className="font-mono font-bold text-lg">{selectedOrder.ticketCode}</p>
+                  <p className="font-mono font-bold text-lg">{selectedTask.order.ticketCode}</p>
                 </div>
                 
                 <Separator />
                 
                 <div>
                   <p className="text-sm text-muted-foreground">Cliente</p>
-                  <p className="font-medium">{selectedOrder.customerName}</p>
+                  <p className="font-medium">{selectedTask.order.customerName}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <Phone className="w-3 h-3 text-muted-foreground" />
                     <a 
-                      href={`tel:${selectedOrder.customerPhone}`} 
+                      href={`tel:${selectedTask.order.customerPhone}`} 
                       className="text-sm text-primary hover:underline"
                     >
-                      {selectedOrder.customerPhone}
+                      {selectedTask.order.customerPhone}
                     </a>
                   </div>
                 </div>
                 
-                {selectedOrder.customerAddress && (
-                  <>
-                    <Separator />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Dirección</p>
-                      <p className="font-medium flex items-start gap-2">
-                        <MapPin className="w-4 h-4 mt-0.5 text-primary shrink-0" />
-                        {selectedOrder.customerAddress}
-                      </p>
-                      <Button variant="outline" size="sm" className="mt-2 gap-2 w-full">
-                        <Navigation className="w-4 h-4" />
-                        Abrir en Maps
-                      </Button>
-                    </div>
-                  </>
-                )}
+                <Separator />
+                
+                <div>
+                  <p className="text-sm text-muted-foreground">Dirección</p>
+                  <p className="font-medium flex items-start gap-2">
+                    <MapPin className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+                    {selectedTask.address}
+                  </p>
+                  <Button variant="outline" size="sm" className="mt-2 gap-2 w-full">
+                    <Navigation className="w-4 h-4" />
+                    Abrir en Maps
+                  </Button>
+                </div>
+
+                {/* Service badges */}
+                <div className="flex flex-wrap gap-2">
+                  {selectedTask.order.needsPickup && (
+                    <Badge variant={selectedTask.order.pickupService?.status === 'completed' ? 'default' : 'outline'} 
+                           className={selectedTask.order.pickupService?.status === 'completed' ? 'bg-green-600' : ''}>
+                      {selectedTask.order.pickupService?.status === 'completed' ? '✅' : '📦'} Recogida
+                    </Badge>
+                  )}
+                  {selectedTask.order.needsDelivery && (
+                    <Badge variant={selectedTask.order.deliveryService?.status === 'completed' ? 'default' : 'outline'}
+                           className={selectedTask.order.deliveryService?.status === 'completed' ? 'bg-green-600' : ''}>
+                      {selectedTask.order.deliveryService?.status === 'completed' ? '✅' : '🚚'} Entrega
+                    </Badge>
+                  )}
+                </div>
                 
                 <Separator />
                 
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Total</span>
-                  <span className="font-bold text-lg">${selectedOrder.totalAmount.toFixed(2)}</span>
+                  <span className="font-bold text-lg">${selectedTask.order.totalAmount.toFixed(2)}</span>
                 </div>
                 
-                {!selectedOrder.isPaid && (
+                {!selectedTask.order.isPaid && selectedTask.type === 'delivery' && (
                   <div className="p-3 bg-destructive/10 rounded-lg flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 text-destructive" />
                     <span className="text-sm text-destructive">
-                      Cobrar ${(selectedOrder.totalAmount - selectedOrder.paidAmount).toFixed(2)} al entregar
+                      Cobrar ${(selectedTask.order.totalAmount - selectedTask.order.paidAmount).toFixed(2)} al entregar
                     </span>
                   </div>
                 )}
                 
-                {selectedOrder.notes && (
+                {selectedTask.notes && (
                   <div className="p-3 bg-muted rounded-lg">
                     <p className="text-sm font-medium">Notas:</p>
-                    <p className="text-sm text-muted-foreground">{selectedOrder.notes}</p>
+                    <p className="text-sm text-muted-foreground">{selectedTask.notes}</p>
                   </div>
                 )}
               </CardContent>
@@ -589,9 +770,11 @@ export default function Deliveries() {
       <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Asignar Repartidor</DialogTitle>
+            <DialogTitle>
+              Asignar Repartidor - {taskToAssign?.type === 'pickup' ? 'Recogida' : 'Entrega'}
+            </DialogTitle>
             <DialogDescription>
-              Selecciona un repartidor para el pedido {orderToAssign?.ticketCode}
+              Pedido {taskToAssign?.order.ticketCode} • {taskToAssign?.order.customerName}
             </DialogDescription>
           </DialogHeader>
           
@@ -611,7 +794,7 @@ export default function Deliveries() {
                     <div>
                       <p className="font-medium">{driver.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        Zona {driver.zone} • {driver.currentOrders} pedidos activos
+                        Zona {driver.zone} • {driver.currentOrders} tareas activas
                       </p>
                     </div>
                   </div>
