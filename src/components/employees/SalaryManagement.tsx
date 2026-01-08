@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useConfig } from '@/contexts/ConfigContext';
+import { formatCurrency, CURRENCIES, CurrencyCode } from '@/lib/currency';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,6 +61,7 @@ const SALARY_TYPES = {
 };
 
 export function SalaryManagement({ employees }: SalaryManagementProps) {
+  const { business } = useConfig();
   const [salaries, setSalaries] = useState<Record<string, Salary[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -66,7 +69,7 @@ export function SalaryManagement({ employees }: SalaryManagementProps) {
   const [formData, setFormData] = useState({
     salary_type: 'monthly' as Salary['salary_type'],
     base_salary: '',
-    currency: 'DOP',
+    currency: business.currency,
     effective_date: format(new Date(), 'yyyy-MM-dd'),
     notes: '',
   });
@@ -132,7 +135,7 @@ export function SalaryManagement({ employees }: SalaryManagementProps) {
       setFormData({
         salary_type: 'monthly',
         base_salary: '',
-        currency: 'DOP',
+        currency: business.currency,
         effective_date: format(new Date(), 'yyyy-MM-dd'),
         notes: '',
       });
@@ -179,11 +182,8 @@ export function SalaryManagement({ employees }: SalaryManagementProps) {
     setIsHistoryOpen(true);
   };
 
-  const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat('es-MX', {
-      style: 'currency',
-      currency: currency,
-    }).format(amount);
+  const formatSalaryCurrency = (amount: number, currency: string) => {
+    return formatCurrency(amount, currency as CurrencyCode);
   };
 
   if (isLoading) {
@@ -241,7 +241,7 @@ export function SalaryManagement({ employees }: SalaryManagementProps) {
                       <TableCell>
                         {currentSalary ? (
                           <span className="font-medium text-green-600">
-                            {formatCurrency(currentSalary.base_salary, currentSalary.currency)}
+                            {formatSalaryCurrency(currentSalary.base_salary, currentSalary.currency)}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">Sin configurar</span>
@@ -341,9 +341,10 @@ export function SalaryManagement({ employees }: SalaryManagementProps) {
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="DOP">RD$ (Peso Dominicano)</SelectItem>
-                    <SelectItem value="USD">USD</SelectItem>
+                  <SelectContent>
+                    {Object.entries(CURRENCIES).map(([code, curr]) => (
+                      <SelectItem key={code} value={code}>{curr.symbol} ({curr.name})</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -410,7 +411,7 @@ export function SalaryManagement({ employees }: SalaryManagementProps) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium text-lg">
-                      {formatCurrency(salary.base_salary, salary.currency)}
+                      {formatSalaryCurrency(salary.base_salary, salary.currency)}
                     </p>
                     <Badge variant="outline" className="mt-1">
                       {SALARY_TYPES[salary.salary_type]}

@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useConfig } from '@/contexts/ConfigContext';
+import { formatCurrency, CurrencyCode } from '@/lib/currency';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,6 +72,7 @@ const STATUS_CONFIG = {
 };
 
 export function PayrollManagement({ employees }: PayrollManagementProps) {
+  const { business } = useConfig();
   const [payrolls, setPayrolls] = useState<PayrollRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -89,6 +92,10 @@ export function PayrollManagement({ employees }: PayrollManagementProps) {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [filterMonth, setFilterMonth] = useState(format(new Date(), 'yyyy-MM'));
+
+  const formatPayrollCurrency = (amount: number) => {
+    return formatCurrency(amount, business.currency as CurrencyCode);
+  };
 
   const fetchPayrolls = async () => {
     try {
@@ -213,12 +220,6 @@ export function PayrollManagement({ employees }: PayrollManagementProps) {
     return emp?.name || 'Desconocido';
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-DO', {
-      style: 'currency',
-      currency: 'DOP',
-    }).format(amount);
-  };
 
   const totalPending = payrolls.filter(p => p.status === 'pending').reduce((sum, p) => sum + p.total_amount, 0);
   const totalPaid = payrolls.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.total_amount, 0);
@@ -256,7 +257,7 @@ export function PayrollManagement({ employees }: PayrollManagementProps) {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Pendiente por pagar</p>
-                <p className="text-2xl font-bold">{formatCurrency(totalPending)}</p>
+                <p className="text-2xl font-bold">{formatPayrollCurrency(totalPending)}</p>
               </div>
             </div>
           </CardContent>
@@ -269,7 +270,7 @@ export function PayrollManagement({ employees }: PayrollManagementProps) {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Pagado este mes</p>
-                <p className="text-2xl font-bold">{formatCurrency(totalPaid)}</p>
+                <p className="text-2xl font-bold">{formatPayrollCurrency(totalPaid)}</p>
               </div>
             </div>
           </CardContent>
@@ -332,12 +333,12 @@ export function PayrollManagement({ employees }: PayrollManagementProps) {
                             {format(new Date(payroll.period_start), 'dd MMM', { locale: es })} - {format(new Date(payroll.period_end), 'dd MMM', { locale: es })}
                           </div>
                         </TableCell>
-                        <TableCell>{formatCurrency(payroll.base_amount)}</TableCell>
+                        <TableCell>{formatPayrollCurrency(payroll.base_amount)}</TableCell>
                         <TableCell>
                           {payroll.bonuses > 0 && (
                             <span className="text-green-600 flex items-center gap-1">
                               <TrendingUp className="w-3 h-3" />
-                              +{formatCurrency(payroll.bonuses)}
+                              +{formatPayrollCurrency(payroll.bonuses)}
                             </span>
                           )}
                         </TableCell>
@@ -345,12 +346,12 @@ export function PayrollManagement({ employees }: PayrollManagementProps) {
                           {payroll.deductions > 0 && (
                             <span className="text-red-600 flex items-center gap-1">
                               <TrendingDown className="w-3 h-3" />
-                              -{formatCurrency(payroll.deductions)}
+                              -{formatPayrollCurrency(payroll.deductions)}
                             </span>
                           )}
                         </TableCell>
                         <TableCell className="font-bold">
-                          {formatCurrency(payroll.total_amount)}
+                          {formatPayrollCurrency(payroll.total_amount)}
                         </TableCell>
                         <TableCell>
                           <Badge className={statusConfig.color}>
@@ -481,7 +482,7 @@ export function PayrollManagement({ employees }: PayrollManagementProps) {
               <div className="flex items-center justify-between">
                 <span className="font-medium">Total a pagar:</span>
                 <span className="text-2xl font-bold text-green-600">
-                  {formatCurrency(calculateTotal())}
+                  {formatPayrollCurrency(calculateTotal())}
                 </span>
               </div>
             </div>
@@ -518,29 +519,29 @@ export function PayrollManagement({ employees }: PayrollManagementProps) {
               <div className="space-y-2">
                 <div className="flex justify-between py-2 border-b">
                   <span>Salario base</span>
-                  <span>{formatCurrency(viewingPayroll.base_amount)}</span>
+                  <span>{formatPayrollCurrency(viewingPayroll.base_amount)}</span>
                 </div>
                 {viewingPayroll.bonuses > 0 && (
                   <div className="flex justify-between py-2 border-b text-green-600">
                     <span>+ Bonificaciones</span>
-                    <span>{formatCurrency(viewingPayroll.bonuses)}</span>
+                    <span>{formatPayrollCurrency(viewingPayroll.bonuses)}</span>
                   </div>
                 )}
                 {viewingPayroll.overtime_amount > 0 && (
                   <div className="flex justify-between py-2 border-b text-blue-600">
                     <span>+ Horas extra ({viewingPayroll.overtime_hours}h)</span>
-                    <span>{formatCurrency(viewingPayroll.overtime_amount)}</span>
+                    <span>{formatPayrollCurrency(viewingPayroll.overtime_amount)}</span>
                   </div>
                 )}
                 {viewingPayroll.deductions > 0 && (
                   <div className="flex justify-between py-2 border-b text-red-600">
                     <span>- Deducciones</span>
-                    <span>{formatCurrency(viewingPayroll.deductions)}</span>
+                    <span>{formatPayrollCurrency(viewingPayroll.deductions)}</span>
                   </div>
                 )}
                 <div className="flex justify-between py-3 font-bold text-lg">
                   <span>Total</span>
-                  <span className="text-green-600">{formatCurrency(viewingPayroll.total_amount)}</span>
+                  <span className="text-green-600">{formatPayrollCurrency(viewingPayroll.total_amount)}</span>
                 </div>
               </div>
               
