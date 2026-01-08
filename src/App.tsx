@@ -19,6 +19,7 @@ import Inventory from "./pages/Inventory";
 import Catalog from "./pages/Catalog";
 import Settings from "./pages/Settings";
 import CashRegister from "./pages/CashRegister";
+import Employees from "./pages/Employees";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -137,10 +138,7 @@ function AppRoutes() {
           path="/employees"
           element={
             <ProtectedRoute>
-              <div className="p-8">
-                <h1 className="text-2xl font-bold">Empleados</h1>
-                <p className="text-muted-foreground">Módulo en desarrollo...</p>
-              </div>
+              <Employees />
             </ProtectedRoute>
           }
         />
