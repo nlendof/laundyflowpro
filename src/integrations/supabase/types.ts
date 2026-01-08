@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      attendance_records: {
+        Row: {
+          check_in: string | null
+          check_out: string | null
+          created_at: string | null
+          date: string
+          id: string
+          notes: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          check_in?: string | null
+          check_out?: string | null
+          created_at?: string | null
+          date: string
+          id?: string
+          notes?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          check_in?: string | null
+          check_out?: string | null
+          created_at?: string | null
+          date?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       cash_closings: {
         Row: {
           actual_balance: number | null
@@ -241,6 +274,42 @@ export type Database = {
           total_orders?: number | null
           total_spent?: number | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      employee_salaries: {
+        Row: {
+          base_salary: number
+          created_at: string | null
+          created_by: string | null
+          currency: string
+          effective_date: string
+          id: string
+          notes: string | null
+          salary_type: string
+          user_id: string
+        }
+        Insert: {
+          base_salary?: number
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string
+          effective_date?: string
+          id?: string
+          notes?: string | null
+          salary_type?: string
+          user_id: string
+        }
+        Update: {
+          base_salary?: number
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string
+          effective_date?: string
+          id?: string
+          notes?: string | null
+          salary_type?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -519,6 +588,107 @@ export type Database = {
           },
         ]
       }
+      payroll_adjustments: {
+        Row: {
+          adjustment_type: string
+          amount: number
+          category: string
+          created_at: string | null
+          description: string | null
+          id: string
+          payroll_id: string
+        }
+        Insert: {
+          adjustment_type: string
+          amount?: number
+          category: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          payroll_id: string
+        }
+        Update: {
+          adjustment_type?: string
+          amount?: number
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          payroll_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_adjustments_payroll_id_fkey"
+            columns: ["payroll_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_records: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          base_amount: number
+          bonuses: number
+          created_at: string | null
+          created_by: string | null
+          deductions: number
+          id: string
+          notes: string | null
+          overtime_amount: number
+          overtime_hours: number
+          payment_date: string | null
+          payment_method: string | null
+          period_end: string
+          period_start: string
+          status: string
+          total_amount: number
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          base_amount?: number
+          bonuses?: number
+          created_at?: string | null
+          created_by?: string | null
+          deductions?: number
+          id?: string
+          notes?: string | null
+          overtime_amount?: number
+          overtime_hours?: number
+          payment_date?: string | null
+          payment_method?: string | null
+          period_end: string
+          period_start: string
+          status?: string
+          total_amount?: number
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          base_amount?: number
+          bonuses?: number
+          created_at?: string | null
+          created_by?: string | null
+          deductions?: number
+          id?: string
+          notes?: string | null
+          overtime_amount?: number
+          overtime_hours?: number
+          payment_date?: string | null
+          payment_method?: string | null
+          period_end?: string
+          period_start?: string
+          status?: string
+          total_amount?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -579,6 +749,48 @@ export type Database = {
         }
         Relationships: []
       }
+      time_off_requests: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string | null
+          end_date: string
+          id: string
+          reason: string | null
+          request_type: string
+          response_notes: string | null
+          start_date: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          end_date: string
+          id?: string
+          reason?: string | null
+          request_type: string
+          response_notes?: string | null
+          start_date: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          end_date?: string
+          id?: string
+          reason?: string | null
+          request_type?: string
+          response_notes?: string | null
+          start_date?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_permissions: {
         Row: {
           created_at: string | null
@@ -614,6 +826,39 @@ export type Database = {
         Update: {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      work_schedules: {
+        Row: {
+          created_at: string | null
+          day_of_week: number
+          end_time: string
+          id: string
+          is_active: boolean | null
+          start_time: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          day_of_week: number
+          end_time: string
+          id?: string
+          is_active?: boolean | null
+          start_time: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          is_active?: boolean | null
+          start_time?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
