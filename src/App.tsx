@@ -13,6 +13,7 @@ import QuickSale from "./pages/QuickSale";
 import Operations from "./pages/Operations";
 import Deliveries from "./pages/Deliveries";
 import Inventory from "./pages/Inventory";
+import Catalog from "./pages/Catalog";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -109,6 +110,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <Inventory />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/catalog"
+          element={
+            <ProtectedRoute>
+              <Catalog />
             </ProtectedRoute>
           }
         />
