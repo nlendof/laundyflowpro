@@ -1,4 +1,6 @@
-import { createContext, useContext, useState, ReactNode, Dispatch, SetStateAction } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, Dispatch, SetStateAction, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 // Types
 export interface CatalogCategory {
@@ -84,10 +86,16 @@ interface ConfigContextType {
   // Business
   business: BusinessSettings;
   setBusiness: Dispatch<SetStateAction<BusinessSettings>>;
+  
+  // Loading state
+  loading: boolean;
+  
+  // Save functions
+  saveConfig: () => Promise<void>;
 }
 
-// Initial data
-const INITIAL_CATEGORIES: CatalogCategory[] = [
+// Default data
+const DEFAULT_CATEGORIES: CatalogCategory[] = [
   { id: '1', name: 'Lavado', order: 0, isActive: true },
   { id: '2', name: 'Planchado', order: 1, isActive: true },
   { id: '3', name: 'Especializado', order: 2, isActive: true },
@@ -97,7 +105,7 @@ const INITIAL_CATEGORIES: CatalogCategory[] = [
   { id: '7', name: 'Accesorios', order: 6, isActive: true },
 ];
 
-const INITIAL_OPERATIONS: OperationStep[] = [
+const DEFAULT_OPERATIONS: OperationStep[] = [
   { id: '1', key: 'pending_pickup', name: 'Pendiente de Recogida', icon: 'Clock', color: 'bg-amber-500', isActive: true, isRequired: true, order: 0 },
   { id: '2', key: 'in_store', name: 'En Local', icon: 'Store', color: 'bg-blue-500', isActive: true, isRequired: true, order: 1 },
   { id: '3', key: 'washing', name: 'Lavando', icon: 'Waves', color: 'bg-cyan-500', isActive: true, isRequired: false, order: 2 },
@@ -108,7 +116,7 @@ const INITIAL_OPERATIONS: OperationStep[] = [
   { id: '8', key: 'delivered', name: 'Entregado', icon: 'CheckCircle', color: 'bg-green-600', isActive: true, isRequired: true, order: 7 },
 ];
 
-const INITIAL_ZONES: DeliveryZone[] = [
+const DEFAULT_ZONES: DeliveryZone[] = [
   { id: '1', name: 'Centro', price: 0, isActive: true },
   { id: '2', name: 'Zona Norte', price: 25, isActive: true },
   { id: '3', name: 'Zona Sur', price: 30, isActive: true },
@@ -116,7 +124,7 @@ const INITIAL_ZONES: DeliveryZone[] = [
   { id: '5', name: 'Zona Poniente', price: 40, isActive: false },
 ];
 
-const INITIAL_EXTRAS: ExtraService[] = [
+const DEFAULT_EXTRAS: ExtraService[] = [
   { id: '1', name: 'Desmanchado', price: 3.00, isActive: true },
   { id: '2', name: 'Suavizante Premium', price: 2.00, isActive: true },
   { id: '3', name: 'Express (24h)', price: 10.00, isActive: true },
@@ -124,7 +132,7 @@ const INITIAL_EXTRAS: ExtraService[] = [
   { id: '5', name: 'Planchado Premium', price: 5.00, isActive: true },
 ];
 
-const INITIAL_PAYMENTS: PaymentMethod[] = [
+const DEFAULT_PAYMENTS: PaymentMethod[] = [
   { id: '1', name: 'Efectivo', isActive: true, commission: 0 },
   { id: '2', name: 'Tarjeta de Crédito', isActive: true, commission: 3.5 },
   { id: '3', name: 'Tarjeta de Débito', isActive: true, commission: 2.5 },
@@ -132,7 +140,7 @@ const INITIAL_PAYMENTS: PaymentMethod[] = [
   { id: '5', name: 'PayPal', isActive: false, commission: 4.0 },
 ];
 
-const INITIAL_BUSINESS: BusinessSettings = {
+const DEFAULT_BUSINESS: BusinessSettings = {
   name: 'Luis Cap',
   slogan: 'Lavandería Profesional',
   phone: '+1 809 123 4567',
@@ -149,12 +157,103 @@ const INITIAL_BUSINESS: BusinessSettings = {
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 
 export function ConfigProvider({ children }: { children: ReactNode }) {
-  const [categories, setCategories] = useState<CatalogCategory[]>(INITIAL_CATEGORIES);
-  const [operations, setOperations] = useState<OperationStep[]>(INITIAL_OPERATIONS);
-  const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>(INITIAL_ZONES);
-  const [extraServices, setExtraServices] = useState<ExtraService[]>(INITIAL_EXTRAS);
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(INITIAL_PAYMENTS);
-  const [business, setBusiness] = useState<BusinessSettings>(INITIAL_BUSINESS);
+  const [categories, setCategories] = useState<CatalogCategory[]>(DEFAULT_CATEGORIES);
+  const [operations, setOperations] = useState<OperationStep[]>(DEFAULT_OPERATIONS);
+  const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>(DEFAULT_ZONES);
+  const [extraServices, setExtraServices] = useState<ExtraService[]>(DEFAULT_EXTRAS);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(DEFAULT_PAYMENTS);
+  const [business, setBusiness] = useState<BusinessSettings>(DEFAULT_BUSINESS);
+  const [loading, setLoading] = useState(true);
+
+  // Load config from database
+  const loadConfig = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('system_config')
+        .select('*');
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        data.forEach(config => {
+          const value = config.value as Record<string, unknown>;
+          switch (config.key) {
+            case 'categories':
+              if (Array.isArray(value)) setCategories(value as CatalogCategory[]);
+              break;
+            case 'operations':
+              if (Array.isArray(value)) setOperations(value as OperationStep[]);
+              break;
+            case 'delivery_zones':
+              if (Array.isArray(value)) setDeliveryZones(value as DeliveryZone[]);
+              break;
+            case 'extra_services':
+              if (Array.isArray(value)) setExtraServices(value as ExtraService[]);
+              break;
+            case 'payment_methods':
+              if (Array.isArray(value)) setPaymentMethods(value as PaymentMethod[]);
+              break;
+            case 'business':
+              if (typeof value === 'object' && value !== null) {
+                setBusiness({ ...DEFAULT_BUSINESS, ...value } as BusinessSettings);
+              }
+              break;
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error loading config:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Save config to database
+  const saveConfig = useCallback(async () => {
+    try {
+      const configs = [
+        { key: 'categories', value: categories as unknown },
+        { key: 'operations', value: operations as unknown },
+        { key: 'delivery_zones', value: deliveryZones as unknown },
+        { key: 'extra_services', value: extraServices as unknown },
+        { key: 'payment_methods', value: paymentMethods as unknown },
+        { key: 'business', value: business as unknown },
+      ];
+
+      for (const config of configs) {
+        // First try to update existing
+        const { data: existing } = await supabase
+          .from('system_config')
+          .select('id')
+          .eq('key', config.key)
+          .single();
+
+        if (existing) {
+          const { error } = await supabase
+            .from('system_config')
+            .update({ value: JSON.parse(JSON.stringify(config.value)), updated_at: new Date().toISOString() })
+            .eq('key', config.key);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('system_config')
+            .insert([{ key: config.key, value: JSON.parse(JSON.stringify(config.value)) }]);
+          if (error) throw error;
+        }
+      }
+
+      toast.success('Configuración guardada');
+    } catch (error) {
+      console.error('Error saving config:', error);
+      toast.error('Error al guardar la configuración');
+    }
+  }, [categories, operations, deliveryZones, extraServices, paymentMethods, business]);
+
+  // Load on mount
+  useEffect(() => {
+    loadConfig();
+  }, [loadConfig]);
 
   // Computed values
   const activeCategories = categories
@@ -192,6 +291,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         activePaymentMethods,
         business,
         setBusiness,
+        loading,
+        saveConfig,
       }}
     >
       {children}

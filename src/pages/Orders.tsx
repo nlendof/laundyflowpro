@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
 import { Order, OrderStatus } from '@/types';
-import { MOCK_ORDERS } from '@/lib/mockData';
 import { ORDER_STATUS_FLOW } from '@/lib/constants';
 import { OrderStatusTabs } from '@/components/orders/OrderStatusTabs';
 import { OrderCard } from '@/components/orders/OrderCard';
@@ -23,13 +22,15 @@ import {
   RefreshCw,
   Package,
   SlidersHorizontal,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useOrders } from '@/hooks/useOrders';
 
 type SortOption = 'newest' | 'oldest' | 'amount_high' | 'amount_low';
 
 export default function Orders() {
-  const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS);
+  const { orders, loading, fetchOrders, createOrder, updateOrderStatus } = useOrders();
   const [activeStatus, setActiveStatus] = useState<OrderStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
@@ -106,35 +107,42 @@ export default function Orders() {
     setIsModalOpen(true);
   };
 
-  const handleAdvanceStatus = (order: Order) => {
+  const handleAdvanceStatus = async (order: Order) => {
     const currentIndex = ORDER_STATUS_FLOW.indexOf(order.status);
     if (currentIndex < ORDER_STATUS_FLOW.length - 1) {
       const nextStatus = ORDER_STATUS_FLOW[currentIndex + 1] as OrderStatus;
+      const success = await updateOrderStatus(order.id, nextStatus);
       
-      setOrders(prev =>
-        prev.map(o =>
-          o.id === order.id
-            ? { ...o, status: nextStatus, updatedAt: new Date() }
-            : o
-        )
-      );
-
-      // Update selected order if modal is open
-      if (selectedOrder?.id === order.id) {
-        setSelectedOrder(prev => 
-          prev ? { ...prev, status: nextStatus, updatedAt: new Date() } : null
-        );
+      if (success) {
+        if (selectedOrder?.id === order.id) {
+          setSelectedOrder(prev => 
+            prev ? { ...prev, status: nextStatus, updatedAt: new Date() } : null
+          );
+        }
+        toast.success(`Pedido ${order.ticketCode} avanzado a: ${nextStatus}`);
       }
-
-      toast.success(`Pedido ${order.ticketCode} avanzado a: ${nextStatus}`);
     }
   };
 
-  const handleCreateOrder = (newOrder: Order) => {
-    setOrders(prev => [newOrder, ...prev]);
-    setQrOrder(newOrder);
-    toast.success(`Pedido ${newOrder.ticketCode} creado exitosamente`);
+  const handleCreateOrder = async (newOrder: Order) => {
+    try {
+      const created = await createOrder(newOrder);
+      if (created) {
+        setQrOrder(created);
+        toast.success(`Pedido ${created.ticketCode} creado exitosamente`);
+      }
+    } catch {
+      // Error handled in hook
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
@@ -195,7 +203,7 @@ export default function Orders() {
           Solo Delivery
         </Button>
 
-        <Button variant="outline" size="icon" title="Refrescar">
+        <Button variant="outline" size="icon" title="Refrescar" onClick={() => fetchOrders()}>
           <RefreshCw className="w-4 h-4" />
         </Button>
       </div>
