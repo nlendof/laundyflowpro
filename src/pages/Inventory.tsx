@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Package,
   Search,
@@ -35,13 +36,16 @@ import {
   Edit,
   PackagePlus,
   Trash2,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { InventoryItem } from '@/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useInventory } from '@/contexts/InventoryContext';
+import { useInventory } from '@/hooks/useInventory';
+import { useConfig } from '@/contexts/ConfigContext';
+import { formatCurrency } from '@/lib/currency';
 
 type CategoryFilter = 'all' | InventoryItem['category'];
 
@@ -53,10 +57,12 @@ const CATEGORY_CONFIG = {
 };
 
 export default function Inventory() {
-  const { items, stats, addItem, updateItem, deleteItem, restockItem } = useInventory();
+  const { items, stats, loading, addItem, updateItem, deleteItem, restockItem } = useInventory();
+  const { business } = useConfig();
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Dialogs
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -95,47 +101,58 @@ export default function Inventory() {
     return { status: 'critical', color: 'text-red-600', bg: 'bg-red-500' };
   };
 
-  const handleAddItem = () => {
+  const handleAddItem = async () => {
     if (!newItem.name.trim()) {
       toast.error('Ingresa el nombre del producto');
       return;
     }
     
-    addItem(newItem);
-    toast.success('Producto agregado al inventario');
-    setShowAddDialog(false);
-    setNewItem({
-      name: '',
-      category: 'detergent',
-      currentStock: 0,
-      minStock: 10,
-      unit: 'unidades',
-      unitCost: 0,
-    });
+    setIsSubmitting(true);
+    try {
+      await addItem(newItem);
+      setShowAddDialog(false);
+      setNewItem({
+        name: '',
+        category: 'detergent',
+        currentStock: 0,
+        minStock: 10,
+        unit: 'unidades',
+        unitCost: 0,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleRestock = () => {
+  const handleRestock = async () => {
     if (!selectedItem || restockAmount <= 0) return;
     
-    restockItem(selectedItem.id, restockAmount);
-    toast.success(`Se agregaron ${restockAmount} ${selectedItem.unit} de ${selectedItem.name}`);
-    setShowRestockDialog(false);
-    setSelectedItem(null);
-    setRestockAmount(0);
+    setIsSubmitting(true);
+    try {
+      await restockItem(selectedItem.id, restockAmount);
+      setShowRestockDialog(false);
+      setSelectedItem(null);
+      setRestockAmount(0);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleEditItem = () => {
+  const handleEditItem = async () => {
     if (!selectedItem) return;
     
-    updateItem(selectedItem.id, selectedItem);
-    toast.success('Producto actualizado');
-    setShowEditDialog(false);
-    setSelectedItem(null);
+    setIsSubmitting(true);
+    try {
+      await updateItem(selectedItem.id, selectedItem);
+      setShowEditDialog(false);
+      setSelectedItem(null);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDeleteItem = (item: InventoryItem) => {
-    deleteItem(item.id);
-    toast.success('Producto eliminado del inventario');
+  const handleDeleteItem = async (item: InventoryItem) => {
+    await deleteItem(item.id);
   };
 
   const openRestockDialog = (item: InventoryItem) => {
@@ -148,6 +165,27 @@ export default function Inventory() {
     setSelectedItem({ ...item });
     setShowEditDialog(true);
   };
+
+  if (loading) {
+    return (
+      <div className="p-4 lg:p-6 max-w-7xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-10 w-48" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <Skeleton key={i} className="h-48" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 lg:p-6 max-w-7xl mx-auto">
@@ -257,7 +295,7 @@ export default function Inventory() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-purple-700 dark:text-purple-400">
-                  ${stats.totalValue.toLocaleString()}
+                  {formatCurrency(stats.totalValue, business.currency)}
                 </p>
                 <p className="text-xs text-purple-600 dark:text-purple-500">Valor Total</p>
               </div>
@@ -353,7 +391,7 @@ export default function Inventory() {
 
                   {/* Info */}
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>Costo: ${item.unitCost.toFixed(2)}/{item.unit.slice(0, -1) || item.unit}</span>
+                    <span>Costo: {formatCurrency(item.unitCost, business.currency)}/{item.unit.slice(0, -1) || item.unit}</span>
                     <span>
                       {format(item.lastRestocked, 'dd MMM', { locale: es })}
                     </span>
@@ -459,7 +497,7 @@ export default function Inventory() {
                   type="number"
                   min="0"
                   value={newItem.currentStock}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, currentStock: Number(e.target.value) }))}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, currentStock: parseInt(e.target.value) || 0 }))}
                 />
               </div>
               
@@ -469,7 +507,7 @@ export default function Inventory() {
                   type="number"
                   min="1"
                   value={newItem.minStock}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, minStock: Number(e.target.value) }))}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, minStock: parseInt(e.target.value) || 1 }))}
                 />
               </div>
               
@@ -480,7 +518,7 @@ export default function Inventory() {
                   min="0"
                   step="0.01"
                   value={newItem.unitCost}
-                  onChange={(e) => setNewItem(prev => ({ ...prev, unitCost: Number(e.target.value) }))}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, unitCost: parseFloat(e.target.value) || 0 }))}
                 />
               </div>
             </div>
@@ -490,8 +528,9 @@ export default function Inventory() {
             <Button variant="outline" onClick={() => setShowAddDialog(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleAddItem}>
-              Agregar Producto
+            <Button onClick={handleAddItem} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Agregar
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -501,52 +540,48 @@ export default function Inventory() {
       <Dialog open={showRestockDialog} onOpenChange={setShowRestockDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reabastecer Stock</DialogTitle>
+            <DialogTitle>Reabastecer Producto</DialogTitle>
             <DialogDescription>
               {selectedItem?.name}
             </DialogDescription>
           </DialogHeader>
           
-          {selectedItem && (
-            <div className="space-y-4">
-              <div className="p-4 bg-muted rounded-lg">
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Stock actual:</span>
-                  <span className="font-bold">{selectedItem.currentStock} {selectedItem.unit}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Stock mínimo:</span>
-                  <span>{selectedItem.minStock} {selectedItem.unit}</span>
-                </div>
+          <div className="space-y-4">
+            <div className="p-4 bg-muted rounded-lg">
+              <div className="flex justify-between text-sm mb-2">
+                <span>Stock Actual:</span>
+                <span className="font-medium">{selectedItem?.currentStock} {selectedItem?.unit}</span>
               </div>
-              
-              <div className="space-y-2">
-                <Label>Cantidad a agregar</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  value={restockAmount}
-                  onChange={(e) => setRestockAmount(Number(e.target.value))}
-                />
-                <p className="text-sm text-muted-foreground">
-                  Stock final: {selectedItem.currentStock + restockAmount} {selectedItem.unit}
-                </p>
-              </div>
-              
-              <div className="p-3 bg-primary/10 rounded-lg">
-                <p className="text-sm font-medium">
-                  Costo estimado: ${(restockAmount * selectedItem.unitCost).toFixed(2)}
-                </p>
+              <div className="flex justify-between text-sm">
+                <span>Stock Mínimo:</span>
+                <span className="font-medium">{selectedItem?.minStock} {selectedItem?.unit}</span>
               </div>
             </div>
-          )}
+            
+            <div className="space-y-2">
+              <Label>Cantidad a agregar</Label>
+              <Input
+                type="number"
+                min="1"
+                value={restockAmount}
+                onChange={(e) => setRestockAmount(parseInt(e.target.value) || 0)}
+              />
+            </div>
+            
+            <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg text-sm">
+              <span className="text-muted-foreground">Nuevo stock: </span>
+              <span className="font-bold text-green-600">
+                {(selectedItem?.currentStock || 0) + restockAmount} {selectedItem?.unit}
+              </span>
+            </div>
+          </div>
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowRestockDialog(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleRestock} className="gap-2">
-              <PackagePlus className="w-4 h-4" />
+            <Button onClick={handleRestock} disabled={isSubmitting} className="gap-2">
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <PackagePlus className="w-4 h-4" />}
               Reabastecer
             </Button>
           </DialogFooter>
@@ -558,6 +593,9 @@ export default function Inventory() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Editar Producto</DialogTitle>
+            <DialogDescription>
+              Modifica los detalles del producto
+            </DialogDescription>
           </DialogHeader>
           
           {selectedItem && (
@@ -609,14 +647,24 @@ export default function Inventory() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Stock Actual</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={selectedItem.currentStock}
+                    onChange={(e) => setSelectedItem(prev => prev ? { ...prev, currentStock: parseInt(e.target.value) || 0 } : null)}
+                  />
+                </div>
+                
                 <div className="space-y-2">
                   <Label>Stock Mínimo</Label>
                   <Input
                     type="number"
                     min="1"
                     value={selectedItem.minStock}
-                    onChange={(e) => setSelectedItem(prev => prev ? { ...prev, minStock: Number(e.target.value) } : null)}
+                    onChange={(e) => setSelectedItem(prev => prev ? { ...prev, minStock: parseInt(e.target.value) || 1 } : null)}
                   />
                 </div>
                 
@@ -627,7 +675,7 @@ export default function Inventory() {
                     min="0"
                     step="0.01"
                     value={selectedItem.unitCost}
-                    onChange={(e) => setSelectedItem(prev => prev ? { ...prev, unitCost: Number(e.target.value) } : null)}
+                    onChange={(e) => setSelectedItem(prev => prev ? { ...prev, unitCost: parseFloat(e.target.value) || 0 } : null)}
                   />
                 </div>
               </div>
@@ -638,7 +686,8 @@ export default function Inventory() {
             <Button variant="outline" onClick={() => setShowEditDialog(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleEditItem}>
+            <Button onClick={handleEditItem} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Guardar Cambios
             </Button>
           </DialogFooter>
