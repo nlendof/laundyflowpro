@@ -1,12 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Order, OrderItem, ItemType } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
-import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OrderQRCode } from '@/components/orders/OrderQRCode';
 import {
   Dialog,
@@ -22,15 +21,8 @@ import {
   Minus,
   Trash2,
   Truck,
-  Waves,
-  Flame,
   Sparkles,
-  Eraser,
-  Droplet,
-  Zap,
-  Scale,
   Shirt,
-  Package,
   ShoppingCart,
   CreditCard,
   Banknote,
@@ -38,26 +30,14 @@ import {
   CheckCircle,
   Receipt,
   RefreshCw,
+  Scale,
+  Hash,
+  Layers,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-
-// Quick services with large touch buttons
-const QUICK_SERVICES = [
-  { id: 'wash_dry', name: 'Lavado + Secado', price: 5.00, icon: Waves, color: 'bg-blue-500', unit: 'kg' },
-  { id: 'wash_dry_iron', name: 'Lavado Completo', price: 8.00, icon: Flame, color: 'bg-orange-500', unit: 'kg' },
-  { id: 'dry_clean', name: 'Lavado en Seco', price: 12.00, icon: Sparkles, color: 'bg-purple-500', unit: 'pieza' },
-  { id: 'shirts', name: 'Camisas', price: 3.00, icon: Shirt, color: 'bg-cyan-500', unit: 'pieza' },
-  { id: 'pants', name: 'Pantalones', price: 4.00, icon: Package, color: 'bg-indigo-500', unit: 'pieza' },
-  { id: 'blankets', name: 'Cobijas', price: 15.00, icon: Package, color: 'bg-teal-500', unit: 'pieza' },
-];
-
-// Extra services
-const EXTRA_SERVICES = [
-  { id: 'stain_removal', name: 'Desmanchado', price: 3.00, icon: Eraser },
-  { id: 'premium_softener', name: 'Suavizante Premium', price: 2.00, icon: Droplet },
-  { id: 'express', name: 'Express 24h', price: 10.00, icon: Zap },
-];
+import { useCatalog, CatalogItem, PricingType } from '@/contexts/CatalogContext';
+import { useConfig } from '@/contexts/ConfigContext';
 
 // Payment methods
 const PAYMENT_METHODS = [
@@ -68,14 +48,44 @@ const PAYMENT_METHODS = [
 
 interface CartItem {
   id: string;
-  serviceId: string;
+  catalogItemId: string;
   name: string;
   quantity: number;
   unitPrice: number;
-  unit: string;
+  pricingType: PricingType;
+  type: 'service' | 'article';
 }
 
+type SaleTab = 'services' | 'articles';
+
+// Colors for service buttons
+const SERVICE_COLORS = [
+  'bg-blue-500',
+  'bg-orange-500',
+  'bg-purple-500',
+  'bg-cyan-500',
+  'bg-indigo-500',
+  'bg-teal-500',
+  'bg-pink-500',
+  'bg-emerald-500',
+];
+
+const ARTICLE_COLORS = [
+  'bg-amber-500',
+  'bg-rose-500',
+  'bg-lime-500',
+  'bg-sky-500',
+  'bg-violet-500',
+  'bg-fuchsia-500',
+];
+
 export default function QuickSale() {
+  const { activeServices, activeArticles } = useCatalog();
+  const { activeExtraServices, activePaymentMethods } = useConfig();
+  
+  // Tab selection
+  const [activeTab, setActiveTab] = useState<SaleTab>('services');
+  
   // Customer info
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -103,10 +113,10 @@ export default function QuickSale() {
 
   const extrasTotal = useMemo(() => {
     return selectedExtras.reduce((sum, extraId) => {
-      const extra = EXTRA_SERVICES.find(e => e.id === extraId);
+      const extra = activeExtraServices.find(e => e.id === extraId);
       return sum + (extra?.price || 0);
     }, 0);
-  }, [selectedExtras]);
+  }, [selectedExtras, activeExtraServices]);
 
   const totalAmount = cartTotal + extrasTotal;
   const change = parseFloat(amountReceived || '0') - totalAmount;
@@ -120,24 +130,34 @@ export default function QuickSale() {
     return `${prefix}-${dateStr}-${random}`;
   };
 
-  // Add service to cart
-  const addToCart = (service: typeof QUICK_SERVICES[0]) => {
-    const existingItem = cart.find(item => item.serviceId === service.id);
+  // Get pricing unit label
+  const getPricingUnit = (pricingType: PricingType) => {
+    switch (pricingType) {
+      case 'weight': return 'kg';
+      case 'piece': return 'pza';
+      case 'fixed': return 'u';
+    }
+  };
+
+  // Add catalog item to cart
+  const addToCart = (item: CatalogItem) => {
+    const existingItem = cart.find(c => c.catalogItemId === item.id);
     
     if (existingItem) {
-      setCart(prev => prev.map(item => 
-        item.serviceId === service.id 
-          ? { ...item, quantity: item.quantity + 1 }
-          : item
+      setCart(prev => prev.map(c => 
+        c.catalogItemId === item.id 
+          ? { ...c, quantity: c.quantity + 1 }
+          : c
       ));
     } else {
       setCart(prev => [...prev, {
         id: crypto.randomUUID(),
-        serviceId: service.id,
-        name: service.name,
+        catalogItemId: item.id,
+        name: item.name,
         quantity: 1,
-        unitPrice: service.price,
-        unit: service.unit,
+        unitPrice: item.price,
+        pricingType: item.pricingType,
+        type: item.type,
       }]);
     }
   };
@@ -146,7 +166,8 @@ export default function QuickSale() {
   const updateCartQuantity = (itemId: string, delta: number) => {
     setCart(prev => prev.map(item => {
       if (item.id === itemId) {
-        const newQty = Math.max(0.5, item.quantity + delta);
+        const increment = item.pricingType === 'weight' ? 0.5 : 1;
+        const newQty = Math.max(increment, item.quantity + (delta * increment));
         return { ...item, quantity: newQty };
       }
       return item;
@@ -173,7 +194,7 @@ export default function QuickSale() {
   // Process sale
   const processSale = () => {
     if (cart.length === 0) {
-      toast.error('Agrega al menos un servicio');
+      toast.error('Agrega al menos un servicio o artículo');
       return;
     }
     if (!customerName) {
@@ -182,6 +203,9 @@ export default function QuickSale() {
     }
 
     const ticketCode = generateTicketCode();
+    
+    // Here we would deduct inventory for articles if they have trackInventory enabled
+    // For now, we just complete the sale
     
     setCompletedOrder({
       ticketCode,
@@ -206,9 +230,13 @@ export default function QuickSale() {
     setCompletedOrder(null);
   };
 
+  // Get items for current tab
+  const currentItems = activeTab === 'services' ? activeServices : activeArticles;
+  const currentColors = activeTab === 'services' ? SERVICE_COLORS : ARTICLE_COLORS;
+
   return (
     <div className="h-[calc(100vh-2rem)] flex flex-col lg:flex-row gap-4 p-4 lg:p-6">
-      {/* Left Panel - Services */}
+      {/* Left Panel - Services/Articles */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <div className="mb-4">
@@ -216,78 +244,114 @@ export default function QuickSale() {
             <ShoppingCart className="w-8 h-8 text-primary" />
             Venta Rápida
           </h1>
-          <p className="text-muted-foreground">Selecciona los servicios para crear un pedido</p>
+          <p className="text-muted-foreground">Selecciona servicios o artículos para crear un pedido</p>
         </div>
 
-        {/* Quick Services Grid */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
-            {QUICK_SERVICES.map((service) => {
-              const Icon = service.icon;
-              const inCart = cart.find(item => item.serviceId === service.id);
-              
-              return (
-                <button
-                  key={service.id}
-                  onClick={() => addToCart(service)}
-                  className={cn(
-                    'relative p-4 lg:p-6 rounded-2xl border-2 transition-all duration-200',
-                    'hover:scale-[1.02] active:scale-[0.98]',
-                    'flex flex-col items-center justify-center text-center gap-2',
-                    'min-h-[120px] lg:min-h-[150px]',
-                    inCart 
-                      ? 'border-primary bg-primary/10 ring-2 ring-primary/20' 
-                      : 'border-border hover:border-primary/50 bg-card'
-                  )}
-                >
-                  {inCart && (
-                    <Badge className="absolute top-2 right-2 h-6 min-w-6">
-                      {inCart.quantity}
-                    </Badge>
-                  )}
-                  <div className={cn('w-12 h-12 lg:w-14 lg:h-14 rounded-xl flex items-center justify-center text-white', service.color)}>
-                    <Icon className="w-6 h-6 lg:w-7 lg:h-7" />
-                  </div>
-                  <span className="font-semibold text-sm lg:text-base">{service.name}</span>
-                  <span className="text-primary font-bold text-lg lg:text-xl">
-                    ${service.price.toFixed(2)}/{service.unit}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+        {/* Tab Selection */}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as SaleTab)} className="mb-4">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="services" className="gap-2">
+              <Sparkles className="w-4 h-4" />
+              Servicios ({activeServices.length})
+            </TabsTrigger>
+            <TabsTrigger value="articles" className="gap-2">
+              <Shirt className="w-4 h-4" />
+              Artículos ({activeArticles.length})
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-          {/* Extra Services */}
-          <div className="mt-6">
-            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide mb-3">
-              Servicios Extra
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {EXTRA_SERVICES.map((extra) => {
-                const Icon = extra.icon;
-                const isSelected = selectedExtras.includes(extra.id);
+        {/* Items Grid */}
+        <div className="flex-1 overflow-y-auto">
+          {currentItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-center text-muted-foreground">
+              <Layers className="w-12 h-12 mb-2 opacity-30" />
+              <p>No hay {activeTab === 'services' ? 'servicios' : 'artículos'} activos</p>
+              <p className="text-sm">Agrega desde el módulo de Catálogo</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
+              {currentItems.map((item, index) => {
+                const inCart = cart.find(c => c.catalogItemId === item.id);
+                const Icon = item.pricingType === 'weight' ? Scale : Hash;
+                const colorClass = currentColors[index % currentColors.length];
                 
                 return (
                   <button
-                    key={extra.id}
-                    onClick={() => toggleExtra(extra.id)}
+                    key={item.id}
+                    onClick={() => addToCart(item)}
                     className={cn(
-                      'flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all',
-                      isSelected
-                        ? 'border-primary bg-primary/10 text-primary'
+                      'relative p-4 lg:p-6 rounded-2xl border-2 transition-all duration-200',
+                      'hover:scale-[1.02] active:scale-[0.98]',
+                      'flex flex-col items-center justify-center text-center gap-2',
+                      'min-h-[120px] lg:min-h-[150px]',
+                      inCart 
+                        ? 'border-primary bg-primary/10 ring-2 ring-primary/20' 
                         : 'border-border hover:border-primary/50 bg-card'
                     )}
                   >
-                    <Icon className="w-4 h-4" />
-                    <span className="font-medium">{extra.name}</span>
-                    <Badge variant={isSelected ? 'default' : 'secondary'}>
-                      +${extra.price.toFixed(2)}
-                    </Badge>
+                    {inCart && (
+                      <Badge className="absolute top-2 right-2 h-6 min-w-6">
+                        {inCart.quantity}
+                      </Badge>
+                    )}
+                    <div className={cn('w-12 h-12 lg:w-14 lg:h-14 rounded-xl flex items-center justify-center text-white', colorClass)}>
+                      {activeTab === 'services' ? (
+                        <Sparkles className="w-6 h-6 lg:w-7 lg:h-7" />
+                      ) : (
+                        <Shirt className="w-6 h-6 lg:w-7 lg:h-7" />
+                      )}
+                    </div>
+                    <span className="font-semibold text-sm lg:text-base line-clamp-2">{item.name}</span>
+                    <div className="flex items-center gap-1 text-primary font-bold text-lg lg:text-xl">
+                      <span>${item.price.toFixed(2)}</span>
+                      <span className="text-xs text-muted-foreground font-normal">
+                        /{getPricingUnit(item.pricingType)}
+                      </span>
+                    </div>
+                    {item.category && (
+                      <Badge variant="secondary" className="text-xs">
+                        {item.category}
+                      </Badge>
+                    )}
                   </button>
                 );
               })}
             </div>
-          </div>
+          )}
+
+          {/* Extra Services */}
+          {activeExtraServices.length > 0 && (
+            <div className="mt-6">
+              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide mb-3">
+                Servicios Extra
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {activeExtraServices.map((extra) => {
+                  const isSelected = selectedExtras.includes(extra.id);
+                  
+                  return (
+                    <button
+                      key={extra.id}
+                      onClick={() => toggleExtra(extra.id)}
+                      className={cn(
+                        'flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all',
+                        isSelected
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border hover:border-primary/50 bg-card'
+                      )}
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      <span className="font-medium">{extra.name}</span>
+                      <Badge variant={isSelected ? 'default' : 'secondary'}>
+                        +${extra.price.toFixed(2)}
+                      </Badge>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -345,7 +409,7 @@ export default function QuickSale() {
             <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
               <ShoppingCart className="w-12 h-12 mb-2 opacity-30" />
               <p>Carrito vacío</p>
-              <p className="text-sm">Selecciona servicios para agregar</p>
+              <p className="text-sm">Selecciona servicios o artículos para agregar</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -355,9 +419,14 @@ export default function QuickSale() {
                   className="flex items-center justify-between p-3 bg-muted/50 rounded-xl"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{item.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium truncate">{item.name}</p>
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        {item.type === 'service' ? 'Servicio' : 'Artículo'}
+                      </Badge>
+                    </div>
                     <p className="text-sm text-muted-foreground">
-                      ${item.unitPrice.toFixed(2)} / {item.unit}
+                      ${item.unitPrice.toFixed(2)} / {getPricingUnit(item.pricingType)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -366,7 +435,7 @@ export default function QuickSale() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
-                        onClick={() => updateCartQuantity(item.id, -0.5)}
+                        onClick={() => updateCartQuantity(item.id, -1)}
                       >
                         <Minus className="w-3 h-3" />
                       </Button>
@@ -377,7 +446,7 @@ export default function QuickSale() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
-                        onClick={() => updateCartQuantity(item.id, 0.5)}
+                        onClick={() => updateCartQuantity(item.id, 1)}
                       >
                         <Plus className="w-3 h-3" />
                       </Button>
@@ -402,7 +471,7 @@ export default function QuickSale() {
                 <>
                   <Separator />
                   {selectedExtras.map((extraId) => {
-                    const extra = EXTRA_SERVICES.find(e => e.id === extraId);
+                    const extra = activeExtraServices.find(e => e.id === extraId);
                     if (!extra) return null;
                     return (
                       <div key={extraId} className="flex items-center justify-between px-3 py-2 text-sm">
