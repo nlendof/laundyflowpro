@@ -214,9 +214,9 @@ export function PayrollManagement({ employees }: PayrollManagementProps) {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-MX', {
+    return new Intl.NumberFormat('es-DO', {
       style: 'currency',
-      currency: 'MXN',
+      currency: 'DOP',
     }).format(amount);
   };
 
