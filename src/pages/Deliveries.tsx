@@ -779,14 +779,11 @@ export default function Deliveries() {
           </DialogHeader>
           
           <div className="space-y-3 mt-4">
-            {drivers.map((driver) => (
+          {drivers.map((driver) => (
               <button
                 key={driver.id}
                 onClick={() => confirmAssignDriver(driver.id)}
-                className={cn(
-                  'w-full p-4 rounded-xl border text-left transition-all hover:border-primary hover:bg-primary/5',
-                  driver.status !== 'available' && 'opacity-50'
-                )}
+                className="w-full p-4 rounded-xl border text-left transition-all hover:border-primary hover:bg-primary/5"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -799,7 +796,7 @@ export default function Deliveries() {
                     </div>
                   </div>
                   <Badge variant={driver.status === 'available' ? 'default' : 'secondary'}>
-                    {driver.status === 'available' ? 'Disponible' : 'En ruta'}
+                    {driver.status === 'available' ? 'Disponible' : `En ruta (${driver.currentOrders})`}
                   </Badge>
                 </div>
               </button>
