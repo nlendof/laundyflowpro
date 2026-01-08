@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Order, OrderItem, ItemType, OrderStatus } from '@/types';
+import { useConfig } from '@/contexts/ConfigContext';
 import { QUICK_SERVICES } from '@/lib/constants';
 import {
   Dialog,
@@ -14,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -39,6 +41,9 @@ import {
   Scale,
   Shirt,
   Package,
+  Home,
+  Store,
+  AlertTriangle,
 } from 'lucide-react';
 
 const iconMap: Record<string, React.ElementType> = {
@@ -55,13 +60,19 @@ const GARMENT_CATEGORIES = [
   { id: 'mixed', name: 'Ropa Mixta', icon: Package, pricePerPiece: 2.50, pricePerKg: 6.00 },
 ];
 
-// Servicios extra
-const EXTRA_SERVICES = [
-  { id: 'stain_removal', name: 'Desmanchado', price: 3.00 },
-  { id: 'premium_softener', name: 'Suavizante Premium', price: 2.00 },
-  { id: 'express', name: 'Express (24h)', price: 10.00 },
-  { id: 'fragrance', name: 'Fragancia Especial', price: 1.50 },
+// Verificación de artículos
+const ITEM_CHECKS = [
+  { id: 'has_laces', label: 'Tiene cordones', defaultChecked: true },
+  { id: 'has_insoles', label: 'Tiene plantilla', defaultChecked: true },
+  { id: 'is_torn', label: 'Está roto', defaultChecked: false },
+  { id: 'is_detached', label: 'Está despegado', defaultChecked: false },
+  { id: 'has_stains', label: 'Tiene manchas', defaultChecked: false },
+  { id: 'missing_buttons', label: 'Faltan botones', defaultChecked: false },
 ];
+
+// Tipo de recepción/entrega
+type ReceptionType = 'in_store' | 'pickup';
+type DeliveryType = 'in_store' | 'delivery';
 
 interface NewOrderModalProps {
   isOpen: boolean;
@@ -80,18 +91,27 @@ interface OrderItemDraft {
 }
 
 export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalProps) {
+  const { activeDeliveryZones, activeExtraServices } = useConfig();
+  
   // Customer info
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
   
-  // Delivery options
-  const [isDelivery, setIsDelivery] = useState(false);
+  // Reception and Delivery options
+  const [receptionType, setReceptionType] = useState<ReceptionType>('in_store');
+  const [deliveryType, setDeliveryType] = useState<DeliveryType>('in_store');
+  const [selectedZone, setSelectedZone] = useState<string>('');
   const [deliverySlot, setDeliverySlot] = useState<'morning' | 'afternoon'>('morning');
   
   // Items
   const [items, setItems] = useState<OrderItemDraft[]>([]);
   const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
+  
+  // Item checks
+  const [itemChecks, setItemChecks] = useState<Record<string, boolean>>(
+    Object.fromEntries(ITEM_CHECKS.map(c => [c.id, c.defaultChecked]))
+  );
   
   // Notes
   const [notes, setNotes] = useState('');
@@ -108,12 +128,27 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
 
   const extrasTotal = useMemo(() => {
     return selectedExtras.reduce((sum, extraId) => {
-      const extra = EXTRA_SERVICES.find(e => e.id === extraId);
+      const extra = activeExtraServices.find(e => e.id === extraId);
       return sum + (extra?.price || 0);
     }, 0);
-  }, [selectedExtras]);
+  }, [selectedExtras, activeExtraServices]);
 
-  const totalAmount = itemsTotal + extrasTotal;
+  // Calculate delivery costs
+  const deliveryCost = useMemo(() => {
+    let cost = 0;
+    const zone = activeDeliveryZones.find(z => z.id === selectedZone);
+    const zonePrice = zone?.price || 0;
+    
+    if (receptionType === 'pickup') {
+      cost += zonePrice;
+    }
+    if (deliveryType === 'delivery') {
+      cost += zonePrice;
+    }
+    return cost;
+  }, [receptionType, deliveryType, selectedZone, activeDeliveryZones]);
+
+  const totalAmount = itemsTotal + extrasTotal + deliveryCost;
 
   // Generate ticket code
   const generateTicketCode = () => {
@@ -173,15 +208,34 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
     );
   };
 
+  // Toggle item check
+  const toggleItemCheck = (checkId: string) => {
+    setItemChecks(prev => ({ ...prev, [checkId]: !prev[checkId] }));
+  };
+
+  // Build notes with checks
+  const buildOrderNotes = () => {
+    const checkNotes = ITEM_CHECKS
+      .map(c => `${c.label}: ${itemChecks[c.id] ? 'Sí' : 'No'}`)
+      .join(' | ');
+    
+    return notes.trim() 
+      ? `[Verificación: ${checkNotes}]\n\n${notes.trim()}`
+      : `[Verificación: ${checkNotes}]`;
+  };
+
   // Reset form
   const resetForm = () => {
     setCustomerName('');
     setCustomerPhone('');
     setCustomerAddress('');
-    setIsDelivery(false);
+    setReceptionType('in_store');
+    setDeliveryType('in_store');
+    setSelectedZone('');
     setDeliverySlot('morning');
     setItems([]);
     setSelectedExtras([]);
+    setItemChecks(Object.fromEntries(ITEM_CHECKS.map(c => [c.id, c.defaultChecked])));
     setNotes('');
     setSelectedCategory('');
     setQuantity(1);
@@ -190,44 +244,58 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
   // Create order
   const handleCreateOrder = () => {
     if (!customerName || !customerPhone || items.length === 0) return;
+    
+    const needsPickup = receptionType === 'pickup';
+    const needsDelivery = deliveryType === 'delivery';
+    const requiresAddress = needsPickup || needsDelivery;
+    
+    if (requiresAddress && !customerAddress) return;
 
     const ticketCode = generateTicketCode();
+    const zone = activeDeliveryZones.find(z => z.id === selectedZone);
     
     const order: Order = {
       id: crypto.randomUUID(),
       ticketCode,
-      qrCode: ticketCode, // QR data is the ticket code
+      qrCode: ticketCode,
       customerId: crypto.randomUUID(),
       customerName,
       customerPhone,
-      customerAddress: isDelivery ? customerAddress : undefined,
+      customerAddress: requiresAddress ? customerAddress : undefined,
       items: items.map(item => ({
         id: item.id,
         name: item.name,
         type: item.type,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
-        extras: selectedExtras.map(id => EXTRA_SERVICES.find(e => e.id === id)?.name || ''),
+        extras: selectedExtras.map(id => activeExtraServices.find(e => e.id === id)?.name || ''),
       })),
-      status: isDelivery ? 'pending_pickup' : 'in_store',
+      status: needsPickup ? 'pending_pickup' : 'in_store',
       totalAmount,
       paidAmount: 0,
       isPaid: false,
-      isDelivery,
-      deliverySlot: isDelivery ? deliverySlot : undefined,
-      needsPickup: false,
-      needsDelivery: isDelivery,
-      pickupService: undefined,
-      deliveryService: isDelivery ? {
+      isDelivery: needsDelivery,
+      deliverySlot: needsDelivery ? deliverySlot : undefined,
+      needsPickup,
+      needsDelivery,
+      pickupService: needsPickup ? {
+        type: 'pickup',
+        status: 'pending',
+        scheduledSlot: deliverySlot,
+        address: customerAddress,
+        notes: zone?.name,
+      } : undefined,
+      deliveryService: needsDelivery ? {
         type: 'delivery',
         status: 'pending',
         scheduledSlot: deliverySlot,
         address: customerAddress,
+        notes: zone?.name,
       } : undefined,
       createdAt: new Date(),
       updatedAt: new Date(),
-      estimatedReadyAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // +24h
-      notes: notes || undefined,
+      estimatedReadyAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      notes: buildOrderNotes(),
     };
 
     onCreateOrder(order);
@@ -283,23 +351,89 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
             </div>
           </div>
 
-          {/* Delivery Toggle */}
-          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-xl">
-            <div className="flex items-center gap-3">
-              <Truck className="w-5 h-5 text-primary" />
-              <div>
-                <p className="font-medium">Servicio a Domicilio</p>
-                <p className="text-sm text-muted-foreground">Recogida y entrega en casa</p>
-              </div>
+          {/* Reception Type - Where garments come from */}
+          <div className="space-y-3">
+            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+              Recepción de Prendas
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setReceptionType('in_store')}
+                className={`p-4 rounded-xl border text-left transition-all flex items-center gap-3 ${
+                  receptionType === 'in_store'
+                    ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
+                    : 'border-border hover:border-primary/30 hover:bg-muted/50'
+                }`}
+              >
+                <Store className="w-6 h-6 text-primary" />
+                <div>
+                  <p className="font-medium">En Local</p>
+                  <p className="text-sm text-muted-foreground">Cliente trae las prendas</p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setReceptionType('pickup')}
+                className={`p-4 rounded-xl border text-left transition-all flex items-center gap-3 ${
+                  receptionType === 'pickup'
+                    ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
+                    : 'border-border hover:border-primary/30 hover:bg-muted/50'
+                }`}
+              >
+                <Truck className="w-6 h-6 text-amber-500" />
+                <div>
+                  <p className="font-medium">Recoger a Domicilio</p>
+                  <p className="text-sm text-muted-foreground">Vamos por las prendas</p>
+                </div>
+              </button>
             </div>
-            <Switch checked={isDelivery} onCheckedChange={setIsDelivery} />
           </div>
 
-          {/* Delivery Options (if enabled) */}
-          {isDelivery && (
+          {/* Delivery Type - Where garments go */}
+          <div className="space-y-3">
+            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+              Entrega de Prendas
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setDeliveryType('in_store')}
+                className={`p-4 rounded-xl border text-left transition-all flex items-center gap-3 ${
+                  deliveryType === 'in_store'
+                    ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
+                    : 'border-border hover:border-primary/30 hover:bg-muted/50'
+                }`}
+              >
+                <Store className="w-6 h-6 text-primary" />
+                <div>
+                  <p className="font-medium">En Local</p>
+                  <p className="text-sm text-muted-foreground">Cliente recoge en tienda</p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeliveryType('delivery')}
+                className={`p-4 rounded-xl border text-left transition-all flex items-center gap-3 ${
+                  deliveryType === 'delivery'
+                    ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
+                    : 'border-border hover:border-primary/30 hover:bg-muted/50'
+                }`}
+              >
+                <Home className="w-6 h-6 text-emerald-500" />
+                <div>
+                  <p className="font-medium">Entregar a Domicilio</p>
+                  <p className="text-sm text-muted-foreground">Llevamos las prendas</p>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Address and Delivery Options (if pickup or delivery needed) */}
+          {(receptionType === 'pickup' || deliveryType === 'delivery') && (
             <div className="space-y-4 p-4 border rounded-xl border-primary/20 bg-primary/5">
               <div className="space-y-2">
-                <Label htmlFor="customerAddress">Dirección de Entrega *</Label>
+                <Label htmlFor="customerAddress">Dirección *</Label>
                 <div className="relative">
                   <MapPin className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                   <Textarea
@@ -311,8 +445,33 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
                   />
                 </div>
               </div>
+              
+              {/* Delivery Zone */}
               <div className="space-y-2">
-                <Label>Franja Horaria de Entrega</Label>
+                <Label>Zona de Entrega</Label>
+                <Select value={selectedZone} onValueChange={setSelectedZone}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar zona..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeDeliveryZones.map((zone) => (
+                      <SelectItem key={zone.id} value={zone.id}>
+                        {zone.name} {zone.price > 0 ? `(+$${zone.price.toFixed(2)})` : '(Sin costo)'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {deliveryCost > 0 && (
+                  <p className="text-sm text-amber-600 flex items-center gap-1">
+                    <Truck className="w-4 h-4" />
+                    Costo de envío: ${deliveryCost.toFixed(2)}
+                    {receptionType === 'pickup' && deliveryType === 'delivery' && ' (recogida + entrega)'}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Franja Horaria</Label>
                 <div className="flex gap-3">
                   <Button
                     type="button"
@@ -479,7 +638,7 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
               Servicios Extra
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {EXTRA_SERVICES.map((extra) => (
+              {activeExtraServices.map((extra) => (
                 <button
                   key={extra.id}
                   type="button"
@@ -497,14 +656,42 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
             </div>
           </div>
 
+          <Separator />
+
+          {/* Item Checks */}
+          <div className="space-y-3">
+            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              Verificación del Pedido
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-muted/50 rounded-xl">
+              {ITEM_CHECKS.map((check) => (
+                <div key={check.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={check.id}
+                    checked={itemChecks[check.id]}
+                    onCheckedChange={() => toggleItemCheck(check.id)}
+                  />
+                  <Label
+                    htmlFor={check.id}
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    {check.label}
+                  </Label>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Notes */}
           <div className="space-y-2">
-            <Label htmlFor="notes">Notas del Pedido</Label>
+            <Label htmlFor="notes">Notas Generales</Label>
             <Textarea
               id="notes"
-              placeholder="Instrucciones especiales, manchas específicas, etc."
+              placeholder="Instrucciones especiales, observaciones adicionales..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
+              className="min-h-[80px]"
             />
           </div>
 
@@ -512,15 +699,21 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
 
           {/* Total and Actions */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl">
+            <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-primary/5 rounded-xl">
               <div>
-                <p className="text-sm text-muted-foreground">Subtotal artículos</p>
+                <p className="text-sm text-muted-foreground">Artículos</p>
                 <p className="font-medium">${itemsTotal.toFixed(2)}</p>
               </div>
               {extrasTotal > 0 && (
                 <div>
                   <p className="text-sm text-muted-foreground">Extras</p>
                   <p className="font-medium">+${extrasTotal.toFixed(2)}</p>
+                </div>
+              )}
+              {deliveryCost > 0 && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Envío</p>
+                  <p className="font-medium">+${deliveryCost.toFixed(2)}</p>
                 </div>
               )}
               <div className="text-right">
