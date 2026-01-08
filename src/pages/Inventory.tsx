@@ -41,90 +41,7 @@ import { toast } from 'sonner';
 import { InventoryItem } from '@/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-
-// Mock inventory data
-const INITIAL_INVENTORY: InventoryItem[] = [
-  {
-    id: '1',
-    name: 'Detergente Industrial',
-    category: 'detergent',
-    currentStock: 45,
-    minStock: 20,
-    unit: 'litros',
-    unitCost: 85.50,
-    lastRestocked: new Date('2024-01-10'),
-  },
-  {
-    id: '2',
-    name: 'Suavizante Premium',
-    category: 'softener',
-    currentStock: 12,
-    minStock: 15,
-    unit: 'litros',
-    unitCost: 120.00,
-    lastRestocked: new Date('2024-01-08'),
-  },
-  {
-    id: '3',
-    name: 'Quitamanchas Profesional',
-    category: 'stain_remover',
-    currentStock: 8,
-    minStock: 10,
-    unit: 'litros',
-    unitCost: 95.00,
-    lastRestocked: new Date('2024-01-05'),
-  },
-  {
-    id: '4',
-    name: 'Bolsas para Entrega (Grande)',
-    category: 'other',
-    currentStock: 250,
-    minStock: 100,
-    unit: 'unidades',
-    unitCost: 2.50,
-    lastRestocked: new Date('2024-01-12'),
-  },
-  {
-    id: '5',
-    name: 'Bolsas para Entrega (Mediana)',
-    category: 'other',
-    currentStock: 180,
-    minStock: 100,
-    unit: 'unidades',
-    unitCost: 1.80,
-    lastRestocked: new Date('2024-01-12'),
-  },
-  {
-    id: '6',
-    name: 'Perchas Plásticas',
-    category: 'other',
-    currentStock: 45,
-    minStock: 50,
-    unit: 'unidades',
-    unitCost: 8.00,
-    lastRestocked: new Date('2024-01-03'),
-  },
-  {
-    id: '7',
-    name: 'Blanqueador',
-    category: 'detergent',
-    currentStock: 30,
-    minStock: 15,
-    unit: 'litros',
-    unitCost: 45.00,
-    lastRestocked: new Date('2024-01-09'),
-  },
-  {
-    id: '8',
-    name: 'Almidón en Spray',
-    category: 'other',
-    currentStock: 5,
-    minStock: 12,
-    unit: 'unidades',
-    unitCost: 65.00,
-    lastRestocked: new Date('2024-01-02'),
-  },
-];
+import { useInventory } from '@/contexts/InventoryContext';
 
 type CategoryFilter = 'all' | InventoryItem['category'];
 
@@ -136,7 +53,7 @@ const CATEGORY_CONFIG = {
 };
 
 export default function Inventory() {
-  const [items, setItems] = useState<InventoryItem[]>(INITIAL_INVENTORY);
+  const { items, stats, addItem, updateItem, deleteItem, restockItem } = useInventory();
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
@@ -171,21 +88,6 @@ export default function Inventory() {
     });
   }, [items, categoryFilter, showLowStockOnly, searchQuery]);
 
-  // Stats
-  const stats = useMemo(() => {
-    const lowStockItems = items.filter(i => i.currentStock < i.minStock);
-    const totalValue = items.reduce((sum, i) => sum + (i.currentStock * i.unitCost), 0);
-    const criticalItems = items.filter(i => i.currentStock < i.minStock * 0.5);
-    
-    return {
-      totalItems: items.length,
-      lowStockCount: lowStockItems.length,
-      criticalCount: criticalItems.length,
-      totalValue,
-      healthyItems: items.length - lowStockItems.length,
-    };
-  }, [items]);
-
   const getStockStatus = (item: InventoryItem) => {
     const percentage = (item.currentStock / item.minStock) * 100;
     if (percentage >= 100) return { status: 'healthy', color: 'text-green-600', bg: 'bg-green-500' };
@@ -199,13 +101,7 @@ export default function Inventory() {
       return;
     }
     
-    const item: InventoryItem = {
-      id: Date.now().toString(),
-      ...newItem,
-      lastRestocked: new Date(),
-    };
-    
-    setItems(prev => [...prev, item]);
+    addItem(newItem);
     toast.success('Producto agregado al inventario');
     setShowAddDialog(false);
     setNewItem({
@@ -221,12 +117,7 @@ export default function Inventory() {
   const handleRestock = () => {
     if (!selectedItem || restockAmount <= 0) return;
     
-    setItems(prev => prev.map(i => 
-      i.id === selectedItem.id 
-        ? { ...i, currentStock: i.currentStock + restockAmount, lastRestocked: new Date() }
-        : i
-    ));
-    
+    restockItem(selectedItem.id, restockAmount);
     toast.success(`Se agregaron ${restockAmount} ${selectedItem.unit} de ${selectedItem.name}`);
     setShowRestockDialog(false);
     setSelectedItem(null);
@@ -236,17 +127,14 @@ export default function Inventory() {
   const handleEditItem = () => {
     if (!selectedItem) return;
     
-    setItems(prev => prev.map(i => 
-      i.id === selectedItem.id ? selectedItem : i
-    ));
-    
+    updateItem(selectedItem.id, selectedItem);
     toast.success('Producto actualizado');
     setShowEditDialog(false);
     setSelectedItem(null);
   };
 
   const handleDeleteItem = (item: InventoryItem) => {
-    setItems(prev => prev.filter(i => i.id !== item.id));
+    deleteItem(item.id);
     toast.success('Producto eliminado del inventario');
   };
 

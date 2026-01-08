@@ -40,160 +40,15 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useConfig } from '@/contexts/ConfigContext';
-
-// Types for catalog items
-type CatalogItemType = 'service' | 'article';
-type PricingType = 'weight' | 'piece' | 'fixed';
-
-interface CatalogItem {
-  id: string;
-  name: string;
-  description?: string;
-  type: CatalogItemType;
-  pricingType: PricingType;
-  price: number;
-  category: string;
-  estimatedTime?: number; // in hours
-  isActive: boolean;
-  extras?: CatalogExtra[];
-  createdAt: Date;
-}
-
-interface CatalogExtra {
-  id: string;
-  name: string;
-  price: number;
-}
-
-// Initial mock data
-const INITIAL_CATALOG: CatalogItem[] = [
-  {
-    id: '1',
-    name: 'Lavado por Kilo',
-    description: 'Servicio de lavado estándar por kilogramo',
-    type: 'service',
-    pricingType: 'weight',
-    price: 35.00,
-    category: 'Lavado',
-    estimatedTime: 24,
-    isActive: true,
-    extras: [
-      { id: 'e1', name: 'Suavizante Premium', price: 10 },
-      { id: 'e2', name: 'Aromatizante', price: 8 },
-    ],
-    createdAt: new Date('2024-01-01'),
-  },
-  {
-    id: '2',
-    name: 'Lavado Express',
-    description: 'Lavado con entrega en 4 horas',
-    type: 'service',
-    pricingType: 'weight',
-    price: 55.00,
-    category: 'Lavado',
-    estimatedTime: 4,
-    isActive: true,
-    createdAt: new Date('2024-01-01'),
-  },
-  {
-    id: '3',
-    name: 'Planchado',
-    description: 'Servicio de planchado profesional',
-    type: 'service',
-    pricingType: 'piece',
-    price: 25.00,
-    category: 'Planchado',
-    estimatedTime: 24,
-    isActive: true,
-    createdAt: new Date('2024-01-01'),
-  },
-  {
-    id: '4',
-    name: 'Lavado en Seco',
-    description: 'Limpieza en seco para prendas delicadas',
-    type: 'service',
-    pricingType: 'piece',
-    price: 85.00,
-    category: 'Especializado',
-    estimatedTime: 48,
-    isActive: true,
-    createdAt: new Date('2024-01-01'),
-  },
-  {
-    id: '5',
-    name: 'Camisa',
-    description: 'Camisa de vestir o casual',
-    type: 'article',
-    pricingType: 'piece',
-    price: 35.00,
-    category: 'Ropa Superior',
-    isActive: true,
-    createdAt: new Date('2024-01-01'),
-  },
-  {
-    id: '6',
-    name: 'Pantalón',
-    description: 'Pantalón de vestir o casual',
-    type: 'article',
-    pricingType: 'piece',
-    price: 40.00,
-    category: 'Ropa Inferior',
-    isActive: true,
-    createdAt: new Date('2024-01-01'),
-  },
-  {
-    id: '7',
-    name: 'Traje Completo',
-    description: 'Saco y pantalón de vestir',
-    type: 'article',
-    pricingType: 'piece',
-    price: 150.00,
-    category: 'Especializado',
-    isActive: true,
-    createdAt: new Date('2024-01-01'),
-  },
-  {
-    id: '8',
-    name: 'Edredón Individual',
-    description: 'Edredón o cobertor tamaño individual',
-    type: 'article',
-    pricingType: 'piece',
-    price: 120.00,
-    category: 'Hogar',
-    isActive: true,
-    createdAt: new Date('2024-01-01'),
-  },
-  {
-    id: '9',
-    name: 'Edredón Matrimonial',
-    description: 'Edredón o cobertor tamaño matrimonial',
-    type: 'article',
-    pricingType: 'piece',
-    price: 180.00,
-    category: 'Hogar',
-    isActive: true,
-    createdAt: new Date('2024-01-01'),
-  },
-  {
-    id: '10',
-    name: 'Cortinas (por m²)',
-    description: 'Lavado de cortinas por metro cuadrado',
-    type: 'article',
-    pricingType: 'fixed',
-    price: 45.00,
-    category: 'Hogar',
-    isActive: true,
-    createdAt: new Date('2024-01-01'),
-  },
-];
+import { useCatalog, CatalogItem, CatalogExtra, CatalogItemType, PricingType } from '@/contexts/CatalogContext';
 
 type TabFilter = 'all' | 'service' | 'article';
 
 export default function Catalog() {
   const { activeCategories } = useConfig();
+  const { items, addItem, updateItem, deleteItem, toggleActive } = useCatalog();
   const categoryNames = activeCategories.map(c => c.name);
   
-  const [items, setItems] = useState<CatalogItem[]>(INITIAL_CATALOG);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<TabFilter>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -273,8 +128,7 @@ export default function Catalog() {
       return;
     }
     
-    const newItem: CatalogItem = {
-      id: Date.now().toString(),
+    addItem({
       name: formData.name,
       description: formData.description,
       type: formData.type || 'service',
@@ -284,11 +138,9 @@ export default function Catalog() {
       estimatedTime: formData.estimatedTime,
       isActive: formData.isActive ?? true,
       extras: formData.extras || [],
-      createdAt: new Date(),
-    };
+    });
     
-    setItems(prev => [...prev, newItem]);
-    toast.success(`${newItem.type === 'service' ? 'Servicio' : 'Artículo'} agregado al catálogo`);
+    toast.success(`${formData.type === 'service' ? 'Servicio' : 'Artículo'} agregado al catálogo`);
     setShowAddDialog(false);
     resetForm();
   };
@@ -296,11 +148,7 @@ export default function Catalog() {
   const handleEditItem = () => {
     if (!selectedItem || !formData.name?.trim()) return;
     
-    setItems(prev => prev.map(i => 
-      i.id === selectedItem.id 
-        ? { ...i, ...formData } as CatalogItem
-        : i
-    ));
+    updateItem(selectedItem.id, formData);
     
     toast.success('Elemento actualizado');
     setShowEditDialog(false);
@@ -309,14 +157,12 @@ export default function Catalog() {
   };
 
   const handleDeleteItem = (item: CatalogItem) => {
-    setItems(prev => prev.filter(i => i.id !== item.id));
+    deleteItem(item.id);
     toast.success('Elemento eliminado del catálogo');
   };
 
   const handleToggleActive = (item: CatalogItem) => {
-    setItems(prev => prev.map(i => 
-      i.id === item.id ? { ...i, isActive: !i.isActive } : i
-    ));
+    toggleActive(item.id);
     toast.success(item.isActive ? 'Elemento desactivado' : 'Elemento activado');
   };
 
