@@ -18,6 +18,7 @@ import Deliveries from "./pages/Deliveries";
 import Inventory from "./pages/Inventory";
 import Catalog from "./pages/Catalog";
 import Settings from "./pages/Settings";
+import CashRegister from "./pages/CashRegister";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -101,10 +102,7 @@ function AppRoutes() {
           path="/cash-register"
           element={
             <ProtectedRoute>
-              <div className="p-8">
-                <h1 className="text-2xl font-bold">Caja</h1>
-                <p className="text-muted-foreground">Módulo en desarrollo...</p>
-              </div>
+              <CashRegister />
             </ProtectedRoute>
           }
         />
