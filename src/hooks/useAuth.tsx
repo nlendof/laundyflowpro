@@ -16,25 +16,25 @@ const DEMO_USERS: Record<UserRole, User> = {
   admin: {
     id: '1',
     name: 'Carlos Administrador',
-    email: 'admin@lavanderiaenpro.com',
+    email: 'admin@luiscap.com',
     role: 'admin',
   },
   cajero: {
     id: '2',
     name: 'María Cajera',
-    email: 'cajero@lavanderiaenpro.com',
+    email: 'cajero@luiscap.com',
     role: 'cajero',
   },
   operador: {
     id: '3',
     name: 'Juan Operador',
-    email: 'operador@lavanderiaenpro.com',
+    email: 'operador@luiscap.com',
     role: 'operador',
   },
   delivery: {
     id: '4',
     name: 'Pedro Repartidor',
-    email: 'delivery@lavanderiaenpro.com',
+    email: 'delivery@luiscap.com',
     role: 'delivery',
   },
 };

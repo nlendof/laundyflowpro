@@ -37,7 +37,7 @@ export default function Login() {
 
   const handleRoleSelect = (role: UserRole) => {
     setSelectedRole(role);
-    setEmail(`${role}@lavanderiaenpro.com`);
+    setEmail(`${role}@luiscap.com`);
     setError('');
   };
 
@@ -73,8 +73,8 @@ export default function Login() {
               <WashingMachine className="w-10 h-10" />
             </div>
             <div>
-              <h1 className="text-4xl font-bold">Lavandería Pro</h1>
-              <p className="text-primary-foreground/80 text-lg">Sistema ERP</p>
+              <h1 className="text-4xl font-bold">Luis Cap</h1>
+              <p className="text-primary-foreground/80 text-lg">Lavandería</p>
             </div>
           </div>
           <p className="text-xl text-primary-foreground/90 max-w-md leading-relaxed">
@@ -108,8 +108,8 @@ export default function Login() {
               <WashingMachine className="w-7 h-7 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Lavandería Pro</h1>
-              <p className="text-sm text-muted-foreground">Sistema ERP</p>
+              <h1 className="text-2xl font-bold">Luis Cap</h1>
+              <p className="text-sm text-muted-foreground">Lavandería</p>
             </div>
           </div>
 
