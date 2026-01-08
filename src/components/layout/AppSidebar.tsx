@@ -65,8 +65,8 @@ export function AppSidebar() {
               <WashingMachine className="w-6 h-6 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="font-bold text-lg text-sidebar-foreground">Lavandería</h1>
-              <p className="text-xs text-sidebar-foreground/60">Pro ERP</p>
+              <h1 className="font-bold text-lg text-sidebar-foreground">Luis Cap</h1>
+              <p className="text-xs text-sidebar-foreground/60">Lavandería</p>
             </div>
           </div>
         )}
