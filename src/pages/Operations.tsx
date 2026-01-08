@@ -1,0 +1,421 @@
+import { useState, useMemo } from 'react';
+import { Order, OrderStatus } from '@/types';
+import { MOCK_ORDERS } from '@/lib/mockData';
+import { ORDER_STATUS_CONFIG, ORDER_STATUS_FLOW } from '@/lib/constants';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatusBadge } from '@/components/StatusBadge';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Store,
+  Waves,
+  Wind,
+  Flame,
+  Package,
+  Search,
+  Clock,
+  ArrowRight,
+  CheckCircle,
+  User,
+  Phone,
+  AlertCircle,
+  Timer,
+  Play,
+  Pause,
+} from 'lucide-react';
+import { format, formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { toast } from 'sonner';
+
+// Only operation-relevant statuses
+const OPERATION_STATUSES: OrderStatus[] = ['in_store', 'washing', 'drying', 'ironing', 'ready_delivery'];
+
+const STATUS_ICONS: Record<string, React.ElementType> = {
+  in_store: Store,
+  washing: Waves,
+  drying: Wind,
+  ironing: Flame,
+  ready_delivery: Package,
+};
+
+interface OperationOrderCardProps {
+  order: Order;
+  onAdvance: (order: Order) => void;
+  onViewDetails: (order: Order) => void;
+}
+
+function OperationOrderCard({ order, onAdvance, onViewDetails }: OperationOrderCardProps) {
+  const currentIndex = ORDER_STATUS_FLOW.indexOf(order.status);
+  const canAdvance = currentIndex < ORDER_STATUS_FLOW.indexOf('ready_delivery');
+  const nextStatus = canAdvance ? ORDER_STATUS_FLOW[currentIndex + 1] as OrderStatus : null;
+  const nextStatusConfig = nextStatus ? ORDER_STATUS_CONFIG[nextStatus] : null;
+
+  const timeInStatus = formatDistanceToNow(order.updatedAt, { locale: es, addSuffix: false });
+
+  return (
+    <Card 
+      className={cn(
+        'cursor-pointer transition-all hover:shadow-md hover:border-primary/30',
+        order.isDelivery && 'border-l-4 border-l-blue-500'
+      )}
+      onClick={() => onViewDetails(order)}
+    >
+      <CardContent className="p-4 space-y-3">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <span className="font-mono font-bold text-sm">{order.ticketCode}</span>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Timer className="w-3 h-3" />
+            {timeInStatus}
+          </div>
+        </div>
+
+        {/* Customer */}
+        <div className="space-y-1">
+          <p className="font-medium text-sm flex items-center gap-2">
+            <User className="w-3.5 h-3.5 text-muted-foreground" />
+            {order.customerName}
+          </p>
+          {order.isDelivery && (
+            <Badge variant="outline" className="text-xs">
+              🚚 Delivery
+            </Badge>
+          )}
+        </div>
+
+        {/* Items summary */}
+        <div className="text-xs text-muted-foreground">
+          {order.items.length} artículo{order.items.length > 1 ? 's' : ''} • 
+          {order.items.reduce((sum, item) => sum + item.quantity, 0)} piezas
+        </div>
+
+        {/* Notes warning */}
+        {order.notes && (
+          <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+            <AlertCircle className="w-3 h-3" />
+            <span className="truncate">{order.notes}</span>
+          </div>
+        )}
+
+        {/* Action button */}
+        {canAdvance && nextStatusConfig && (
+          <Button
+            size="sm"
+            className="w-full gap-2 mt-2"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdvance(order);
+            }}
+          >
+            <Play className="w-3.5 h-3.5" />
+            Pasar a {nextStatusConfig.labelEs}
+          </Button>
+        )}
+
+        {order.status === 'ready_delivery' && (
+          <div className="flex items-center justify-center gap-2 p-2 bg-green-500/10 rounded-lg text-green-600 dark:text-green-400">
+            <CheckCircle className="w-4 h-4" />
+            <span className="text-sm font-medium">Listo</span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+interface OrderDetailsDialogProps {
+  order: Order | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onAdvance: (order: Order) => void;
+}
+
+function OrderDetailsDialog({ order, isOpen, onClose, onAdvance }: OrderDetailsDialogProps) {
+  if (!order) return null;
+
+  const currentIndex = ORDER_STATUS_FLOW.indexOf(order.status);
+  const canAdvance = currentIndex < ORDER_STATUS_FLOW.indexOf('ready_delivery');
+  const nextStatus = canAdvance ? ORDER_STATUS_FLOW[currentIndex + 1] as OrderStatus : null;
+  const nextStatusConfig = nextStatus ? ORDER_STATUS_CONFIG[nextStatus] : null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-3">
+            <span className="font-mono">{order.ticketCode}</span>
+            <StatusBadge status={order.status} />
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Customer Info */}
+          <div className="p-3 bg-muted/50 rounded-lg space-y-2">
+            <p className="font-medium flex items-center gap-2">
+              <User className="w-4 h-4 text-primary" />
+              {order.customerName}
+            </p>
+            <p className="text-sm text-muted-foreground flex items-center gap-2">
+              <Phone className="w-4 h-4" />
+              {order.customerPhone}
+            </p>
+            {order.isDelivery && (
+              <Badge>🚚 Entrega a Domicilio</Badge>
+            )}
+          </div>
+
+          {/* Items */}
+          <div className="space-y-2">
+            <h4 className="font-semibold text-sm">Artículos</h4>
+            <div className="space-y-2">
+              {order.items.map((item) => (
+                <div key={item.id} className="flex justify-between p-2 bg-muted/30 rounded-lg text-sm">
+                  <span>{item.name}</span>
+                  <span className="font-medium">
+                    {item.quantity} {item.type === 'weight' ? 'kg' : 'pz'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Extras */}
+          {order.items.some(item => item.extras.length > 0) && (
+            <div className="space-y-2">
+              <h4 className="font-semibold text-sm">Servicios Extra</h4>
+              <div className="flex flex-wrap gap-1">
+                {order.items.flatMap(item => item.extras).map((extra, idx) => (
+                  <Badge key={idx} variant="secondary">{extra}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Notes */}
+          {order.notes && (
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                <strong>📝 Notas:</strong> {order.notes}
+              </p>
+            </div>
+          )}
+
+          {/* Timestamps */}
+          <div className="text-xs text-muted-foreground space-y-1">
+            <p className="flex items-center gap-2">
+              <Clock className="w-3.5 h-3.5" />
+              Recibido: {format(order.createdAt, "dd/MM/yyyy HH:mm", { locale: es })}
+            </p>
+            <p className="flex items-center gap-2">
+              <Clock className="w-3.5 h-3.5" />
+              Última actualización: {format(order.updatedAt, "dd/MM/yyyy HH:mm", { locale: es })}
+            </p>
+          </div>
+
+          {/* Actions */}
+          {canAdvance && nextStatusConfig && (
+            <Button
+              className="w-full gap-2"
+              size="lg"
+              onClick={() => {
+                onAdvance(order);
+                onClose();
+              }}
+            >
+              <ArrowRight className="w-4 h-4" />
+              Avanzar a {nextStatusConfig.labelEs}
+            </Button>
+          )}
+
+          {order.status === 'ready_delivery' && (
+            <div className="p-4 bg-green-500/10 rounded-xl text-center">
+              <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
+              <p className="font-semibold text-green-600 dark:text-green-400">
+                Pedido listo para entrega
+              </p>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default function Operations() {
+  const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
+  // Filter orders for operations (only relevant statuses)
+  const operationOrders = useMemo(() => {
+    return orders.filter(order => OPERATION_STATUSES.includes(order.status));
+  }, [orders]);
+
+  // Group by status
+  const ordersByStatus = useMemo(() => {
+    const groups: Record<OrderStatus, Order[]> = {
+      pending_pickup: [],
+      in_store: [],
+      washing: [],
+      drying: [],
+      ironing: [],
+      ready_delivery: [],
+      in_transit: [],
+      delivered: [],
+    };
+
+    operationOrders.forEach(order => {
+      // Apply search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matches = 
+          order.ticketCode.toLowerCase().includes(query) ||
+          order.customerName.toLowerCase().includes(query);
+        if (!matches) return;
+      }
+      groups[order.status].push(order);
+    });
+
+    return groups;
+  }, [operationOrders, searchQuery]);
+
+  // Count totals
+  const totalPending = ordersByStatus.in_store.length;
+  const totalInProcess = ordersByStatus.washing.length + ordersByStatus.drying.length + ordersByStatus.ironing.length;
+  const totalReady = ordersByStatus.ready_delivery.length;
+
+  const handleAdvanceStatus = (order: Order) => {
+    const currentIndex = ORDER_STATUS_FLOW.indexOf(order.status);
+    if (currentIndex < ORDER_STATUS_FLOW.length - 1) {
+      const nextStatus = ORDER_STATUS_FLOW[currentIndex + 1] as OrderStatus;
+      
+      setOrders(prev =>
+        prev.map(o =>
+          o.id === order.id
+            ? { ...o, status: nextStatus, updatedAt: new Date() }
+            : o
+        )
+      );
+
+      const statusConfig = ORDER_STATUS_CONFIG[nextStatus];
+      toast.success(`${order.ticketCode} → ${statusConfig.labelEs}`);
+    }
+  };
+
+  const handleViewDetails = (order: Order) => {
+    setSelectedOrder(order);
+    setIsDetailsOpen(true);
+  };
+
+  return (
+    <div className="h-[calc(100vh-2rem)] flex flex-col p-4 lg:p-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-bold flex items-center gap-3">
+            <Waves className="w-8 h-8 text-primary" />
+            Operaciones
+          </h1>
+          <p className="text-muted-foreground">Gestión del proceso de lavado</p>
+        </div>
+
+        {/* Stats */}
+        <div className="flex gap-3">
+          <div className="px-4 py-2 bg-amber-500/10 rounded-xl border border-amber-500/20">
+            <p className="text-xs text-amber-600 dark:text-amber-400">Pendientes</p>
+            <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{totalPending}</p>
+          </div>
+          <div className="px-4 py-2 bg-blue-500/10 rounded-xl border border-blue-500/20">
+            <p className="text-xs text-blue-600 dark:text-blue-400">En Proceso</p>
+            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totalInProcess}</p>
+          </div>
+          <div className="px-4 py-2 bg-green-500/10 rounded-xl border border-green-500/20">
+            <p className="text-xs text-green-600 dark:text-green-400">Listos</p>
+            <p className="text-2xl font-bold text-green-600 dark:text-green-400">{totalReady}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-4 max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por código o cliente..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+
+      {/* Kanban Board */}
+      <div className="flex-1 overflow-x-auto">
+        <div className="flex gap-4 min-w-max h-full pb-4">
+          {OPERATION_STATUSES.map((status) => {
+            const config = ORDER_STATUS_CONFIG[status];
+            const Icon = STATUS_ICONS[status];
+            const statusOrders = ordersByStatus[status];
+
+            return (
+              <div
+                key={status}
+                className="w-[300px] flex flex-col bg-muted/30 rounded-2xl border"
+              >
+                {/* Column Header */}
+                <div className={cn(
+                  'p-4 rounded-t-2xl flex items-center justify-between',
+                  config.bgColor
+                )}>
+                  <div className="flex items-center gap-2">
+                    <Icon className={cn('w-5 h-5', config.color)} />
+                    <span className={cn('font-semibold', config.color)}>
+                      {config.labelEs}
+                    </span>
+                  </div>
+                  <Badge variant="secondary" className="h-6 min-w-6">
+                    {statusOrders.length}
+                  </Badge>
+                </div>
+
+                {/* Column Content */}
+                <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                  {statusOrders.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-32 text-center text-muted-foreground">
+                      <Icon className="w-8 h-8 mb-2 opacity-30" />
+                      <p className="text-sm">Sin pedidos</p>
+                    </div>
+                  ) : (
+                    statusOrders.map((order) => (
+                      <OperationOrderCard
+                        key={order.id}
+                        order={order}
+                        onAdvance={handleAdvanceStatus}
+                        onViewDetails={handleViewDetails}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Order Details Dialog */}
+      <OrderDetailsDialog
+        order={selectedOrder}
+        isOpen={isDetailsOpen}
+        onClose={() => setIsDetailsOpen(false)}
+        onAdvance={handleAdvanceStatus}
+      />
+    </div>
+  );
+}
