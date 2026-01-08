@@ -135,15 +135,15 @@ const INITIAL_PAYMENTS: PaymentMethod[] = [
 const INITIAL_BUSINESS: BusinessSettings = {
   name: 'Luis Cap',
   slogan: 'Lavandería Profesional',
-  phone: '+52 55 1234 5678',
+  phone: '+1 809 123 4567',
   email: 'contacto@luiscap.com',
-  address: 'Av. Principal #123, Col. Centro',
+  address: 'Av. Principal #123, Sector Centro',
   website: 'www.luiscap.com',
   openTime: '08:00',
   closeTime: '20:00',
   workDays: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
-  taxRate: 16,
-  currency: 'MXN',
+  taxRate: 18,
+  currency: 'DOP',
 };
 
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);

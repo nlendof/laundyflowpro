@@ -564,8 +564,9 @@ export default function SettingsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="MXN">MXN - Peso Mexicano</SelectItem>
+                      <SelectItem value="DOP">RD$ - Peso Dominicano</SelectItem>
                       <SelectItem value="USD">USD - Dólar Americano</SelectItem>
+                      <SelectItem value="MXN">MXN - Peso Mexicano</SelectItem>
                       <SelectItem value="EUR">EUR - Euro</SelectItem>
                     </SelectContent>
                   </Select>
