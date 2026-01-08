@@ -43,6 +43,15 @@ import {
   Percent,
   Package,
   Zap,
+  Workflow,
+  GripVertical,
+  ArrowUp,
+  ArrowDown,
+  Waves,
+  Wind,
+  Flame,
+  CheckCircle,
+  Store,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -90,6 +99,17 @@ interface PaymentMethod {
   name: string;
   isActive: boolean;
   commission: number;
+}
+
+interface OperationStep {
+  id: string;
+  key: string;
+  name: string;
+  icon: string;
+  color: string;
+  isActive: boolean;
+  isRequired: boolean;
+  order: number;
 }
 
 // Initial mock data
@@ -141,6 +161,42 @@ const INITIAL_PAYMENTS: PaymentMethod[] = [
   { id: '5', name: 'PayPal', isActive: false, commission: 4.0 },
 ];
 
+const INITIAL_OPERATIONS: OperationStep[] = [
+  { id: '1', key: 'pending_pickup', name: 'Pendiente de Recogida', icon: 'Clock', color: 'bg-amber-500', isActive: true, isRequired: true, order: 0 },
+  { id: '2', key: 'in_store', name: 'En Local', icon: 'Store', color: 'bg-blue-500', isActive: true, isRequired: true, order: 1 },
+  { id: '3', key: 'washing', name: 'Lavando', icon: 'Waves', color: 'bg-cyan-500', isActive: true, isRequired: false, order: 2 },
+  { id: '4', key: 'drying', name: 'Secando', icon: 'Wind', color: 'bg-purple-500', isActive: true, isRequired: false, order: 3 },
+  { id: '5', key: 'ironing', name: 'Planchado', icon: 'Flame', color: 'bg-orange-500', isActive: true, isRequired: false, order: 4 },
+  { id: '6', key: 'ready_delivery', name: 'Listo para Entrega', icon: 'Package', color: 'bg-emerald-500', isActive: true, isRequired: true, order: 5 },
+  { id: '7', key: 'in_transit', name: 'En Camino', icon: 'Truck', color: 'bg-indigo-500', isActive: true, isRequired: false, order: 6 },
+  { id: '8', key: 'delivered', name: 'Entregado', icon: 'CheckCircle', color: 'bg-green-600', isActive: true, isRequired: true, order: 7 },
+];
+
+const AVAILABLE_ICONS = [
+  { name: 'Clock', icon: Clock },
+  { name: 'Store', icon: Store },
+  { name: 'Waves', icon: Waves },
+  { name: 'Wind', icon: Wind },
+  { name: 'Flame', icon: Flame },
+  { name: 'Package', icon: Package },
+  { name: 'Truck', icon: Truck },
+  { name: 'CheckCircle', icon: CheckCircle },
+  { name: 'Zap', icon: Zap },
+];
+
+const AVAILABLE_COLORS = [
+  { name: 'Ámbar', value: 'bg-amber-500' },
+  { name: 'Azul', value: 'bg-blue-500' },
+  { name: 'Cyan', value: 'bg-cyan-500' },
+  { name: 'Púrpura', value: 'bg-purple-500' },
+  { name: 'Naranja', value: 'bg-orange-500' },
+  { name: 'Esmeralda', value: 'bg-emerald-500' },
+  { name: 'Índigo', value: 'bg-indigo-500' },
+  { name: 'Verde', value: 'bg-green-600' },
+  { name: 'Rosa', value: 'bg-pink-500' },
+  { name: 'Rojo', value: 'bg-red-500' },
+];
+
 const WORK_DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 export default function SettingsPage() {
@@ -150,6 +206,7 @@ export default function SettingsPage() {
   const [extras, setExtras] = useState<ExtraService[]>(INITIAL_EXTRAS);
   const [zones, setZones] = useState<DeliveryZone[]>(INITIAL_ZONES);
   const [payments, setPayments] = useState<PaymentMethod[]>(INITIAL_PAYMENTS);
+  const [operations, setOperations] = useState<OperationStep[]>(INITIAL_OPERATIONS);
   
   // Notification settings
   const [notifications, setNotifications] = useState({
@@ -172,6 +229,7 @@ export default function SettingsPage() {
   const [editingService, setEditingService] = useState<ServiceItem | null>(null);
   const [editingExtra, setEditingExtra] = useState<ExtraService | null>(null);
   const [editingZone, setEditingZone] = useState<DeliveryZone | null>(null);
+  const [editingOperation, setEditingOperation] = useState<OperationStep | null>(null);
 
   const handleSave = () => {
     toast.success('Configuración guardada correctamente');
@@ -260,6 +318,74 @@ export default function SettingsPage() {
     ));
   };
 
+  // Operations functions
+  const toggleOperation = (id: string) => {
+    setOperations(prev => prev.map(op => {
+      if (op.id === id && !op.isRequired) {
+        return { ...op, isActive: !op.isActive };
+      }
+      return op;
+    }));
+  };
+
+  const moveOperation = (id: string, direction: 'up' | 'down') => {
+    setOperations(prev => {
+      const sorted = [...prev].sort((a, b) => a.order - b.order);
+      const index = sorted.findIndex(op => op.id === id);
+      if (index === -1) return prev;
+      
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= sorted.length) return prev;
+      
+      // Swap orders
+      const current = sorted[index];
+      const target = sorted[targetIndex];
+      
+      return prev.map(op => {
+        if (op.id === current.id) return { ...op, order: target.order };
+        if (op.id === target.id) return { ...op, order: current.order };
+        return op;
+      });
+    });
+  };
+
+  const addOperation = () => {
+    const maxOrder = Math.max(...operations.map(op => op.order));
+    const newOperation: OperationStep = {
+      id: crypto.randomUUID(),
+      key: `custom_${Date.now()}`,
+      name: 'Nueva Operación',
+      icon: 'Zap',
+      color: 'bg-pink-500',
+      isActive: true,
+      isRequired: false,
+      order: maxOrder + 1,
+    };
+    setOperations(prev => [...prev, newOperation]);
+    setEditingOperation(newOperation);
+  };
+
+  const updateOperation = (updated: OperationStep) => {
+    setOperations(prev => prev.map(op => op.id === updated.id ? updated : op));
+    setEditingOperation(null);
+    toast.success('Operación actualizada');
+  };
+
+  const deleteOperation = (id: string) => {
+    const op = operations.find(o => o.id === id);
+    if (op?.isRequired) {
+      toast.error('Esta operación es requerida y no se puede eliminar');
+      return;
+    }
+    setOperations(prev => prev.filter(op => op.id !== id));
+    toast.success('Operación eliminada');
+  };
+
+  const getIconComponent = (iconName: string) => {
+    const iconConfig = AVAILABLE_ICONS.find(i => i.name === iconName);
+    return iconConfig?.icon || Zap;
+  };
+
   return (
     <div className="p-4 lg:p-6 max-w-6xl mx-auto">
       {/* Header */}
@@ -298,6 +424,10 @@ export default function SettingsPage() {
           <TabsTrigger value="notifications" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Bell className="w-4 h-4" />
             Notificaciones
+          </TabsTrigger>
+          <TabsTrigger value="operations" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Workflow className="w-4 h-4" />
+            Operaciones
           </TabsTrigger>
           <TabsTrigger value="appearance" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Palette className="w-4 h-4" />
@@ -794,6 +924,160 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
+        {/* Operations Settings */}
+        <TabsContent value="operations" className="space-y-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Workflow className="w-5 h-5" />
+                  Flujo de Operaciones
+                </CardTitle>
+                <CardDescription>
+                  Configura los pasos del proceso de lavandería. Activa, desactiva y reordena según tu flujo de trabajo.
+                </CardDescription>
+              </div>
+              <Button onClick={addOperation} size="sm" className="gap-2">
+                <Plus className="w-4 h-4" />
+                Agregar Paso
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {operations
+                  .sort((a, b) => a.order - b.order)
+                  .map((operation, index, arr) => {
+                    const IconComponent = getIconComponent(operation.icon);
+                    return (
+                      <div 
+                        key={operation.id}
+                        className={cn(
+                          'flex items-center justify-between p-4 rounded-xl border transition-all',
+                          !operation.isActive && 'opacity-50 bg-muted/30',
+                          operation.isActive && 'bg-card'
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex flex-col gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              disabled={index === 0}
+                              onClick={() => moveOperation(operation.id, 'up')}
+                            >
+                              <ArrowUp className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              disabled={index === arr.length - 1}
+                              onClick={() => moveOperation(operation.id, 'down')}
+                            >
+                              <ArrowDown className="w-3 h-3" />
+                            </Button>
+                          </div>
+                          
+                          <Switch
+                            checked={operation.isActive}
+                            disabled={operation.isRequired}
+                            onCheckedChange={() => toggleOperation(operation.id)}
+                          />
+                          
+                          <div className={cn('p-2 rounded-lg text-white', operation.color)}>
+                            <IconComponent className="w-5 h-5" />
+                          </div>
+                          
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{operation.name}</p>
+                              {operation.isRequired && (
+                                <Badge variant="secondary" className="text-xs">
+                                  Requerido
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Paso {index + 1} • {operation.key}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => setEditingOperation(operation)}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          {!operation.isRequired && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => deleteOperation(operation.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+              
+              {/* Flow Preview */}
+              <div className="mt-6 pt-6 border-t">
+                <Label className="mb-3 block">Vista Previa del Flujo</Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {operations
+                    .filter(op => op.isActive)
+                    .sort((a, b) => a.order - b.order)
+                    .map((operation, index, arr) => {
+                      const IconComponent = getIconComponent(operation.icon);
+                      return (
+                        <div key={operation.id} className="flex items-center gap-2">
+                          <div className={cn(
+                            'flex items-center gap-2 px-3 py-1.5 rounded-full text-white text-sm',
+                            operation.color
+                          )}>
+                            <IconComponent className="w-4 h-4" />
+                            <span>{operation.name}</span>
+                          </div>
+                          {index < arr.length - 1 && (
+                            <span className="text-muted-foreground">→</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Tips Card */}
+          <Card className="bg-muted/50 border-dashed">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Workflow className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium mb-1">Consejos para configurar el flujo</p>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• Los pasos marcados como "Requerido" no se pueden desactivar ni eliminar.</li>
+                    <li>• Usa las flechas para reordenar los pasos según tu proceso.</li>
+                    <li>• Los pasos desactivados no aparecerán en el tablero de operaciones.</li>
+                    <li>• Puedes crear pasos personalizados para procesos especiales.</li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Appearance Settings */}
         <TabsContent value="appearance" className="space-y-6">
           <Card>
@@ -986,6 +1270,93 @@ export default function SettingsPage() {
                 <p className="text-xs text-muted-foreground">Ingresa 0 para envío gratis</p>
               </div>
               <Button className="w-full" onClick={() => updateZone(editingZone)}>
+                Guardar Cambios
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Operation Dialog */}
+      <Dialog open={!!editingOperation} onOpenChange={() => setEditingOperation(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Operación</DialogTitle>
+          </DialogHeader>
+          {editingOperation && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Nombre de la Operación</Label>
+                <Input
+                  value={editingOperation.name}
+                  onChange={(e) => setEditingOperation({ ...editingOperation, name: e.target.value })}
+                  disabled={editingOperation.isRequired}
+                />
+                {editingOperation.isRequired && (
+                  <p className="text-xs text-muted-foreground">
+                    El nombre de operaciones requeridas no puede modificarse.
+                  </p>
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Ícono</Label>
+                <div className="grid grid-cols-5 gap-2">
+                  {AVAILABLE_ICONS.map(({ name, icon: Icon }) => (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => setEditingOperation({ ...editingOperation, icon: name })}
+                      className={cn(
+                        'p-3 rounded-lg border-2 flex items-center justify-center transition-all',
+                        editingOperation.icon === name
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border hover:border-primary/50'
+                      )}
+                    >
+                      <Icon className="w-5 h-5" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Color</Label>
+                <div className="grid grid-cols-5 gap-2">
+                  {AVAILABLE_COLORS.map(({ name, value }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setEditingOperation({ ...editingOperation, color: value })}
+                      className={cn(
+                        'w-10 h-10 rounded-lg transition-all',
+                        value,
+                        editingOperation.color === value
+                          ? 'ring-2 ring-offset-2 ring-primary'
+                          : ''
+                      )}
+                      title={name}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Preview */}
+              <div className="space-y-2">
+                <Label>Vista Previa</Label>
+                <div className={cn(
+                  'inline-flex items-center gap-2 px-4 py-2 rounded-full text-white',
+                  editingOperation.color
+                )}>
+                  {(() => {
+                    const IconComponent = getIconComponent(editingOperation.icon);
+                    return <IconComponent className="w-5 h-5" />;
+                  })()}
+                  <span className="font-medium">{editingOperation.name}</span>
+                </div>
+              </div>
+              
+              <Button className="w-full" onClick={() => updateOperation(editingOperation)}>
                 Guardar Cambios
               </Button>
             </div>
