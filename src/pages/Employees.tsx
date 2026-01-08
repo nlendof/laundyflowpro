@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
-import { User, UserRole } from '@/types';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
@@ -47,14 +46,12 @@ import {
   Trash2,
   Search,
   Phone,
-  Mail,
   Calendar,
   Clock,
   CheckCircle,
   XCircle,
   Eye,
   EyeOff,
-  Key,
   Settings,
   Store,
   Truck,
@@ -63,14 +60,18 @@ import {
   LayoutDashboard,
   ClipboardList,
   FileText,
+  Loader2,
+  RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+type AppRole = 'admin' | 'cajero' | 'operador' | 'delivery';
+
 // Role configuration
-const ROLE_CONFIG: Record<UserRole, { label: string; color: string; icon: React.ElementType; description: string }> = {
+const ROLE_CONFIG: Record<AppRole, { label: string; color: string; icon: React.ElementType; description: string }> = {
   admin: {
     label: 'Administrador',
     color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
@@ -115,84 +116,32 @@ const MODULES = [
 type ModuleKey = typeof MODULES[number]['key'];
 
 // Default permissions by role
-const DEFAULT_PERMISSIONS: Record<UserRole, ModuleKey[]> = {
+const DEFAULT_PERMISSIONS: Record<AppRole, ModuleKey[]> = {
   admin: MODULES.map(m => m.key),
   cajero: ['dashboard', 'pos', 'orders', 'cash_register'],
   operador: ['dashboard', 'orders', 'operations'],
   delivery: ['dashboard', 'deliveries'],
 };
 
-interface Employee extends User {
+interface Employee {
+  id: string;
+  name: string;
+  email: string;
   phone?: string;
-  hireDate: Date;
-  isActive: boolean;
-  permissions: ModuleKey[];
-  lastLogin?: Date;
+  avatar_url?: string;
+  is_active: boolean;
+  hire_date: string;
+  last_login?: string;
+  role: AppRole;
+  permissions: string[];
 }
-
-// Mock employees
-const INITIAL_EMPLOYEES: Employee[] = [
-  {
-    id: '1',
-    name: 'Carlos Administrador',
-    email: 'admin@luiscap.com',
-    role: 'admin',
-    phone: '+52 55 1234 5678',
-    hireDate: new Date('2023-01-15'),
-    isActive: true,
-    permissions: MODULES.map(m => m.key),
-    lastLogin: new Date(),
-  },
-  {
-    id: '2',
-    name: 'María García',
-    email: 'maria@luiscap.com',
-    role: 'cajero',
-    phone: '+52 55 9876 5432',
-    hireDate: new Date('2023-06-20'),
-    isActive: true,
-    permissions: ['dashboard', 'pos', 'orders', 'cash_register'],
-    lastLogin: new Date(Date.now() - 3600000),
-  },
-  {
-    id: '3',
-    name: 'Juan López',
-    email: 'juan@luiscap.com',
-    role: 'operador',
-    phone: '+52 55 5555 1234',
-    hireDate: new Date('2023-09-10'),
-    isActive: true,
-    permissions: ['dashboard', 'orders', 'operations'],
-    lastLogin: new Date(Date.now() - 7200000),
-  },
-  {
-    id: '4',
-    name: 'Pedro Repartidor',
-    email: 'pedro@luiscap.com',
-    role: 'delivery',
-    phone: '+52 55 4444 3333',
-    hireDate: new Date('2024-01-05'),
-    isActive: true,
-    permissions: ['dashboard', 'deliveries'],
-    lastLogin: new Date(Date.now() - 86400000),
-  },
-  {
-    id: '5',
-    name: 'Ana Martínez',
-    email: 'ana@luiscap.com',
-    role: 'cajero',
-    phone: '+52 55 2222 1111',
-    hireDate: new Date('2023-11-01'),
-    isActive: false,
-    permissions: ['dashboard', 'pos', 'orders', 'cash_register'],
-  },
-];
 
 export default function Employees() {
   const { user: currentUser } = useAuth();
-  const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterRole, setFilterRole] = useState<UserRole | 'all'>('all');
+  const [filterRole, setFilterRole] = useState<AppRole | 'all'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   
   // New/Edit employee dialog
@@ -202,16 +151,78 @@ export default function Employees() {
     name: '',
     email: '',
     phone: '',
-    role: 'cajero' as UserRole,
+    role: 'cajero' as AppRole,
     permissions: [] as ModuleKey[],
-    isActive: true,
+    is_active: true,
   });
+  const [isSaving, setIsSaving] = useState(false);
   
   // Permissions dialog
   const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
   const isAdmin = currentUser?.role === 'admin';
+
+  // Fetch employees from database
+  const fetchEmployees = async () => {
+    try {
+      setIsLoadingData(true);
+      
+      // Fetch profiles with roles and permissions
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (profilesError) throw profilesError;
+      
+      // Fetch all roles
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('*');
+      
+      if (rolesError) throw rolesError;
+      
+      // Fetch all permissions
+      const { data: permissions, error: permissionsError } = await supabase
+        .from('user_permissions')
+        .select('*');
+      
+      if (permissionsError) throw permissionsError;
+      
+      // Combine data
+      const employeesData: Employee[] = (profiles || []).map(profile => {
+        const userRole = roles?.find(r => r.user_id === profile.id);
+        const userPermissions = permissions?.filter(p => p.user_id === profile.id) || [];
+        
+        return {
+          id: profile.id,
+          name: profile.name,
+          email: profile.email,
+          phone: profile.phone || undefined,
+          avatar_url: profile.avatar_url || undefined,
+          is_active: profile.is_active,
+          hire_date: profile.hire_date,
+          last_login: profile.last_login || undefined,
+          role: (userRole?.role as AppRole) || 'cajero',
+          permissions: userPermissions.map(p => p.module_key),
+        };
+      });
+      
+      setEmployees(employeesData);
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+      toast.error('Error al cargar empleados');
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchEmployees();
+    }
+  }, [isAdmin]);
 
   // Filter employees
   const filteredEmployees = useMemo(() => {
@@ -223,8 +234,8 @@ export default function Employees() {
       const matchesRole = filterRole === 'all' || emp.role === filterRole;
       const matchesStatus = 
         filterStatus === 'all' || 
-        (filterStatus === 'active' && emp.isActive) ||
-        (filterStatus === 'inactive' && !emp.isActive);
+        (filterStatus === 'active' && emp.is_active) ||
+        (filterStatus === 'inactive' && !emp.is_active);
       
       return matchesSearch && matchesRole && matchesStatus;
     });
@@ -233,26 +244,13 @@ export default function Employees() {
   // Stats
   const stats = useMemo(() => ({
     total: employees.length,
-    active: employees.filter(e => e.isActive).length,
-    inactive: employees.filter(e => !e.isActive).length,
+    active: employees.filter(e => e.is_active).length,
+    inactive: employees.filter(e => !e.is_active).length,
     byRole: Object.keys(ROLE_CONFIG).reduce((acc, role) => {
-      acc[role as UserRole] = employees.filter(e => e.role === role).length;
+      acc[role as AppRole] = employees.filter(e => e.role === role).length;
       return acc;
-    }, {} as Record<UserRole, number>),
+    }, {} as Record<AppRole, number>),
   }), [employees]);
-
-  const handleOpenNewDialog = () => {
-    setEditingEmployee(null);
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      role: 'cajero',
-      permissions: DEFAULT_PERMISSIONS['cajero'],
-      isActive: true,
-    });
-    setIsDialogOpen(true);
-  };
 
   const handleOpenEditDialog = (employee: Employee) => {
     setEditingEmployee(employee);
@@ -261,13 +259,13 @@ export default function Employees() {
       email: employee.email,
       phone: employee.phone || '',
       role: employee.role,
-      permissions: employee.permissions,
-      isActive: employee.isActive,
+      permissions: employee.permissions as ModuleKey[],
+      is_active: employee.is_active,
     });
     setIsDialogOpen(true);
   };
 
-  const handleRoleChange = (role: UserRole) => {
+  const handleRoleChange = async (role: AppRole) => {
     setFormData(prev => ({
       ...prev,
       role,
@@ -275,46 +273,81 @@ export default function Employees() {
     }));
   };
 
-  const handleSaveEmployee = () => {
-    if (!formData.name || !formData.email) {
-      toast.error('Nombre y correo son requeridos');
-      return;
-    }
-
-    if (editingEmployee) {
-      // Update existing
-      setEmployees(prev => prev.map(emp => 
-        emp.id === editingEmployee.id 
-          ? { ...emp, ...formData }
-          : emp
-      ));
+  const handleSaveEmployee = async () => {
+    if (!editingEmployee) return;
+    
+    setIsSaving(true);
+    
+    try {
+      // Update profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          name: formData.name,
+          phone: formData.phone || null,
+          is_active: formData.is_active,
+        })
+        .eq('id', editingEmployee.id);
+      
+      if (profileError) throw profileError;
+      
+      // Update role if changed
+      if (formData.role !== editingEmployee.role) {
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .update({ role: formData.role })
+          .eq('user_id', editingEmployee.id);
+        
+        if (roleError) throw roleError;
+      }
+      
+      // Update permissions - delete all and re-insert
+      const { error: deleteError } = await supabase
+        .from('user_permissions')
+        .delete()
+        .eq('user_id', editingEmployee.id);
+      
+      if (deleteError) throw deleteError;
+      
+      if (formData.permissions.length > 0) {
+        const { error: insertError } = await supabase
+          .from('user_permissions')
+          .insert(
+            formData.permissions.map(moduleKey => ({
+              user_id: editingEmployee.id,
+              module_key: moduleKey,
+            }))
+          );
+        
+        if (insertError) throw insertError;
+      }
+      
       toast.success('Empleado actualizado correctamente');
-    } else {
-      // Create new
-      const newEmployee: Employee = {
-        id: crypto.randomUUID(),
-        ...formData,
-        hireDate: new Date(),
-      };
-      setEmployees(prev => [...prev, newEmployee]);
-      toast.success('Empleado agregado correctamente');
+      setIsDialogOpen(false);
+      fetchEmployees();
+    } catch (error) {
+      console.error('Error updating employee:', error);
+      toast.error('Error al actualizar empleado');
+    } finally {
+      setIsSaving(false);
     }
-
-    setIsDialogOpen(false);
   };
 
-  const handleToggleActive = (employee: Employee) => {
-    setEmployees(prev => prev.map(emp =>
-      emp.id === employee.id
-        ? { ...emp, isActive: !emp.isActive }
-        : emp
-    ));
-    toast.success(`Empleado ${employee.isActive ? 'desactivado' : 'activado'}`);
-  };
-
-  const handleDeleteEmployee = (employee: Employee) => {
-    setEmployees(prev => prev.filter(emp => emp.id !== employee.id));
-    toast.success('Empleado eliminado');
+  const handleToggleActive = async (employee: Employee) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_active: !employee.is_active })
+        .eq('id', employee.id);
+      
+      if (error) throw error;
+      
+      toast.success(`Empleado ${employee.is_active ? 'desactivado' : 'activado'}`);
+      fetchEmployees();
+    } catch (error) {
+      console.error('Error toggling employee status:', error);
+      toast.error('Error al cambiar estado');
+    }
   };
 
   const handleOpenPermissions = (employee: Employee) => {
@@ -322,30 +355,49 @@ export default function Employees() {
     setIsPermissionsOpen(true);
   };
 
-  const handleTogglePermission = (moduleKey: ModuleKey) => {
+  const handleTogglePermission = async (moduleKey: ModuleKey) => {
     if (!selectedEmployee) return;
     
-    setEmployees(prev => prev.map(emp => {
-      if (emp.id !== selectedEmployee.id) return emp;
+    const hasPermission = selectedEmployee.permissions.includes(moduleKey);
+    
+    try {
+      if (hasPermission) {
+        // Remove permission
+        const { error } = await supabase
+          .from('user_permissions')
+          .delete()
+          .eq('user_id', selectedEmployee.id)
+          .eq('module_key', moduleKey);
+        
+        if (error) throw error;
+      } else {
+        // Add permission
+        const { error } = await supabase
+          .from('user_permissions')
+          .insert({
+            user_id: selectedEmployee.id,
+            module_key: moduleKey,
+          });
+        
+        if (error) throw error;
+      }
       
-      const hasPermission = emp.permissions.includes(moduleKey);
-      const newPermissions = hasPermission
-        ? emp.permissions.filter(p => p !== moduleKey)
-        : [...emp.permissions, moduleKey];
+      // Update local state
+      setSelectedEmployee(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          permissions: hasPermission
+            ? prev.permissions.filter(p => p !== moduleKey)
+            : [...prev.permissions, moduleKey],
+        };
+      });
       
-      return { ...emp, permissions: newPermissions };
-    }));
-
-    setSelectedEmployee(prev => {
-      if (!prev) return null;
-      const hasPermission = prev.permissions.includes(moduleKey);
-      return {
-        ...prev,
-        permissions: hasPermission
-          ? prev.permissions.filter(p => p !== moduleKey)
-          : [...prev.permissions, moduleKey],
-      };
-    });
+      fetchEmployees();
+    } catch (error) {
+      console.error('Error toggling permission:', error);
+      toast.error('Error al cambiar permiso');
+    }
   };
 
   if (!isAdmin) {
@@ -364,6 +416,14 @@ export default function Employees() {
     );
   }
 
+  if (isLoadingData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen p-4 lg:p-6 space-y-6">
       {/* Header */}
@@ -376,9 +436,9 @@ export default function Employees() {
           <p className="text-muted-foreground">Administra usuarios, roles y permisos</p>
         </div>
 
-        <Button className="gap-2" onClick={handleOpenNewDialog}>
-          <UserPlus className="w-4 h-4" />
-          Nuevo Empleado
+        <Button variant="outline" className="gap-2" onClick={fetchEmployees}>
+          <RefreshCw className="w-4 h-4" />
+          Actualizar
         </Button>
       </div>
 
@@ -399,7 +459,7 @@ export default function Employees() {
         {Object.entries(ROLE_CONFIG).map(([role, config]) => (
           <Card key={role}>
             <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold">{stats.byRole[role as UserRole]}</p>
+              <p className="text-2xl font-bold">{stats.byRole[role as AppRole] || 0}</p>
               <p className="text-xs text-muted-foreground">{config.label}</p>
             </CardContent>
           </Card>
@@ -417,7 +477,7 @@ export default function Employees() {
             className="pl-10"
           />
         </div>
-        <Select value={filterRole} onValueChange={(v) => setFilterRole(v as UserRole | 'all')}>
+        <Select value={filterRole} onValueChange={(v) => setFilterRole(v as AppRole | 'all')}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Filtrar por rol" />
           </SelectTrigger>
@@ -439,6 +499,20 @@ export default function Employees() {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Info */}
+      <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+        <CardContent className="p-4 flex items-start gap-3">
+          <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium text-blue-800 dark:text-blue-300">Gestión de Empleados</p>
+            <p className="text-blue-600 dark:text-blue-400">
+              Los nuevos empleados se registran desde la página de login. El primer usuario registrado es administrador automáticamente.
+              Aquí puedes editar roles, permisos y estado de los empleados existentes.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Employees Table */}
       <Card>
@@ -465,14 +539,14 @@ export default function Employees() {
               ) : (
                 filteredEmployees.map((employee) => {
                   const roleConfig = ROLE_CONFIG[employee.role];
-                  const RoleIcon = roleConfig.icon;
+                  const RoleIcon = roleConfig?.icon || Shield;
                   
                   return (
-                    <TableRow key={employee.id} className={cn(!employee.isActive && 'opacity-60')}>
+                    <TableRow key={employee.id} className={cn(!employee.is_active && 'opacity-60')}>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10">
-                            <AvatarImage src={employee.avatar} />
+                            <AvatarImage src={employee.avatar_url} />
                             <AvatarFallback className="bg-primary/10 text-primary">
                               {employee.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                             </AvatarFallback>
@@ -484,9 +558,9 @@ export default function Employees() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={cn('gap-1', roleConfig.color)}>
+                        <Badge className={cn('gap-1', roleConfig?.color)}>
                           <RoleIcon className="w-3 h-3" />
-                          {roleConfig.label}
+                          {roleConfig?.label || employee.role}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -500,16 +574,16 @@ export default function Employees() {
                       <TableCell>
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Calendar className="w-3.5 h-3.5" />
-                          {format(employee.hireDate, 'dd/MM/yyyy', { locale: es })}
+                          {format(new Date(employee.hire_date), 'dd/MM/yyyy', { locale: es })}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={employee.isActive ? 'default' : 'secondary'} className={cn(
-                          employee.isActive 
+                        <Badge variant={employee.is_active ? 'default' : 'secondary'} className={cn(
+                          employee.is_active 
                             ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
                             : 'bg-gray-100 text-gray-500'
                         )}>
-                          {employee.isActive ? (
+                          {employee.is_active ? (
                             <><CheckCircle className="w-3 h-3 mr-1" /> Activo</>
                           ) : (
                             <><XCircle className="w-3 h-3 mr-1" /> Inactivo</>
@@ -517,10 +591,10 @@ export default function Employees() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {employee.lastLogin ? (
+                        {employee.last_login ? (
                           <div className="flex items-center gap-1 text-sm text-muted-foreground">
                             <Clock className="w-3.5 h-3.5" />
-                            {format(employee.lastLogin, 'dd/MM HH:mm', { locale: es })}
+                            {format(new Date(employee.last_login), 'dd/MM HH:mm', { locale: es })}
                           </div>
                         ) : (
                           <span className="text-sm text-muted-foreground">-</span>
@@ -548,38 +622,15 @@ export default function Employees() {
                             size="icon" 
                             variant="ghost"
                             onClick={() => handleToggleActive(employee)}
-                            title={employee.isActive ? 'Desactivar' : 'Activar'}
+                            title={employee.is_active ? 'Desactivar' : 'Activar'}
+                            disabled={employee.id === currentUser?.id}
                           >
-                            {employee.isActive ? (
+                            {employee.is_active ? (
                               <EyeOff className="w-4 h-4" />
                             ) : (
                               <Eye className="w-4 h-4" />
                             )}
                           </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="icon" variant="ghost" className="text-red-600 hover:text-red-700">
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>¿Eliminar empleado?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Esta acción no se puede deshacer. Se eliminará permanentemente a {employee.name} del sistema.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction 
-                                  className="bg-red-600 hover:bg-red-700"
-                                  onClick={() => handleDeleteEmployee(employee)}
-                                >
-                                  Eliminar
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -591,22 +642,18 @@ export default function Employees() {
         </CardContent>
       </Card>
 
-      {/* New/Edit Employee Dialog */}
+      {/* Edit Employee Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              {editingEmployee ? (
-                <><Pencil className="w-5 h-5" /> Editar Empleado</>
-              ) : (
-                <><UserPlus className="w-5 h-5" /> Nuevo Empleado</>
-              )}
+              <Pencil className="w-5 h-5" /> Editar Empleado
             </DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4 pt-4">
             <div className="space-y-2">
-              <Label>Nombre completo *</Label>
+              <Label>Nombre completo</Label>
               <Input
                 placeholder="Nombre del empleado"
                 value={formData.name}
@@ -615,13 +662,14 @@ export default function Employees() {
             </div>
             
             <div className="space-y-2">
-              <Label>Correo electrónico *</Label>
+              <Label>Correo electrónico</Label>
               <Input
                 type="email"
-                placeholder="correo@ejemplo.com"
                 value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                disabled
+                className="bg-muted"
               />
+              <p className="text-xs text-muted-foreground">El correo no se puede cambiar</p>
             </div>
             
             <div className="space-y-2">
@@ -636,7 +684,11 @@ export default function Employees() {
             
             <div className="space-y-2">
               <Label>Rol</Label>
-              <Select value={formData.role} onValueChange={(v) => handleRoleChange(v as UserRole)}>
+              <Select 
+                value={formData.role} 
+                onValueChange={(v) => handleRoleChange(v as AppRole)}
+                disabled={editingEmployee?.id === currentUser?.id}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -647,9 +699,7 @@ export default function Employees() {
                       <SelectItem key={key} value={key}>
                         <div className="flex items-center gap-2">
                           <Icon className="w-4 h-4" />
-                          <div>
-                            <span>{config.label}</span>
-                          </div>
+                          <span>{config.label}</span>
                         </div>
                       </SelectItem>
                     );
@@ -657,15 +707,16 @@ export default function Employees() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                {ROLE_CONFIG[formData.role].description}
+                {ROLE_CONFIG[formData.role]?.description}
               </p>
             </div>
             
             <div className="flex items-center justify-between">
               <Label>Estado activo</Label>
               <Switch
-                checked={formData.isActive}
-                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isActive: checked }))}
+                checked={formData.is_active}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
+                disabled={editingEmployee?.id === currentUser?.id}
               />
             </div>
           </div>
@@ -674,8 +725,15 @@ export default function Employees() {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSaveEmployee}>
-              {editingEmployee ? 'Guardar Cambios' : 'Crear Empleado'}
+            <Button onClick={handleSaveEmployee} disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                'Guardar Cambios'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -702,8 +760,8 @@ export default function Employees() {
                 </Avatar>
                 <div>
                   <p className="font-medium">{selectedEmployee.name}</p>
-                  <Badge className={cn('text-xs', ROLE_CONFIG[selectedEmployee.role].color)}>
-                    {ROLE_CONFIG[selectedEmployee.role].label}
+                  <Badge className={cn('text-xs', ROLE_CONFIG[selectedEmployee.role]?.color)}>
+                    {ROLE_CONFIG[selectedEmployee.role]?.label || selectedEmployee.role}
                   </Badge>
                 </div>
               </div>
@@ -715,8 +773,7 @@ export default function Employees() {
                   {MODULES.map((module) => {
                     const Icon = module.icon;
                     const hasPermission = selectedEmployee.permissions.includes(module.key);
-                    const isAdminModule = module.key === 'employees' || module.key === 'settings';
-                    const isDisabled = selectedEmployee.role === 'admin'; // Admins always have all
+                    const isDisabled = selectedEmployee.role === 'admin' || selectedEmployee.id === currentUser?.id;
                     
                     return (
                       <div
