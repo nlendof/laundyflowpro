@@ -8,6 +8,7 @@ import { AppLayout } from "./components/layout/AppLayout";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import Orders from "./pages/Orders";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -71,10 +72,7 @@ function AppRoutes() {
           path="/orders"
           element={
             <ProtectedRoute>
-              <div className="p-8">
-                <h1 className="text-2xl font-bold">Pedidos</h1>
-                <p className="text-muted-foreground">Módulo en desarrollo...</p>
-              </div>
+              <Orders />
             </ProtectedRoute>
           }
         />
