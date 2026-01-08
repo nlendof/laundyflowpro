@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import {
   Settings,
@@ -52,6 +53,8 @@ import {
   Flame,
   CheckCircle,
   Store,
+  Tag,
+  FolderOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -110,6 +113,13 @@ interface OperationStep {
   isActive: boolean;
   isRequired: boolean;
   order: number;
+}
+
+interface CatalogCategory {
+  id: string;
+  name: string;
+  order: number;
+  isActive: boolean;
 }
 
 // Initial mock data
@@ -172,6 +182,16 @@ const INITIAL_OPERATIONS: OperationStep[] = [
   { id: '8', key: 'delivered', name: 'Entregado', icon: 'CheckCircle', color: 'bg-green-600', isActive: true, isRequired: true, order: 7 },
 ];
 
+const INITIAL_CATEGORIES: CatalogCategory[] = [
+  { id: '1', name: 'Lavado', order: 0, isActive: true },
+  { id: '2', name: 'Planchado', order: 1, isActive: true },
+  { id: '3', name: 'Especializado', order: 2, isActive: true },
+  { id: '4', name: 'Ropa Superior', order: 3, isActive: true },
+  { id: '5', name: 'Ropa Inferior', order: 4, isActive: true },
+  { id: '6', name: 'Hogar', order: 5, isActive: true },
+  { id: '7', name: 'Accesorios', order: 6, isActive: true },
+];
+
 const AVAILABLE_ICONS = [
   { name: 'Clock', icon: Clock },
   { name: 'Store', icon: Store },
@@ -207,6 +227,7 @@ export default function SettingsPage() {
   const [zones, setZones] = useState<DeliveryZone[]>(INITIAL_ZONES);
   const [payments, setPayments] = useState<PaymentMethod[]>(INITIAL_PAYMENTS);
   const [operations, setOperations] = useState<OperationStep[]>(INITIAL_OPERATIONS);
+  const [categories, setCategories] = useState<CatalogCategory[]>(INITIAL_CATEGORIES);
   
   // Notification settings
   const [notifications, setNotifications] = useState({
@@ -230,6 +251,8 @@ export default function SettingsPage() {
   const [editingExtra, setEditingExtra] = useState<ExtraService | null>(null);
   const [editingZone, setEditingZone] = useState<DeliveryZone | null>(null);
   const [editingOperation, setEditingOperation] = useState<OperationStep | null>(null);
+  const [editingCategory, setEditingCategory] = useState<CatalogCategory | null>(null);
+  const [newCategoryName, setNewCategoryName] = useState('');
 
   const handleSave = () => {
     toast.success('Configuración guardada correctamente');
@@ -381,6 +404,61 @@ export default function SettingsPage() {
     toast.success('Operación eliminada');
   };
 
+  // Category functions
+  const addCategory = () => {
+    if (!newCategoryName.trim()) {
+      toast.error('Ingresa el nombre de la categoría');
+      return;
+    }
+    const maxOrder = categories.length > 0 ? Math.max(...categories.map(c => c.order)) : -1;
+    const newCategory: CatalogCategory = {
+      id: crypto.randomUUID(),
+      name: newCategoryName.trim(),
+      order: maxOrder + 1,
+      isActive: true,
+    };
+    setCategories(prev => [...prev, newCategory]);
+    setNewCategoryName('');
+    toast.success('Categoría agregada');
+  };
+
+  const updateCategory = (updated: CatalogCategory) => {
+    setCategories(prev => prev.map(c => c.id === updated.id ? updated : c));
+    setEditingCategory(null);
+    toast.success('Categoría actualizada');
+  };
+
+  const deleteCategory = (id: string) => {
+    setCategories(prev => prev.filter(c => c.id !== id));
+    toast.success('Categoría eliminada');
+  };
+
+  const moveCategory = (id: string, direction: 'up' | 'down') => {
+    setCategories(prev => {
+      const sorted = [...prev].sort((a, b) => a.order - b.order);
+      const index = sorted.findIndex(c => c.id === id);
+      if (index === -1) return prev;
+      
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= sorted.length) return prev;
+      
+      const current = sorted[index];
+      const target = sorted[targetIndex];
+      
+      return prev.map(c => {
+        if (c.id === current.id) return { ...c, order: target.order };
+        if (c.id === target.id) return { ...c, order: current.order };
+        return c;
+      });
+    });
+  };
+
+  const toggleCategory = (id: string) => {
+    setCategories(prev => prev.map(c => 
+      c.id === id ? { ...c, isActive: !c.isActive } : c
+    ));
+  };
+
   const getIconComponent = (iconName: string) => {
     const iconConfig = AVAILABLE_ICONS.find(i => i.name === iconName);
     return iconConfig?.icon || Zap;
@@ -428,6 +506,10 @@ export default function SettingsPage() {
           <TabsTrigger value="operations" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Workflow className="w-4 h-4" />
             Operaciones
+          </TabsTrigger>
+          <TabsTrigger value="catalog" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Tag className="w-4 h-4" />
+            Catálogo
           </TabsTrigger>
           <TabsTrigger value="appearance" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Palette className="w-4 h-4" />
@@ -1078,6 +1160,138 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
+        {/* Catalog Settings */}
+        <TabsContent value="catalog" className="space-y-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <FolderOpen className="w-5 h-5" />
+                  Categorías del Catálogo
+                </CardTitle>
+                <CardDescription>
+                  Organiza tus artículos y servicios en categorías. Agrega, edita y reordena según tus necesidades.
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {/* Add Category */}
+              <div className="flex gap-2 mb-6">
+                <Input
+                  placeholder="Nueva categoría..."
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addCategory()}
+                />
+                <Button onClick={addCategory} className="gap-2">
+                  <Plus className="w-4 h-4" />
+                  Agregar
+                </Button>
+              </div>
+
+              {/* Categories List */}
+              <div className="space-y-2">
+                {categories
+                  .sort((a, b) => a.order - b.order)
+                  .map((category, index, arr) => (
+                    <div 
+                      key={category.id}
+                      className={cn(
+                        'flex items-center justify-between p-4 rounded-xl border transition-all',
+                        !category.isActive && 'opacity-50 bg-muted/30',
+                        category.isActive && 'bg-card'
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex flex-col gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            disabled={index === 0}
+                            onClick={() => moveCategory(category.id, 'up')}
+                          >
+                            <ArrowUp className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            disabled={index === arr.length - 1}
+                            onClick={() => moveCategory(category.id, 'down')}
+                          >
+                            <ArrowDown className="w-3 h-3" />
+                          </Button>
+                        </div>
+                        
+                        <Switch
+                          checked={category.isActive}
+                          onCheckedChange={() => toggleCategory(category.id)}
+                        />
+                        
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                          <Tag className="w-4 h-4 text-primary" />
+                        </div>
+                        
+                        <div>
+                          <p className="font-medium">{category.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Orden: {category.order + 1}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => setEditingCategory(category)}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => deleteCategory(category.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+
+              {categories.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FolderOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No hay categorías. Agrega una para comenzar.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Tips Card */}
+          <Card className="bg-muted/50 border-dashed">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Tag className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium mb-1">Sobre las categorías</p>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• Las categorías te ayudan a organizar tus artículos y servicios.</li>
+                    <li>• Usa las flechas para reordenar el orden en que aparecen.</li>
+                    <li>• Las categorías desactivadas no aparecerán en el catálogo.</li>
+                    <li>• Eliminar una categoría no elimina los artículos asociados.</li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Appearance Settings */}
         <TabsContent value="appearance" className="space-y-6">
           <Card>
@@ -1359,6 +1573,49 @@ export default function SettingsPage() {
               <Button className="w-full" onClick={() => updateOperation(editingOperation)}>
                 Guardar Cambios
               </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Category Dialog */}
+      <Dialog open={!!editingCategory} onOpenChange={(open) => !open && setEditingCategory(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Categoría</DialogTitle>
+          </DialogHeader>
+          {editingCategory && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Nombre de la Categoría</Label>
+                <Input
+                  value={editingCategory.name}
+                  onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
+                  placeholder="Nombre de la categoría"
+                />
+              </div>
+              
+              <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div>
+                  <Label>Estado Activo</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Las categorías inactivas no aparecen en el catálogo
+                  </p>
+                </div>
+                <Switch
+                  checked={editingCategory.isActive}
+                  onCheckedChange={(checked) => setEditingCategory({ ...editingCategory, isActive: checked })}
+                />
+              </div>
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingCategory(null)}>
+                  Cancelar
+                </Button>
+                <Button onClick={() => updateCategory(editingCategory)}>
+                  Guardar Cambios
+                </Button>
+              </DialogFooter>
             </div>
           )}
         </DialogContent>
