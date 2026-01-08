@@ -12,6 +12,7 @@ import Orders from "./pages/Orders";
 import QuickSale from "./pages/QuickSale";
 import Operations from "./pages/Operations";
 import Deliveries from "./pages/Deliveries";
+import Inventory from "./pages/Inventory";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -107,10 +108,7 @@ function AppRoutes() {
           path="/inventory"
           element={
             <ProtectedRoute>
-              <div className="p-8">
-                <h1 className="text-2xl font-bold">Inventario</h1>
-                <p className="text-muted-foreground">Módulo en desarrollo...</p>
-              </div>
+              <Inventory />
             </ProtectedRoute>
           }
         />
