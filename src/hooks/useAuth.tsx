@@ -1,74 +1,243 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
-import { User, UserRole } from '@/types';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { User, Session } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+type AppRole = 'admin' | 'cajero' | 'operador' | 'delivery';
+
+interface Profile {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  avatar_url?: string;
+  is_active: boolean;
+  hire_date?: string;
+}
+
+interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  role: AppRole;
+  avatar?: string;
+  phone?: string;
+  permissions: string[];
+}
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
+  session: Session | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string, role: UserRole) => Promise<boolean>;
-  logout: () => void;
-  switchRole: (role: UserRole) => void;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<{ error: string | null }>;
+  signup: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
+  logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users for demo
-const DEMO_USERS: Record<UserRole, User> = {
-  admin: {
-    id: '1',
-    name: 'Carlos Administrador',
-    email: 'admin@luiscap.com',
-    role: 'admin',
-  },
-  cajero: {
-    id: '2',
-    name: 'María Cajera',
-    email: 'cajero@luiscap.com',
-    role: 'cajero',
-  },
-  operador: {
-    id: '3',
-    name: 'Juan Operador',
-    email: 'operador@luiscap.com',
-    role: 'operador',
-  },
-  delivery: {
-    id: '4',
-    name: 'Pedro Repartidor',
-    email: 'delivery@luiscap.com',
-    role: 'delivery',
-  },
-};
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const login = async (email: string, password: string, role: UserRole): Promise<boolean> => {
-    // Demo login - in production this would call Supabase
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    if (password === 'demo123') {
-      setUser(DEMO_USERS[role]);
-      return true;
+  const fetchUserData = async (userId: string): Promise<AuthUser | null> => {
+    try {
+      // Fetch profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        return null;
+      }
+
+      if (!profile) {
+        console.error('No profile found for user');
+        return null;
+      }
+
+      // Fetch role
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (roleError) {
+        console.error('Error fetching role:', roleError);
+      }
+
+      // Fetch permissions
+      const { data: permissionsData, error: permissionsError } = await supabase
+        .from('user_permissions')
+        .select('module_key')
+        .eq('user_id', userId);
+
+      if (permissionsError) {
+        console.error('Error fetching permissions:', permissionsError);
+      }
+
+      const role = (roleData?.role as AppRole) || 'cajero';
+      const permissions = permissionsData?.map(p => p.module_key) || [];
+
+      return {
+        id: profile.id,
+        name: profile.name,
+        email: profile.email,
+        role,
+        avatar: profile.avatar_url || undefined,
+        phone: profile.phone || undefined,
+        permissions,
+      };
+    } catch (error) {
+      console.error('Error in fetchUserData:', error);
+      return null;
     }
-    return false;
   };
 
-  const logout = () => {
-    setUser(null);
+  useEffect(() => {
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        
+        if (session?.user) {
+          // Defer data fetch to avoid deadlock
+          setTimeout(() => {
+            fetchUserData(session.user.id).then(userData => {
+              setUser(userData);
+              setIsLoading(false);
+            });
+          }, 0);
+        } else {
+          setUser(null);
+          setIsLoading(false);
+        }
+      }
+    );
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      
+      if (session?.user) {
+        fetchUserData(session.user.id).then(userData => {
+          setUser(userData);
+          setIsLoading(false);
+        });
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const login = async (email: string, password: string): Promise<{ error: string | null }> => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          return { error: 'Correo o contraseña incorrectos' };
+        }
+        return { error: error.message };
+      }
+
+      if (data.user) {
+        // Check if user is active
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_active')
+          .eq('id', data.user.id)
+          .maybeSingle();
+
+        if (profile && !profile.is_active) {
+          await supabase.auth.signOut();
+          return { error: 'Tu cuenta está desactivada. Contacta al administrador.' };
+        }
+
+        // Update last login
+        await supabase
+          .from('profiles')
+          .update({ last_login: new Date().toISOString() })
+          .eq('id', data.user.id);
+      }
+
+      return { error: null };
+    } catch (error) {
+      console.error('Login error:', error);
+      return { error: 'Error al iniciar sesión. Intenta de nuevo.' };
+    }
   };
 
-  const switchRole = (role: UserRole) => {
-    setUser(DEMO_USERS[role]);
+  const signup = async (email: string, password: string, name: string): Promise<{ error: string | null }> => {
+    try {
+      const redirectUrl = `${window.location.origin}/`;
+      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            name,
+          },
+        },
+      });
+
+      if (error) {
+        if (error.message.includes('User already registered')) {
+          return { error: 'Este correo ya está registrado' };
+        }
+        return { error: error.message };
+      }
+
+      return { error: null };
+    } catch (error) {
+      console.error('Signup error:', error);
+      return { error: 'Error al crear cuenta. Intenta de nuevo.' };
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setSession(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast.error('Error al cerrar sesión');
+    }
+  };
+
+  const refreshUser = async () => {
+    if (session?.user) {
+      const userData = await fetchUserData(session.user.id);
+      setUser(userData);
+    }
   };
 
   return (
-    <AuthContext.Provider 
-      value={{ 
-        user, 
-        isAuthenticated: !!user, 
-        login, 
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        isAuthenticated: !!session && !!user,
+        isLoading,
+        login,
+        signup,
         logout,
-        switchRole 
+        refreshUser,
       }}
     >
       {children}
