@@ -7,8 +7,9 @@ export const CURRENCIES = {
 
 export type CurrencyCode = keyof typeof CURRENCIES;
 
-export function formatCurrency(amount: number, currencyCode: CurrencyCode = 'DOP'): string {
-  const currency = CURRENCIES[currencyCode] || CURRENCIES.DOP;
+export function formatCurrency(amount: number, currencyCode: string = 'DOP'): string {
+  const code = currencyCode as CurrencyCode;
+  const currency = CURRENCIES[code] || CURRENCIES.DOP;
   return new Intl.NumberFormat(currency.locale, {
     style: 'currency',
     currency: currency.code,

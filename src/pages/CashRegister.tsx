@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
-import { format, startOfDay, endOfDay, isToday } from 'date-fns';
+import { format, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { CashRegisterEntry, Expense } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
   DialogContent,
@@ -41,8 +41,6 @@ import {
   FileText,
   ArrowUpCircle,
   ArrowDownCircle,
-  Banknote,
-  CreditCard,
   Building,
   Zap,
   Users,
@@ -51,9 +49,14 @@ import {
   Calculator,
   CheckCircle,
   AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useCashRegister } from '@/hooks/useCashRegister';
+import { useConfig } from '@/contexts/ConfigContext';
+import { formatCurrency } from '@/lib/currency';
+import { Expense } from '@/types';
 
 // Expense categories with labels and icons
 const EXPENSE_CATEGORIES = {
@@ -64,109 +67,24 @@ const EXPENSE_CATEGORIES = {
   other: { label: 'Otros', icon: MoreHorizontal },
 } as const;
 
-// Mock data for demo
-const generateMockEntries = (): CashRegisterEntry[] => {
-  const today = new Date();
-  return [
-    {
-      id: '1',
-      type: 'income',
-      category: 'Venta de Servicio',
-      amount: 450.00,
-      description: 'Orden LC-2024-001 - María García',
-      orderId: '1',
-      createdAt: new Date(today.setHours(9, 30)),
-      createdBy: 'Admin',
-    },
-    {
-      id: '2',
-      type: 'income',
-      category: 'Venta de Servicio',
-      amount: 320.00,
-      description: 'Orden LC-2024-002 - Juan López',
-      orderId: '2',
-      createdAt: new Date(today.setHours(10, 15)),
-      createdBy: 'Admin',
-    },
-    {
-      id: '3',
-      type: 'expense',
-      category: 'supplies',
-      amount: 150.00,
-      description: 'Compra de detergente industrial',
-      createdAt: new Date(today.setHours(11, 0)),
-      createdBy: 'Admin',
-    },
-    {
-      id: '4',
-      type: 'income',
-      category: 'Venta de Producto',
-      amount: 85.00,
-      description: 'Venta rápida - Jabón y suavizante',
-      createdAt: new Date(today.setHours(12, 30)),
-      createdBy: 'Cajero',
-    },
-    {
-      id: '5',
-      type: 'expense',
-      category: 'other',
-      amount: 50.00,
-      description: 'Cambio para caja chica',
-      createdAt: new Date(today.setHours(13, 0)),
-      createdBy: 'Admin',
-    },
-    {
-      id: '6',
-      type: 'income',
-      category: 'Venta de Servicio',
-      amount: 680.00,
-      description: 'Orden LC-2024-003 - Ana Martínez',
-      orderId: '3',
-      createdAt: new Date(today.setHours(14, 45)),
-      createdBy: 'Cajero',
-    },
-  ];
-};
-
-const generateMockExpenses = (): Expense[] => {
-  const today = new Date();
-  const lastMonth = new Date(today);
-  lastMonth.setMonth(lastMonth.getMonth() - 1);
-  
-  return [
-    {
-      id: '1',
-      category: 'rent',
-      amount: 15000.00,
-      description: 'Renta mensual del local',
-      date: new Date(lastMonth.setDate(1)),
-      createdBy: 'Admin',
-    },
-    {
-      id: '2',
-      category: 'utilities',
-      amount: 2500.00,
-      description: 'Recibo de luz - Enero',
-      date: new Date(lastMonth.setDate(15)),
-      createdBy: 'Admin',
-    },
-    {
-      id: '3',
-      category: 'payroll',
-      amount: 25000.00,
-      description: 'Nómina quincenal',
-      date: new Date(lastMonth.setDate(15)),
-      createdBy: 'Admin',
-    },
-  ];
-};
-
 export default function CashRegister() {
-  const [entries, setEntries] = useState<CashRegisterEntry[]>(generateMockEntries);
-  const [expenses, setExpenses] = useState<Expense[]>(generateMockExpenses);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const { business } = useConfig();
+  const {
+    entries,
+    expenses,
+    loading,
+    selectedDate,
+    setSelectedDate,
+    openingBalance,
+    setOpeningBalance,
+    totals,
+    addEntry,
+    addExpense,
+  } = useCashRegister();
+
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('movements');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // New entry dialog
   const [isNewEntryOpen, setIsNewEntryOpen] = useState(false);
@@ -181,35 +99,9 @@ export default function CashRegister() {
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseDescription, setExpenseDescription] = useState('');
   
-  // Opening balance
-  const [openingBalance, setOpeningBalance] = useState(5000);
+  // Opening balance dialog
   const [isBalanceOpen, setIsBalanceOpen] = useState(false);
   const [newOpeningBalance, setNewOpeningBalance] = useState('');
-
-  // Filter entries by selected date
-  const filteredEntries = useMemo(() => {
-    const start = startOfDay(selectedDate);
-    const end = endOfDay(selectedDate);
-    return entries.filter(entry => {
-      const entryDate = new Date(entry.createdAt);
-      return entryDate >= start && entryDate <= end;
-    });
-  }, [entries, selectedDate]);
-
-  // Calculate totals
-  const totals = useMemo(() => {
-    const income = filteredEntries
-      .filter(e => e.type === 'income')
-      .reduce((sum, e) => sum + e.amount, 0);
-    
-    const expense = filteredEntries
-      .filter(e => e.type === 'expense')
-      .reduce((sum, e) => sum + e.amount, 0);
-    
-    const balance = openingBalance + income - expense;
-    
-    return { income, expense, balance };
-  }, [filteredEntries, openingBalance]);
 
   // Monthly expenses summary
   const monthlyExpenses = useMemo(() => {
@@ -233,85 +125,61 @@ export default function CashRegister() {
     return { byCategory, total };
   }, [expenses]);
 
-  const handleAddEntry = () => {
+  const handleAddEntry = async () => {
     if (!entryAmount || parseFloat(entryAmount) <= 0) {
       toast.error('Ingresa un monto válido');
       return;
     }
     
-    const newEntry: CashRegisterEntry = {
-      id: crypto.randomUUID(),
-      type: entryType,
-      category: entryCategory || (entryType === 'income' ? 'Ingreso General' : 'Gasto General'),
-      amount: parseFloat(entryAmount),
-      description: entryDescription,
-      createdAt: new Date(),
-      createdBy: 'Admin', // TODO: Get from auth context
-    };
-    
-    setEntries(prev => [newEntry, ...prev]);
-    
-    // If it's an expense, also add to expenses list
-    if (entryType === 'expense') {
-      const newExpense: Expense = {
-        id: crypto.randomUUID(),
-        category: 'other',
+    setIsSubmitting(true);
+    try {
+      await addEntry({
+        type: entryType,
+        category: entryCategory || (entryType === 'income' ? 'Ingreso General' : 'Gasto General'),
         amount: parseFloat(entryAmount),
         description: entryDescription,
-        date: new Date(),
-        createdBy: 'Admin',
-      };
-      setExpenses(prev => [newExpense, ...prev]);
+      });
+      resetEntryForm();
+    } finally {
+      setIsSubmitting(false);
     }
-    
-    toast.success(`${entryType === 'income' ? 'Ingreso' : 'Gasto'} registrado correctamente`);
-    resetEntryForm();
   };
 
-  const handleAddExpense = () => {
+  const handleAddExpense = async () => {
     if (!expenseAmount || parseFloat(expenseAmount) <= 0) {
       toast.error('Ingresa un monto válido');
       return;
     }
     
-    const newExpense: Expense = {
-      id: crypto.randomUUID(),
-      category: expenseCategory,
-      amount: parseFloat(expenseAmount),
-      description: expenseDescription,
-      date: new Date(),
-      createdBy: 'Admin',
-    };
-    
-    setExpenses(prev => [newExpense, ...prev]);
-    
-    // Also add to daily entries
-    const newEntry: CashRegisterEntry = {
-      id: crypto.randomUUID(),
-      type: 'expense',
-      category: EXPENSE_CATEGORIES[expenseCategory].label,
-      amount: parseFloat(expenseAmount),
-      description: expenseDescription,
-      createdAt: new Date(),
-      createdBy: 'Admin',
-    };
-    
-    setEntries(prev => [newEntry, ...prev]);
-    
-    toast.success('Gasto operativo registrado');
-    resetExpenseForm();
+    setIsSubmitting(true);
+    try {
+      await addExpense({
+        category: expenseCategory,
+        amount: parseFloat(expenseAmount),
+        description: expenseDescription,
+        date: new Date(),
+      });
+      resetExpenseForm();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleSetOpeningBalance = () => {
+  const handleSetOpeningBalance = async () => {
     const balance = parseFloat(newOpeningBalance);
     if (isNaN(balance) || balance < 0) {
       toast.error('Ingresa un monto válido');
       return;
     }
-    setOpeningBalance(balance);
-    setIsBalanceOpen(false);
-    setNewOpeningBalance('');
-    toast.success('Saldo inicial actualizado');
+    
+    setIsSubmitting(true);
+    try {
+      await setOpeningBalance(balance);
+      setIsBalanceOpen(false);
+      setNewOpeningBalance('');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const resetEntryForm = () => {
@@ -328,6 +196,23 @@ export default function CashRegister() {
     setExpenseCategory('other');
     setExpenseDescription('');
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen p-4 lg:p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-10 w-48" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+        <Skeleton className="h-96" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-4 lg:p-6 space-y-6">
@@ -373,7 +258,7 @@ export default function CashRegister() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Saldo Inicial</p>
-                <p className="text-2xl font-bold">${openingBalance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+                <p className="text-2xl font-bold">{formatCurrency(openingBalance, business.currency)}</p>
               </div>
               <Dialog open={isBalanceOpen} onOpenChange={setIsBalanceOpen}>
                 <DialogTrigger asChild>
@@ -399,7 +284,8 @@ export default function CashRegister() {
                         />
                       </div>
                     </div>
-                    <Button className="w-full" onClick={handleSetOpeningBalance}>
+                    <Button className="w-full" onClick={handleSetOpeningBalance} disabled={isSubmitting}>
+                      {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                       Guardar
                     </Button>
                   </div>
@@ -416,7 +302,7 @@ export default function CashRegister() {
               <div>
                 <p className="text-sm text-green-600 dark:text-green-400">Ingresos del Día</p>
                 <p className="text-2xl font-bold text-green-700 dark:text-green-300">
-                  +${totals.income.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  +{formatCurrency(totals.income, business.currency)}
                 </p>
               </div>
               <ArrowUpCircle className="w-10 h-10 text-green-500/50" />
@@ -431,7 +317,7 @@ export default function CashRegister() {
               <div>
                 <p className="text-sm text-red-600 dark:text-red-400">Egresos del Día</p>
                 <p className="text-2xl font-bold text-red-700 dark:text-red-300">
-                  -${totals.expense.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  -{formatCurrency(totals.expense, business.currency)}
                 </p>
               </div>
               <ArrowDownCircle className="w-10 h-10 text-red-500/50" />
@@ -451,7 +337,7 @@ export default function CashRegister() {
               <div>
                 <p className="text-sm text-muted-foreground">Saldo en Caja</p>
                 <p className="text-2xl font-bold">
-                  ${totals.balance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  {formatCurrency(totals.balance, business.currency)}
                 </p>
               </div>
               {totals.balance >= openingBalance ? (
@@ -510,28 +396,22 @@ export default function CashRegister() {
                         </div>
                         <div className="space-y-2">
                           <Label>Categoría</Label>
-                          <Select value={entryCategory} onValueChange={setEntryCategory}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccionar categoría" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Venta de Servicio">Venta de Servicio</SelectItem>
-                              <SelectItem value="Venta de Producto">Venta de Producto</SelectItem>
-                              <SelectItem value="Cobro Delivery">Cobro Delivery</SelectItem>
-                              <SelectItem value="Anticipo">Anticipo</SelectItem>
-                              <SelectItem value="Otro">Otro Ingreso</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <Input
+                            placeholder="Ej: Venta de Servicio"
+                            value={entryCategory}
+                            onChange={(e) => setEntryCategory(e.target.value)}
+                          />
                         </div>
                         <div className="space-y-2">
-                          <Label>Descripción</Label>
+                          <Label>Descripción (opcional)</Label>
                           <Textarea
-                            placeholder="Detalles del ingreso..."
+                            placeholder="Detalles adicionales..."
                             value={entryDescription}
                             onChange={(e) => setEntryDescription(e.target.value)}
                           />
                         </div>
-                        <Button className="w-full bg-green-600 hover:bg-green-700" onClick={handleAddEntry}>
+                        <Button className="w-full bg-green-600 hover:bg-green-700" onClick={handleAddEntry} disabled={isSubmitting}>
+                          {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                           Registrar Ingreso
                         </Button>
                       </div>
@@ -546,14 +426,14 @@ export default function CashRegister() {
                     <DialogTrigger asChild>
                       <Button size="sm" variant="outline" className="gap-1 text-red-600 border-red-200 hover:bg-red-50">
                         <Minus className="w-4 h-4" />
-                        Egreso
+                        Gasto
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-red-600">
                           <TrendingDown className="w-5 h-5" />
-                          Registrar Egreso
+                          Registrar Gasto
                         </DialogTitle>
                       </DialogHeader>
                       <div className="space-y-4 pt-4">
@@ -572,29 +452,23 @@ export default function CashRegister() {
                         </div>
                         <div className="space-y-2">
                           <Label>Categoría</Label>
-                          <Select value={entryCategory} onValueChange={setEntryCategory}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Seleccionar categoría" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Cambio">Cambio / Fondo de Caja</SelectItem>
-                              <SelectItem value="Devolución">Devolución</SelectItem>
-                              <SelectItem value="Compra Menor">Compra Menor</SelectItem>
-                              <SelectItem value="Retiro">Retiro de Efectivo</SelectItem>
-                              <SelectItem value="Otro">Otro Egreso</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <Input
+                            placeholder="Ej: Compra de suministros"
+                            value={entryCategory}
+                            onChange={(e) => setEntryCategory(e.target.value)}
+                          />
                         </div>
                         <div className="space-y-2">
-                          <Label>Descripción</Label>
+                          <Label>Descripción (opcional)</Label>
                           <Textarea
-                            placeholder="Detalles del egreso..."
+                            placeholder="Detalles adicionales..."
                             value={entryDescription}
                             onChange={(e) => setEntryDescription(e.target.value)}
                           />
                         </div>
-                        <Button className="w-full" variant="destructive" onClick={handleAddEntry}>
-                          Registrar Egreso
+                        <Button className="w-full" variant="destructive" onClick={handleAddEntry} disabled={isSubmitting}>
+                          {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                          Registrar Gasto
                         </Button>
                       </div>
                     </DialogContent>
@@ -603,10 +477,10 @@ export default function CashRegister() {
               </div>
             </CardHeader>
             <CardContent>
-              {filteredEntries.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Receipt className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                  <p>No hay movimientos registrados para esta fecha</p>
+              {entries.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Receipt className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No hay movimientos para este día</p>
                 </div>
               ) : (
                 <Table>
@@ -620,32 +494,29 @@ export default function CashRegister() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredEntries.map((entry) => (
+                    {entries.map((entry) => (
                       <TableRow key={entry.id}>
                         <TableCell className="text-muted-foreground">
                           <div className="flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5" />
+                            <Clock className="w-3 h-3" />
                             {format(new Date(entry.createdAt), 'HH:mm')}
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={entry.type === 'income' ? 'default' : 'destructive'} className={cn(
-                            entry.type === 'income' 
-                              ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                              : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                          )}>
-                            {entry.type === 'income' ? 'Ingreso' : 'Egreso'}
+                          <Badge variant={entry.type === 'income' ? 'default' : 'destructive'}>
+                            {entry.type === 'income' ? 'Ingreso' : 'Gasto'}
                           </Badge>
                         </TableCell>
-                        <TableCell className="font-medium">{entry.category}</TableCell>
-                        <TableCell className="max-w-[200px] truncate text-muted-foreground">
+                        <TableCell>{entry.category}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">
                           {entry.description || '-'}
                         </TableCell>
                         <TableCell className={cn(
-                          "text-right font-semibold",
+                          "text-right font-medium",
                           entry.type === 'income' ? 'text-green-600' : 'text-red-600'
                         )}>
-                          {entry.type === 'income' ? '+' : '-'}${entry.amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          {entry.type === 'income' ? '+' : '-'}
+                          {formatCurrency(entry.amount, business.currency)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -656,93 +527,28 @@ export default function CashRegister() {
           </Card>
         </div>
 
-        {/* Right Panel - Expenses & Summary */}
-        <div className="space-y-6">
-          {/* Monthly Expenses */}
+        {/* Right Panel - Monthly Expenses */}
+        <div>
           <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <FileText className="w-5 h-5" />
-                  Gastos Operativos
-                </CardTitle>
-                <Dialog open={isNewExpenseOpen} onOpenChange={setIsNewExpenseOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" variant="outline" className="gap-1">
-                      <Plus className="w-4 h-4" />
-                      Agregar
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Registrar Gasto Operativo</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 pt-4">
-                      <div className="space-y-2">
-                        <Label>Categoría</Label>
-                        <Select value={expenseCategory} onValueChange={(v) => setExpenseCategory(v as keyof typeof EXPENSE_CATEGORIES)}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(EXPENSE_CATEGORIES).map(([key, { label, icon: Icon }]) => (
-                              <SelectItem key={key} value={key}>
-                                <div className="flex items-center gap-2">
-                                  <Icon className="w-4 h-4" />
-                                  {label}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Monto</Label>
-                        <div className="relative">
-                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <Input
-                            type="number"
-                            placeholder="0.00"
-                            value={expenseAmount}
-                            onChange={(e) => setExpenseAmount(e.target.value)}
-                            className="pl-9"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Descripción</Label>
-                        <Textarea
-                          placeholder="Detalles del gasto..."
-                          value={expenseDescription}
-                          onChange={(e) => setExpenseDescription(e.target.value)}
-                        />
-                      </div>
-                      <Button className="w-full" onClick={handleAddExpense}>
-                        Registrar Gasto
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Gastos del Mes
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-xs text-muted-foreground mb-2">
-                Resumen del mes: {format(new Date(), 'MMMM yyyy', { locale: es })}
-              </p>
-              
-              {Object.entries(EXPENSE_CATEGORIES).map(([key, { label, icon: Icon }]) => {
+            <CardContent className="space-y-4">
+              {Object.entries(EXPENSE_CATEGORIES).map(([key, config]) => {
                 const amount = monthlyExpenses.byCategory[key] || 0;
+                const Icon = config.icon;
+                
                 return (
-                  <div key={key} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                  <div key={key} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Icon className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm">{label}</span>
+                      <span className="text-sm">{config.label}</span>
                     </div>
-                    <span className={cn(
-                      "text-sm font-medium",
-                      amount > 0 ? "text-red-600" : "text-muted-foreground"
-                    )}>
-                      ${amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    <span className="font-medium">
+                      {formatCurrency(amount, business.currency)}
                     </span>
                   </div>
                 );
@@ -750,51 +556,69 @@ export default function CashRegister() {
               
               <Separator />
               
-              <div className="flex items-center justify-between p-2 bg-red-50 dark:bg-red-950/30 rounded-lg">
-                <span className="font-medium">Total Gastos</span>
-                <span className="font-bold text-red-600">
-                  ${monthlyExpenses.total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              <div className="flex items-center justify-between font-bold">
+                <span>Total del Mes</span>
+                <span className="text-red-600">
+                  {formatCurrency(monthlyExpenses.total, business.currency)}
                 </span>
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Quick Stats */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Banknote className="w-5 h-5" />
-                Resumen del Día
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Transacciones</span>
-                <Badge variant="secondary">{filteredEntries.length}</Badge>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Ingresos</span>
-                <span className="text-sm font-medium text-green-600">
-                  {filteredEntries.filter(e => e.type === 'income').length} mov.
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Egresos</span>
-                <span className="text-sm font-medium text-red-600">
-                  {filteredEntries.filter(e => e.type === 'expense').length} mov.
-                </span>
-              </div>
-              <Separator />
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Diferencia</span>
-                <span className={cn(
-                  "font-bold",
-                  totals.income - totals.expense >= 0 ? "text-green-600" : "text-red-600"
-                )}>
-                  {totals.income - totals.expense >= 0 ? '+' : ''}
-                  ${(totals.income - totals.expense).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
+              {/* Add Operational Expense */}
+              <Dialog open={isNewExpenseOpen} onOpenChange={setIsNewExpenseOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="w-full gap-2">
+                    <Plus className="w-4 h-4" />
+                    Agregar Gasto Operativo
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Registrar Gasto Operativo</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <div className="space-y-2">
+                      <Label>Categoría</Label>
+                      <Select value={expenseCategory} onValueChange={(v) => setExpenseCategory(v as keyof typeof EXPENSE_CATEGORIES)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(EXPENSE_CATEGORIES).map(([key, config]) => (
+                            <SelectItem key={key} value={key}>
+                              {config.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Monto</Label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          type="number"
+                          placeholder="0.00"
+                          value={expenseAmount}
+                          onChange={(e) => setExpenseAmount(e.target.value)}
+                          className="pl-9"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Descripción</Label>
+                      <Textarea
+                        placeholder="Descripción del gasto..."
+                        value={expenseDescription}
+                        onChange={(e) => setExpenseDescription(e.target.value)}
+                      />
+                    </div>
+                    <Button className="w-full" onClick={handleAddExpense} disabled={isSubmitting}>
+                      {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      Registrar Gasto
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </CardContent>
           </Card>
         </div>

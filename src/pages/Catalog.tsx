@@ -22,6 +22,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Tag,
   Search,
@@ -36,22 +37,25 @@ import {
   DollarSign,
   Package,
   Layers,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useConfig } from '@/contexts/ConfigContext';
-import { useCatalog, CatalogItem, CatalogExtra, CatalogItemType, PricingType } from '@/contexts/CatalogContext';
+import { useCatalog, CatalogItem, CatalogExtra, CatalogItemType, PricingType } from '@/hooks/useCatalog';
+import { formatCurrency } from '@/lib/currency';
 
 type TabFilter = 'all' | 'service' | 'article';
 
 export default function Catalog() {
-  const { activeCategories } = useConfig();
-  const { items, addItem, updateItem, deleteItem, toggleActive } = useCatalog();
+  const { activeCategories, business } = useConfig();
+  const { items, loading, addItem, updateItem, deleteItem, toggleActive } = useCatalog();
   const categoryNames = activeCategories.map(c => c.name);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<TabFilter>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Dialogs
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -122,48 +126,53 @@ export default function Catalog() {
     }
   };
 
-  const handleAddItem = () => {
+  const handleAddItem = async () => {
     if (!formData.name?.trim()) {
       toast.error('Ingresa el nombre del artículo o servicio');
       return;
     }
     
-    addItem({
-      name: formData.name,
-      description: formData.description,
-      type: formData.type || 'service',
-      pricingType: formData.pricingType || 'piece',
-      price: formData.price || 0,
-      category: formData.category || 'Lavado',
-      estimatedTime: formData.estimatedTime,
-      isActive: formData.isActive ?? true,
-      extras: formData.extras || [],
-    });
-    
-    toast.success(`${formData.type === 'service' ? 'Servicio' : 'Artículo'} agregado al catálogo`);
-    setShowAddDialog(false);
-    resetForm();
+    setIsSubmitting(true);
+    try {
+      await addItem({
+        name: formData.name,
+        description: formData.description,
+        type: formData.type || 'service',
+        pricingType: formData.pricingType || 'piece',
+        price: formData.price || 0,
+        category: formData.category || 'Lavado',
+        estimatedTime: formData.estimatedTime,
+        isActive: formData.isActive ?? true,
+        extras: formData.extras || [],
+      });
+      
+      setShowAddDialog(false);
+      resetForm();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleEditItem = () => {
+  const handleEditItem = async () => {
     if (!selectedItem || !formData.name?.trim()) return;
     
-    updateItem(selectedItem.id, formData);
-    
-    toast.success('Elemento actualizado');
-    setShowEditDialog(false);
-    setSelectedItem(null);
-    resetForm();
+    setIsSubmitting(true);
+    try {
+      await updateItem(selectedItem.id, formData);
+      setShowEditDialog(false);
+      setSelectedItem(null);
+      resetForm();
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDeleteItem = (item: CatalogItem) => {
-    deleteItem(item.id);
-    toast.success('Elemento eliminado del catálogo');
+  const handleDeleteItem = async (item: CatalogItem) => {
+    await deleteItem(item.id);
   };
 
-  const handleToggleActive = (item: CatalogItem) => {
-    toggleActive(item.id);
-    toast.success(item.isActive ? 'Elemento desactivado' : 'Elemento activado');
+  const handleToggleActive = async (item: CatalogItem) => {
+    await toggleActive(item.id);
   };
 
   const openEditDialog = (item: CatalogItem) => {
@@ -205,7 +214,8 @@ export default function Catalog() {
       extras: [...(prev.extras || []), { 
         id: Date.now().toString(), 
         name: newExtra.name, 
-        price: newExtra.price 
+        price: newExtra.price,
+        isActive: true,
       }],
     }));
     setNewExtra({ name: '', price: 0 });
@@ -223,6 +233,27 @@ export default function Catalog() {
     setFormData(prev => ({ ...prev, type }));
     setShowAddDialog(true);
   };
+
+  if (loading) {
+    return (
+      <div className="p-4 lg:p-6 max-w-7xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-10 w-48" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <Skeleton key={i} className="h-48" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 lg:p-6 max-w-7xl mx-auto">
@@ -412,7 +443,7 @@ export default function Catalog() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-2xl font-bold text-primary">
-                        ${item.price.toFixed(2)}
+                        {formatCurrency(item.price, business.currency)}
                       </span>
                       <Badge variant="outline" className="gap-1">
                         <PricingIcon className="w-3 h-3" />
@@ -439,7 +470,7 @@ export default function Catalog() {
                     <div className="flex flex-wrap gap-1">
                       {item.extras.map(extra => (
                         <Badge key={extra.id} variant="secondary" className="text-xs">
-                          +{extra.name} (${extra.price})
+                          +{extra.name} ({formatCurrency(extra.price, business.currency)})
                         </Badge>
                       ))}
                     </div>
@@ -494,83 +525,41 @@ export default function Catalog() {
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {showEditDialog ? 'Editar' : 'Agregar'} {formData.type === 'service' ? 'Servicio' : 'Artículo'}
+              {showEditDialog ? 'Editar Elemento' : `Agregar ${formData.type === 'service' ? 'Servicio' : 'Artículo'}`}
             </DialogTitle>
             <DialogDescription>
               {showEditDialog 
-                ? 'Modifica los datos del elemento' 
-                : 'Completa los datos para agregar al catálogo'
+                ? 'Modifica los detalles del elemento' 
+                : `Agrega un nuevo ${formData.type === 'service' ? 'servicio' : 'artículo'} al catálogo`
               }
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4">
-            {/* Type Toggle (only for new items) */}
-            {showAddDialog && (
-              <div className="flex items-center gap-4">
-                <Label>Tipo:</Label>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={formData.type === 'service' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setFormData(prev => ({ ...prev, type: 'service' }))}
-                    className="gap-2"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    Servicio
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={formData.type === 'article' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setFormData(prev => ({ ...prev, type: 'article' }))}
-                    className="gap-2"
-                  >
-                    <Shirt className="w-4 h-4" />
-                    Artículo
-                  </Button>
-                </div>
-              </div>
-            )}
-
+          <div className="space-y-4 py-4">
+            {/* Name */}
             <div className="space-y-2">
-              <Label>Nombre *</Label>
+              <Label htmlFor="name">Nombre</Label>
               <Input
-                placeholder="Ej: Lavado Premium"
-                value={formData.name}
+                id="name"
+                placeholder="Ej: Lavado Express"
+                value={formData.name || ''}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
               />
             </div>
 
+            {/* Description */}
             <div className="space-y-2">
-              <Label>Descripción</Label>
+              <Label htmlFor="description">Descripción</Label>
               <Textarea
-                placeholder="Descripción del artículo o servicio..."
-                value={formData.description}
+                id="description"
+                placeholder="Descripción del servicio o artículo..."
+                value={formData.description || ''}
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                rows={2}
               />
             </div>
-            
+
+            {/* Pricing Type & Price */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Categoría</Label>
-                <Select 
-                  value={formData.category} 
-                  onValueChange={(v) => setFormData(prev => ({ ...prev, category: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categoryNames.map(cat => (
-                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
               <div className="space-y-2">
                 <Label>Tipo de Precio</Label>
                 <Select 
@@ -587,104 +576,125 @@ export default function Catalog() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
+
               <div className="space-y-2">
-                <Label>Precio ($)</Label>
+                <Label htmlFor="price">Precio</Label>
                 <Input
+                  id="price"
                   type="number"
                   min="0"
                   step="0.01"
-                  value={formData.price}
-                  onChange={(e) => setFormData(prev => ({ ...prev, price: Number(e.target.value) }))}
+                  value={formData.price || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
                 />
               </div>
-              
-              {formData.type === 'service' && (
-                <div className="space-y-2">
-                  <Label>Tiempo Estimado (hrs)</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={formData.estimatedTime}
-                    onChange={(e) => setFormData(prev => ({ ...prev, estimatedTime: Number(e.target.value) }))}
-                  />
-                </div>
-              )}
             </div>
 
-            {/* Extras (only for services) */}
+            {/* Category */}
+            <div className="space-y-2">
+              <Label>Categoría</Label>
+              <Select 
+                value={formData.category} 
+                onValueChange={(v) => setFormData(prev => ({ ...prev, category: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categoryNames.map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Estimated Time (for services) */}
             {formData.type === 'service' && (
-              <div className="space-y-3">
-                <Label>Extras Opcionales</Label>
-                
-                {formData.extras && formData.extras.length > 0 && (
-                  <div className="space-y-2">
-                    {formData.extras.map(extra => (
-                      <div key={extra.id} className="flex items-center justify-between p-2 bg-muted rounded-lg">
-                        <span className="text-sm">{extra.name} - ${extra.price}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeExtra(extra.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Nombre del extra"
-                    value={newExtra.name}
-                    onChange={(e) => setNewExtra(prev => ({ ...prev, name: e.target.value }))}
-                    className="flex-1"
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Precio"
-                    value={newExtra.price || ''}
-                    onChange={(e) => setNewExtra(prev => ({ ...prev, price: Number(e.target.value) }))}
-                    className="w-24"
-                  />
-                  <Button type="button" variant="outline" size="icon" onClick={addExtra}>
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="estimatedTime">Tiempo Estimado (horas)</Label>
+                <Input
+                  id="estimatedTime"
+                  type="number"
+                  min="1"
+                  value={formData.estimatedTime || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, estimatedTime: parseInt(e.target.value) || 24 }))}
+                />
               </div>
             )}
 
-            {/* Active Toggle */}
-            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-              <div>
-                <Label>Estado Activo</Label>
-                <p className="text-xs text-muted-foreground">
-                  Los elementos inactivos no aparecen en la venta
-                </p>
-              </div>
+            {/* Active Status */}
+            <div className="flex items-center justify-between">
+              <Label htmlFor="isActive">Activo</Label>
               <Switch
+                id="isActive"
                 checked={formData.isActive}
                 onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isActive: checked }))}
               />
             </div>
+
+            {/* Extras */}
+            <div className="space-y-3">
+              <Label>Extras</Label>
+              
+              {formData.extras && formData.extras.length > 0 && (
+                <div className="space-y-2">
+                  {formData.extras.map(extra => (
+                    <div key={extra.id} className="flex items-center gap-2 p-2 bg-muted rounded-md">
+                      <span className="flex-1">{extra.name}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {formatCurrency(extra.price, business.currency)}
+                      </span>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => removeExtra(extra.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Nombre del extra"
+                  value={newExtra.name}
+                  onChange={(e) => setNewExtra(prev => ({ ...prev, name: e.target.value }))}
+                />
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Precio"
+                  className="w-24"
+                  value={newExtra.price || ''}
+                  onChange={(e) => setNewExtra(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                />
+                <Button variant="outline" size="icon" onClick={addExtra}>
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
           </div>
-          
+
           <DialogFooter>
             <Button 
               variant="outline" 
               onClick={() => {
                 setShowAddDialog(false);
                 setShowEditDialog(false);
+                setSelectedItem(null);
                 resetForm();
               }}
             >
               Cancelar
             </Button>
-            <Button onClick={showEditDialog ? handleEditItem : handleAddItem}>
+            <Button 
+              onClick={showEditDialog ? handleEditItem : handleAddItem}
+              disabled={isSubmitting}
+            >
+              {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {showEditDialog ? 'Guardar Cambios' : 'Agregar'}
             </Button>
           </DialogFooter>
