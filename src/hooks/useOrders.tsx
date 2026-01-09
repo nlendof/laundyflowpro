@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Order, OrderStatus, OrderItem, ItemType } from '@/types';
 import { toast } from 'sonner';
 import { useAuth } from './useAuth';
 import { Tables, TablesInsert } from '@/integrations/supabase/types';
+import { Package } from 'lucide-react';
 
 type DbOrder = Tables<'orders'>;
 type DbOrderItem = Tables<'order_items'>;
@@ -65,6 +66,8 @@ export function useOrders() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [newOrderIds, setNewOrderIds] = useState<Set<string>>(new Set());
+  const isInitialLoadRef = useRef(true);
 
   // Fetch all orders with their items
   const fetchOrders = useCallback(async () => {
@@ -105,6 +108,7 @@ export function useOrders() {
       );
 
       setOrders(mappedOrders);
+      isInitialLoadRef.current = false;
     } catch (error) {
       console.error('Error fetching orders:', error);
       toast.error('Error al cargar los pedidos');
@@ -285,6 +289,28 @@ export function useOrders() {
 
     if (eventType === 'INSERT') {
       setOrders(prev => [mappedOrder, ...prev]);
+      
+      // Show toast notification for new orders (not on initial load)
+      if (!isInitialLoadRef.current) {
+        // Add to highlighted orders
+        setNewOrderIds(prev => new Set(prev).add(mappedOrder.id));
+        
+        // Auto-remove highlight after 5 seconds
+        setTimeout(() => {
+          setNewOrderIds(prev => {
+            const next = new Set(prev);
+            next.delete(mappedOrder.id);
+            return next;
+          });
+        }, 5000);
+        
+        // Show toast notification
+        toast.success(`Nuevo pedido: ${mappedOrder.ticketCode}`, {
+          description: `Cliente: ${mappedOrder.customerName}`,
+          icon: <Package className="w-4 h-4" />,
+          duration: 5000,
+        });
+      }
     } else if (eventType === 'UPDATE') {
       setOrders(prev => prev.map(order => 
         order.id === newRecord.id ? mappedOrder : order
@@ -344,6 +370,7 @@ export function useOrders() {
   return {
     orders,
     loading,
+    newOrderIds,
     fetchOrders,
     createOrder,
     updateOrderStatus,
