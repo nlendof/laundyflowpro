@@ -208,6 +208,17 @@ export default function Login() {
           <p className="text-center text-sm text-muted-foreground mt-6">
             Contacta al administrador para obtener acceso.
           </p>
+
+          {/* Legal Footer */}
+          <div className="text-center mt-4 space-x-4">
+            <Link to="/terms" className="text-xs text-muted-foreground hover:text-primary hover:underline">
+              Términos y Condiciones
+            </Link>
+            <span className="text-muted-foreground">•</span>
+            <Link to="/privacy" className="text-xs text-muted-foreground hover:text-primary hover:underline">
+              Política de Privacidad
+            </Link>
+          </div>
         </div>
       </div>
     </div>
