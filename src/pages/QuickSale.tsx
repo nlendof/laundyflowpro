@@ -55,6 +55,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { DiscountInput } from '@/components/DiscountInput';
 import { useCatalog, CatalogItem, PricingType } from '@/contexts/CatalogContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { Order, OrderItem } from '@/types';
@@ -130,6 +131,9 @@ export default function QuickSale() {
   // Cart
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
+  
+  // Discount
+  const [discountAmount, setDiscountAmount] = useState(0);
   
   // Payment
   const [paymentMethod, setPaymentMethod] = useState<string>('cash');
@@ -220,7 +224,8 @@ export default function QuickSale() {
     }, 0);
   }, [selectedExtras, activeExtraServices]);
 
-  const totalAmount = cartTotal + extrasTotal;
+  const subtotal = cartTotal + extrasTotal;
+  const totalAmount = Math.max(0, subtotal - discountAmount);
   const change = parseFloat(amountReceived || '0') - totalAmount;
 
   // Generate ticket code
@@ -465,9 +470,12 @@ export default function QuickSale() {
     setCustomerAddress('');
     setCart([]);
     setSelectedExtras([]);
+    setDiscountAmount(0);
     setPaymentMethod('cash');
     setAmountReceived('');
     setShowSuccess(false);
+    setCompletedOrder(null);
+  };
     setCompletedOrder(null);
   };
 
@@ -851,6 +859,14 @@ export default function QuickSale() {
 
         {/* Payment Section */}
         <div className="border-t p-4 space-y-4 bg-muted/30">
+          {/* Discount */}
+          {cart.length > 0 && (
+            <DiscountInput 
+              subtotal={subtotal} 
+              onDiscountChange={setDiscountAmount} 
+            />
+          )}
+
           {/* Payment Methods */}
           <div className="flex gap-2">
             {PAYMENT_METHODS.map((method) => {
@@ -910,10 +926,24 @@ export default function QuickSale() {
             </div>
           )}
 
-          {/* Total */}
-          <div className="flex items-center justify-between p-4 bg-primary/10 rounded-xl">
-            <span className="text-lg font-medium">Total:</span>
-            <span className="text-3xl font-bold text-primary">${totalAmount.toFixed(2)}</span>
+          {/* Totals Summary */}
+          <div className="space-y-2">
+            {discountAmount > 0 && (
+              <>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal:</span>
+                  <span>${subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm text-green-600">
+                  <span>Descuento:</span>
+                  <span>-${discountAmount.toFixed(2)}</span>
+                </div>
+              </>
+            )}
+            <div className="flex items-center justify-between p-4 bg-primary/10 rounded-xl">
+              <span className="text-lg font-medium">Total:</span>
+              <span className="text-3xl font-bold text-primary">${totalAmount.toFixed(2)}</span>
+            </div>
           </div>
 
           {/* Action Buttons */}

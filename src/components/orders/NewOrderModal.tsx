@@ -3,6 +3,7 @@ import { Order, OrderItem, ItemType, OrderStatus } from '@/types';
 import { useConfig } from '@/contexts/ConfigContext';
 import { QUICK_SERVICES } from '@/lib/constants';
 import { supabase } from '@/integrations/supabase/client';
+import { DiscountInput } from '@/components/DiscountInput';
 import {
   Dialog,
   DialogContent,
@@ -142,6 +143,9 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
   const [items, setItems] = useState<OrderItemDraft[]>([]);
   const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
   
+  // Discount
+  const [discountAmount, setDiscountAmount] = useState(0);
+  
   // Item checks
   const [itemChecks, setItemChecks] = useState<Record<string, boolean>>(
     Object.fromEntries(ITEM_CHECKS.map(c => [c.id, c.defaultChecked]))
@@ -241,7 +245,8 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
     return cost;
   }, [receptionType, deliveryType, pickupCost, deliveryCostValue]);
 
-  const totalAmount = itemsTotal + extrasTotal + totalDeliveryCost;
+  const subtotal = itemsTotal + extrasTotal + totalDeliveryCost;
+  const totalAmount = Math.max(0, subtotal - discountAmount);
 
   // Generate ticket code
   const generateTicketCode = () => {
@@ -332,6 +337,7 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
     setDeliveryCostValue(100);
     setItems([]);
     setSelectedExtras([]);
+    setDiscountAmount(0);
     setItemChecks(Object.fromEntries(ITEM_CHECKS.map(c => [c.id, c.defaultChecked])));
     setNotes('');
     setSelectedCategory('');
@@ -961,6 +967,14 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
 
           <Separator />
 
+          {/* Discount */}
+          {items.length > 0 && (
+            <DiscountInput 
+              subtotal={subtotal} 
+              onDiscountChange={setDiscountAmount} 
+            />
+          )}
+
           {/* Total and Actions */}
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-primary/5 rounded-xl">
@@ -978,6 +992,12 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
                 <div>
                   <p className="text-sm text-muted-foreground">Envío</p>
                   <p className="font-medium">+${totalDeliveryCost.toFixed(2)}</p>
+                </div>
+              )}
+              {discountAmount > 0 && (
+                <div>
+                  <p className="text-sm text-green-600">Descuento</p>
+                  <p className="font-medium text-green-600">-${discountAmount.toFixed(2)}</p>
                 </div>
               )}
               <div className="text-right">
