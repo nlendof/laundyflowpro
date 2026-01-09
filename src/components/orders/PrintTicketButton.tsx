@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { TicketPrint } from './TicketPrint';
+import { WhatsAppTicketButton } from './WhatsAppTicketButton';
 import { Printer, Eye } from 'lucide-react';
 
 interface PrintTicketButtonProps {
@@ -125,7 +126,7 @@ export function PrintTicketButton({
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-2 pt-4">
             <Button
               variant="outline"
               className="flex-1"
@@ -133,6 +134,11 @@ export function PrintTicketButton({
             >
               Cerrar
             </Button>
+            <WhatsAppTicketButton 
+              order={order} 
+              variant="outline"
+              className="flex-1"
+            />
             <Button className="flex-1 gap-2" onClick={handlePrint}>
               <Printer className="w-4 h-4" />
               Imprimir
