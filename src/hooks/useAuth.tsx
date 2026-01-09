@@ -13,6 +13,8 @@ interface Profile {
   avatar_url?: string;
   is_active: boolean;
   hire_date?: string;
+  must_change_password?: boolean;
+  profile_completed?: boolean;
 }
 
 interface AuthUser {
@@ -23,6 +25,8 @@ interface AuthUser {
   avatar?: string;
   phone?: string;
   permissions: string[];
+  mustChangePassword: boolean;
+  profileCompleted: boolean;
 }
 
 interface AuthContextType {
@@ -94,6 +98,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         avatar: profile.avatar_url || undefined,
         phone: profile.phone || undefined,
         permissions,
+        mustChangePassword: profile.must_change_password ?? false,
+        profileCompleted: profile.profile_completed ?? true,
       };
     } catch (error) {
       console.error('Error in fetchUserData:', error);
