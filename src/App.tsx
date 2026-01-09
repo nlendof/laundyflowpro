@@ -26,6 +26,12 @@ import EmployeePortal from "./pages/EmployeePortal";
 import FirstLoginSetup from "./pages/FirstLoginSetup";
 import Reports from "./pages/Reports";
 import Purchases from "./pages/Purchases";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import TermsAndConditions from "./pages/TermsAndConditions";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import AuditLogs from "./pages/AuditLogs";
+import ErrorPage from "./pages/ErrorPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -105,6 +111,10 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Index />} />
+      <Route path="/terms" element={<TermsAndConditions />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route
         path="/login"
         element={
@@ -231,6 +241,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <Settings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/audit-logs"
+          element={
+            <ProtectedRoute>
+              <AuditLogs />
             </ProtectedRoute>
           }
         />
