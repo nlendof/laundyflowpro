@@ -914,6 +914,109 @@ export type Database = {
         }
         Relationships: []
       }
+      purchase_items: {
+        Row: {
+          article_id: string | null
+          created_at: string
+          id: string
+          inventory_id: string | null
+          item_name: string
+          item_type: string
+          purchase_id: string
+          quantity: number
+          stock_action: string
+          stock_before: number
+          total_cost: number
+          unit_cost: number
+        }
+        Insert: {
+          article_id?: string | null
+          created_at?: string
+          id?: string
+          inventory_id?: string | null
+          item_name: string
+          item_type?: string
+          purchase_id: string
+          quantity: number
+          stock_action?: string
+          stock_before?: number
+          total_cost?: number
+          unit_cost?: number
+        }
+        Update: {
+          article_id?: string | null
+          created_at?: string
+          id?: string
+          inventory_id?: string | null
+          item_name?: string
+          item_type?: string
+          purchase_id?: string
+          quantity?: number
+          stock_action?: string
+          stock_before?: number
+          total_cost?: number
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_items_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "catalog_articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_items_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_items_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchases: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          purchase_date: string
+          status: string
+          supplier_name: string | null
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          purchase_date?: string
+          status?: string
+          supplier_name?: string | null
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          purchase_date?: string
+          status?: string
+          supplier_name?: string | null
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       system_config: {
         Row: {
           id: string

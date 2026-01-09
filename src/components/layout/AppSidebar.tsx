@@ -17,6 +17,7 @@ import {
   Boxes,
   Tag,
   UserCircle,
+  ShoppingBag,
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,7 @@ const navItems: NavItem[] = [
   { icon: DollarSign, label: 'Caja', path: '/cash-register', roles: ['admin', 'cajero'] },
   { icon: UserCircle, label: 'Clientes', path: '/customers', roles: ['admin', 'cajero'] },
   { icon: Boxes, label: 'Inventario', path: '/inventory', roles: ['admin'] },
+  { icon: ShoppingBag, label: 'Compras', path: '/purchases', roles: ['admin', 'operador'] },
   { icon: Tag, label: 'Catálogo', path: '/catalog', roles: ['admin'] },
   { icon: BarChart3, label: 'Reportes', path: '/reports', roles: ['admin'] },
   { icon: Users, label: 'Empleados', path: '/employees', roles: ['admin'] },

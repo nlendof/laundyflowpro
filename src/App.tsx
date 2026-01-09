@@ -25,6 +25,7 @@ import Employees from "./pages/Employees";
 import EmployeePortal from "./pages/EmployeePortal";
 import FirstLoginSetup from "./pages/FirstLoginSetup";
 import Reports from "./pages/Reports";
+import Purchases from "./pages/Purchases";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -182,6 +183,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <Inventory />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/purchases"
+          element={
+            <ProtectedRoute>
+              <Purchases />
             </ProtectedRoute>
           }
         />
