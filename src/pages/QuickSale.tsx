@@ -476,8 +476,6 @@ export default function QuickSale() {
     setShowSuccess(false);
     setCompletedOrder(null);
   };
-    setCompletedOrder(null);
-  };
 
   // Get items for current tab with search filter
   const currentItems = useMemo(() => {
