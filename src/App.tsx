@@ -18,6 +18,7 @@ import Operations from "./pages/Operations";
 import Deliveries from "./pages/Deliveries";
 import Inventory from "./pages/Inventory";
 import Catalog from "./pages/Catalog";
+import Customers from "./pages/Customers";
 import Settings from "./pages/Settings";
 import CashRegister from "./pages/CashRegister";
 import Employees from "./pages/Employees";
@@ -188,6 +189,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <Catalog />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/customers"
+          element={
+            <ProtectedRoute>
+              <Customers />
             </ProtectedRoute>
           }
         />

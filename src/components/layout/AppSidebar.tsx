@@ -16,6 +16,7 @@ import {
   WashingMachine,
   Boxes,
   Tag,
+  UserCircle,
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,7 @@ const navItems: NavItem[] = [
   { icon: WashingMachine, label: 'Operaciones', path: '/operations', roles: ['admin', 'operador'] },
   { icon: Truck, label: 'Entregas', path: '/deliveries', roles: ['admin', 'delivery'] },
   { icon: DollarSign, label: 'Caja', path: '/cash-register', roles: ['admin', 'cajero'] },
+  { icon: UserCircle, label: 'Clientes', path: '/customers', roles: ['admin', 'cajero'] },
   { icon: Boxes, label: 'Inventario', path: '/inventory', roles: ['admin'] },
   { icon: Tag, label: 'Catálogo', path: '/catalog', roles: ['admin'] },
   { icon: BarChart3, label: 'Reportes', path: '/reports', roles: ['admin'] },
