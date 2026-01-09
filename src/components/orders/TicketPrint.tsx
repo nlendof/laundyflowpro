@@ -1,12 +1,13 @@
 import { forwardRef } from 'react';
 import { Order, OrderItem } from '@/types';
-import { useConfig } from '@/contexts/ConfigContext';
+import { useConfig, TicketSettings } from '@/contexts/ConfigContext';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface TicketPrintProps {
   order: Order;
-  showPrices?: boolean;
+  overrideSettings?: Partial<TicketSettings>;
 }
 
 /**
@@ -14,8 +15,11 @@ interface TicketPrintProps {
  * Use with window.print() or a print library.
  */
 export const TicketPrint = forwardRef<HTMLDivElement, TicketPrintProps>(
-  ({ order, showPrices = true }, ref) => {
-    const { business, activeExtraServices } = useConfig();
+  ({ order, overrideSettings }, ref) => {
+    const { business, activeExtraServices, ticketSettings } = useConfig();
+
+    // Merge config settings with any overrides
+    const settings = { ...ticketSettings, ...overrideSettings };
 
     const getItemTypeLabel = (type: 'weight' | 'piece') =>
       type === 'weight' ? 'kg' : 'pza';
@@ -30,6 +34,19 @@ export const TicketPrint = forwardRef<HTMLDivElement, TicketPrintProps>(
         .join(', ');
     };
 
+    // Determine QR content
+    const getQrValue = () => {
+      switch (settings.qrContent) {
+        case 'payment_link':
+          return settings.customQrUrl || `https://pay.example.com/${order.ticketCode}`;
+        case 'custom':
+          return settings.customQrUrl || order.ticketCode;
+        case 'ticket_code':
+        default:
+          return order.qrCode || order.ticketCode;
+      }
+    };
+
     return (
       <div
         ref={ref}
@@ -42,8 +59,22 @@ export const TicketPrint = forwardRef<HTMLDivElement, TicketPrintProps>(
           padding: '8px',
         }}
       >
-        {/* Header - Business Info */}
+        {/* Header - Business Info with optional Logo */}
         <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+          {settings.showLogo && settings.logoUrl && (
+            <div style={{ marginBottom: '4px' }}>
+              <img 
+                src={settings.logoUrl} 
+                alt={business.name}
+                style={{ 
+                  maxWidth: '120px', 
+                  maxHeight: '60px', 
+                  margin: '0 auto',
+                  display: 'block'
+                }} 
+              />
+            </div>
+          )}
           <div style={{ fontSize: '16px', fontWeight: 'bold' }}>
             {business.name}
           </div>
@@ -143,7 +174,7 @@ export const TicketPrint = forwardRef<HTMLDivElement, TicketPrintProps>(
         >
           <span style={{ flex: 2 }}>ARTICULO</span>
           <span style={{ flex: 1, textAlign: 'center' }}>CANT</span>
-          {showPrices && (
+          {settings.showPrices && (
             <>
               <span style={{ flex: 1, textAlign: 'right' }}>P.U.</span>
               <span style={{ flex: 1, textAlign: 'right' }}>TOTAL</span>
@@ -174,7 +205,7 @@ export const TicketPrint = forwardRef<HTMLDivElement, TicketPrintProps>(
               <span style={{ flex: 1, textAlign: 'center' }}>
                 {item.quantity} {getItemTypeLabel(item.type)}
               </span>
-              {showPrices && (
+              {settings.showPrices && (
                 <>
                   <span style={{ flex: 1, textAlign: 'right' }}>
                     ${item.unitPrice.toFixed(2)}
@@ -202,7 +233,7 @@ export const TicketPrint = forwardRef<HTMLDivElement, TicketPrintProps>(
         />
 
         {/* Totals */}
-        {showPrices && (
+        {settings.showPrices && (
           <div style={{ marginBottom: '8px' }}>
             <div
               style={{
@@ -280,32 +311,34 @@ export const TicketPrint = forwardRef<HTMLDivElement, TicketPrintProps>(
             borderTop: '1px dashed #000',
           }}
         >
-          <div>¡Gracias por su preferencia!</div>
+          {settings.thankYouMessage && <div>{settings.thankYouMessage}</div>}
           {business.website && <div>{business.website}</div>}
-          <div style={{ marginTop: '8px', fontSize: '9px', color: '#666' }}>
-            Conserve este ticket para recoger su pedido
-          </div>
+          {settings.showFooter && settings.footerText && (
+            <div style={{ marginTop: '8px', fontSize: '9px', color: '#666' }}>
+              {settings.footerText}
+            </div>
+          )}
         </div>
 
-        {/* QR Placeholder */}
-        <div
-          style={{
-            textAlign: 'center',
-            marginTop: '8px',
-            fontSize: '10px',
-          }}
-        >
+        {/* QR Code */}
+        {settings.showQR && (
           <div
             style={{
-              display: 'inline-block',
-              padding: '8px',
-              border: '1px solid #000',
-              backgroundColor: '#f8f8f8',
+              textAlign: 'center',
+              marginTop: '8px',
             }}
           >
-            QR: {order.qrCode || order.ticketCode}
+            <QRCodeSVG 
+              value={getQrValue()} 
+              size={80} 
+              level="M"
+              style={{ margin: '0 auto' }}
+            />
+            <div style={{ fontSize: '8px', marginTop: '4px', color: '#666' }}>
+              {settings.qrContent === 'payment_link' ? 'Escanea para pagar' : order.ticketCode}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     );
   }

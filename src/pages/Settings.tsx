@@ -55,10 +55,12 @@ import {
   Store,
   Tag,
   FolderOpen,
+  Receipt,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useConfig, CatalogCategory, OperationStep, DeliveryZone, ExtraService, PaymentMethod, BusinessSettings } from '@/contexts/ConfigContext';
+import { TicketSettingsTab } from '@/components/settings/TicketSettingsTab';
 
 // ServiceItem is local to Settings (not in context yet)
 interface ServiceItem {
@@ -408,6 +410,10 @@ export default function SettingsPage() {
           <TabsTrigger value="catalog" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Tag className="w-4 h-4" />
             Catálogo
+          </TabsTrigger>
+          <TabsTrigger value="tickets" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Receipt className="w-4 h-4" />
+            Tickets
           </TabsTrigger>
           <TabsTrigger value="appearance" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Palette className="w-4 h-4" />
@@ -1189,6 +1195,11 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Ticket Settings */}
+        <TabsContent value="tickets">
+          <TicketSettingsTab />
         </TabsContent>
 
         {/* Appearance Settings */}
