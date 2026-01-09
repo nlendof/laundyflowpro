@@ -124,6 +124,8 @@ export default function SettingsPage() {
     setPaymentMethods: setPayments,
     business,
     setBusiness,
+    saveConfig,
+    loading,
   } = useConfig();
 
   const [activeTab, setActiveTab] = useState('business');
@@ -154,8 +156,8 @@ export default function SettingsPage() {
   const [editingCategory, setEditingCategory] = useState<CatalogCategory | null>(null);
   const [newCategoryName, setNewCategoryName] = useState('');
 
-  const handleSave = () => {
-    toast.success('Configuración guardada correctamente');
+  const handleSave = async () => {
+    await saveConfig();
   };
 
   const toggleWorkDay = (day: string) => {
@@ -375,9 +377,9 @@ export default function SettingsPage() {
           </h1>
           <p className="text-muted-foreground">Personaliza tu sistema de lavandería</p>
         </div>
-        <Button onClick={handleSave} className="gap-2">
+        <Button onClick={handleSave} disabled={loading} className="gap-2">
           <Save className="w-4 h-4" />
-          Guardar Cambios
+          {loading ? 'Guardando...' : 'Guardar Cambios'}
         </Button>
       </div>
 
