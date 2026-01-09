@@ -35,8 +35,8 @@ export const ORDER_STATUS_CONFIG: Record<string, OrderStatusInfo> = {
   },
   ironing: {
     key: 'ironing',
-    label: 'Ironing',
-    labelEs: 'Planchado',
+    label: 'Finishing',
+    labelEs: 'Terminación',
     color: 'text-status-ironing',
     bgColor: 'bg-status-ironing-bg',
     icon: 'Flame',
