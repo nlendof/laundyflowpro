@@ -12,10 +12,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Receipt, Image, QrCode, FileText, Eye } from 'lucide-react';
+import { Receipt, Image, QrCode, FileText, Eye, Upload, Trash2, Loader2 } from 'lucide-react';
 import { useConfig, TicketSettings } from '@/contexts/ConfigContext';
 import { TicketPrint } from '@/components/orders/TicketPrint';
 import { Order } from '@/types';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 // Sample order for preview
 const SAMPLE_ORDER: Order = {
@@ -59,7 +61,9 @@ const SAMPLE_ORDER: Order = {
 export function TicketSettingsTab() {
   const { ticketSettings, setTicketSettings } = useConfig();
   const ticketRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewKey, setPreviewKey] = useState(0);
+  const [uploading, setUploading] = useState(false);
 
   const updateSetting = <K extends keyof TicketSettings>(
     key: K,
@@ -68,6 +72,76 @@ export function TicketSettingsTab() {
     setTicketSettings(prev => ({ ...prev, [key]: value }));
     // Force preview refresh
     setPreviewKey(prev => prev + 1);
+  };
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Por favor selecciona una imagen válida');
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('La imagen debe ser menor a 2MB');
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      // Generate unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `logo-${Date.now()}.${fileExt}`;
+
+      // Upload to Supabase storage
+      const { data, error } = await supabase.storage
+        .from('business-logos')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (error) throw error;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('business-logos')
+        .getPublicUrl(data.path);
+
+      updateSetting('logoUrl', urlData.publicUrl);
+      toast.success('Logo subido correctamente');
+    } catch (error: any) {
+      console.error('Error uploading logo:', error);
+      toast.error('Error al subir el logo: ' + error.message);
+    } finally {
+      setUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    // Extract filename from URL if it's a Supabase URL
+    if (ticketSettings.logoUrl.includes('business-logos')) {
+      try {
+        const urlParts = ticketSettings.logoUrl.split('business-logos/');
+        if (urlParts[1]) {
+          await supabase.storage
+            .from('business-logos')
+            .remove([urlParts[1]]);
+        }
+      } catch (error) {
+        console.error('Error removing old logo:', error);
+      }
+    }
+    updateSetting('logoUrl', '');
+    toast.success('Logo eliminado');
   };
 
   return (
@@ -95,17 +169,72 @@ export function TicketSettingsTab() {
               />
             </div>
             {ticketSettings.showLogo && (
-              <div className="space-y-2">
-                <Label htmlFor="logoUrl">URL del Logo</Label>
-                <Input
-                  id="logoUrl"
-                  placeholder="https://ejemplo.com/logo.png"
-                  value={ticketSettings.logoUrl}
-                  onChange={(e) => updateSetting('logoUrl', e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Recomendado: imagen cuadrada, máximo 120x60px
-                </p>
+              <div className="space-y-4">
+                {/* Logo Preview */}
+                {ticketSettings.logoUrl && (
+                  <div className="flex items-center gap-4 p-3 border rounded-lg bg-muted/50">
+                    <img 
+                      src={ticketSettings.logoUrl} 
+                      alt="Logo preview" 
+                      className="max-w-[80px] max-h-[40px] object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleRemoveLogo}
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      Eliminar
+                    </Button>
+                  </div>
+                )}
+
+                {/* Upload Button */}
+                <div className="space-y-2">
+                  <Label>Subir Logo</Label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Subiendo...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Seleccionar imagen
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Formatos: JPG, PNG, GIF. Máximo 2MB. Recomendado: 120x60px
+                  </p>
+                </div>
+
+                {/* Manual URL Input */}
+                <div className="space-y-2">
+                  <Label htmlFor="logoUrl">O ingresar URL manualmente</Label>
+                  <Input
+                    id="logoUrl"
+                    placeholder="https://ejemplo.com/logo.png"
+                    value={ticketSettings.logoUrl}
+                    onChange={(e) => updateSetting('logoUrl', e.target.value)}
+                  />
+                </div>
               </div>
             )}
           </CardContent>
