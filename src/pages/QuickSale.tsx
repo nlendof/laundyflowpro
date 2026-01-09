@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OrderQRCode } from '@/components/orders/OrderQRCode';
+import { TicketPrint } from '@/components/orders/TicketPrint';
 import {
   Dialog,
   DialogContent,
@@ -34,11 +35,13 @@ import {
   Hash,
   Layers,
   Search,
+  Printer,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useCatalog, CatalogItem, PricingType } from '@/contexts/CatalogContext';
 import { useConfig } from '@/contexts/ConfigContext';
+import { Order, OrderItem } from '@/types';
 
 // Payment methods
 const PAYMENT_METHODS = [
@@ -107,8 +110,9 @@ export default function QuickSale() {
   const [amountReceived, setAmountReceived] = useState<string>('');
   
   // Completed order
-  const [completedOrder, setCompletedOrder] = useState<{ ticketCode: string; customerName: string } | null>(null);
+  const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const ticketRef = useRef<HTMLDivElement>(null);
 
   // Calculate totals
   const cartTotal = useMemo(() => {
@@ -195,6 +199,40 @@ export default function QuickSale() {
   // Quick amount buttons
   const quickAmounts = [50, 100, 200, 500];
 
+  // Build Order object from cart
+  const buildOrder = (ticketCode: string): Order => {
+    const orderItems: OrderItem[] = cart.map((item) => ({
+      id: item.id,
+      name: item.name,
+      type: item.pricingType === 'weight' ? 'weight' : 'piece',
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      extras: selectedExtras,
+    }));
+
+    const now = new Date();
+    return {
+      id: crypto.randomUUID(),
+      ticketCode,
+      qrCode: `qr_${ticketCode.toLowerCase().replace(/-/g, '_')}`,
+      customerId: '',
+      customerName,
+      customerPhone,
+      customerAddress: isDelivery ? customerAddress : undefined,
+      items: orderItems,
+      status: 'in_store',
+      totalAmount,
+      paidAmount: paymentMethod === 'cash' ? parseFloat(amountReceived || '0') : totalAmount,
+      isPaid: true,
+      isDelivery,
+      needsPickup: false,
+      needsDelivery: isDelivery,
+      createdAt: now,
+      updatedAt: now,
+      notes: '',
+    };
+  };
+
   // Process sale
   const processSale = () => {
     if (cart.length === 0) {
@@ -207,17 +245,62 @@ export default function QuickSale() {
     }
 
     const ticketCode = generateTicketCode();
-    
+    const order = buildOrder(ticketCode);
+
     // Here we would deduct inventory for articles if they have trackInventory enabled
     // For now, we just complete the sale
-    
-    setCompletedOrder({
-      ticketCode,
-      customerName,
-    });
+
+    setCompletedOrder(order);
     setShowSuccess(true);
-    
+
     toast.success(`Venta completada: ${ticketCode}`);
+  };
+
+  // Print ticket
+  const handlePrintTicket = () => {
+    if (!ticketRef.current || !completedOrder) return;
+
+    const printWindow = window.open('', '_blank', 'width=350,height=600');
+    if (!printWindow) {
+      alert('Por favor habilite las ventanas emergentes para imprimir');
+      return;
+    }
+
+    const ticketHtml = ticketRef.current.innerHTML;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Ticket ${completedOrder.ticketCode}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+              font-family: monospace, 'Courier New', Courier;
+              font-size: 12px;
+              line-height: 1.3;
+              width: 80mm;
+              padding: 2mm;
+              background: white;
+              color: black;
+            }
+            @media print {
+              @page { size: 80mm auto; margin: 0; }
+              body { width: 80mm; padding: 2mm; }
+            }
+          </style>
+        </head>
+        <body>${ticketHtml}</body>
+      </html>
+    `);
+
+    printWindow.document.close();
+
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+      setTimeout(() => printWindow.close(), 500);
+    };
   };
 
   // Reset form
@@ -616,7 +699,7 @@ export default function QuickSale() {
 
       {/* Success Dialog */}
       <Dialog open={showSuccess} onOpenChange={setShowSuccess}>
-        <DialogContent className="max-w-sm text-center">
+        <DialogContent className="max-w-md text-center">
           <DialogHeader>
             <DialogTitle className="flex flex-col items-center gap-4">
               <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center">
@@ -638,21 +721,38 @@ export default function QuickSale() {
               </div>
             )}
 
+            {/* Hidden ticket for printing */}
+            {completedOrder && (
+              <div className="hidden">
+                <TicketPrint ref={ticketRef} order={completedOrder} />
+              </div>
+            )}
+
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={resetSale}>
                 Nueva Venta
               </Button>
-              {completedOrder && (
-                <Button 
-                  className="flex-1"
-                  onClick={() => {
-                    setShowSuccess(false);
-                  }}
-                >
-                  Ver Ticket
-                </Button>
-              )}
+              <Button 
+                variant="outline"
+                className="flex-1 gap-2"
+                onClick={handlePrintTicket}
+                disabled={!completedOrder}
+              >
+                <Printer className="w-4 h-4" />
+                Imprimir
+              </Button>
             </div>
+            
+            {completedOrder && (
+              <Button 
+                className="w-full"
+                onClick={() => {
+                  setShowSuccess(false);
+                }}
+              >
+                Ver QR del Ticket
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>
