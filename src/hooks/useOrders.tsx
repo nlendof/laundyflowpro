@@ -63,12 +63,13 @@ const mapDbOrderToOrder = (dbOrder: DbOrder, dbItems: DbOrderItem[]): Order => {
   };
 };
 
-export function useOrders() {
+export function useOrders(options?: { onNewOrder?: () => void }) {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [newOrderIds, setNewOrderIds] = useState<Set<string>>(new Set());
   const isInitialLoadRef = useRef(true);
+  const onNewOrderRef = useRef(options?.onNewOrder);
 
   // Fetch all orders with their items
   const fetchOrders = useCallback(async () => {
@@ -307,6 +308,9 @@ export function useOrders() {
         
         // Play notification sound
         playNotificationSound();
+        
+        // Trigger callback for external listeners (e.g., sidebar badge)
+        onNewOrderRef.current?.();
         
         // Show toast notification
         toast.success(`Nuevo pedido: ${mappedOrder.ticketCode}`, {

@@ -1,4 +1,5 @@
 import { useAuth } from '@/hooks/useAuth';
+import { useNewOrders } from '@/contexts/NewOrdersContext';
 import { ROLE_CONFIG } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import {
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
 import { UserRole } from '@/types';
 
@@ -44,6 +46,7 @@ const navItems: NavItem[] = [
 
 export function AppSidebar() {
   const { user, logout } = useAuth();
+  const { newOrderCount, clearCount } = useNewOrders();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -102,19 +105,44 @@ export function AppSidebar() {
         <ul className="space-y-1">
           {filteredNavItems.map((item) => {
             const isActive = location.pathname === item.path;
+            const showBadge = item.path === '/orders' && newOrderCount > 0;
+            
             return (
               <li key={item.path}>
                 <NavLink
                   to={item.path}
+                  onClick={() => {
+                    // Clear badge when navigating to orders
+                    if (item.path === '/orders') {
+                      clearCount();
+                    }
+                  }}
                   className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200',
+                    'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 relative',
                     'hover:bg-sidebar-accent',
                     isActive && 'bg-sidebar-primary text-sidebar-primary-foreground',
                     collapsed && 'justify-center px-2'
                   )}
                 >
-                  <item.icon className="w-5 h-5 flex-shrink-0" />
-                  {!collapsed && <span className="font-medium">{item.label}</span>}
+                  <div className="relative">
+                    <item.icon className="w-5 h-5 flex-shrink-0" />
+                    {showBadge && collapsed && (
+                      <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground animate-pulse">
+                        {newOrderCount > 9 ? '9+' : newOrderCount}
+                      </span>
+                    )}
+                  </div>
+                  {!collapsed && (
+                    <span className="font-medium flex-1">{item.label}</span>
+                  )}
+                  {showBadge && !collapsed && (
+                    <Badge 
+                      variant="destructive" 
+                      className="ml-auto h-5 min-w-5 px-1.5 text-xs animate-pulse"
+                    >
+                      {newOrderCount > 99 ? '99+' : newOrderCount}
+                    </Badge>
+                  )}
                 </NavLink>
               </li>
             );
