@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Order, OrderItem, ItemType, OrderStatus } from '@/types';
 import { useConfig } from '@/contexts/ConfigContext';
 import { QUICK_SERVICES } from '@/lib/constants';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,19 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
   User,
   Phone,
   MapPin,
@@ -44,7 +58,19 @@ import {
   Home,
   Store,
   AlertTriangle,
+  Search,
+  UserPlus,
+  Check,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface Customer {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+}
 
 const iconMap: Record<string, React.ElementType> = {
   Waves, Flame, Sparkles, Eraser, Droplet, Zap,
@@ -93,6 +119,12 @@ interface OrderItemDraft {
 export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalProps) {
   const { activeDeliveryZones, activeExtraServices } = useConfig();
   
+  // Customer search and selection
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
+  const [isNewCustomer, setIsNewCustomer] = useState(false);
+  
   // Customer info
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -122,6 +154,68 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedType, setSelectedType] = useState<ItemType>('piece');
   const [quantity, setQuantity] = useState<number>(1);
+
+  // Fetch customers from database
+  const fetchCustomers = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('id, name, phone, email, address')
+        .order('name');
+      
+      if (error) throw error;
+      setCustomers(data || []);
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchCustomers();
+    }
+  }, [isOpen, fetchCustomers]);
+
+  // Select existing customer
+  const handleSelectCustomer = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setCustomerName(customer.name);
+    setCustomerPhone(customer.phone || '');
+    setCustomerAddress(customer.address || '');
+    setIsNewCustomer(false);
+    setCustomerSearchOpen(false);
+  };
+
+  // Switch to new customer mode
+  const handleNewCustomer = () => {
+    setSelectedCustomer(null);
+    setCustomerName('');
+    setCustomerPhone('');
+    setCustomerAddress('');
+    setIsNewCustomer(true);
+    setCustomerSearchOpen(false);
+  };
+
+  // Create new customer in database
+  const createCustomer = async (): Promise<string | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .insert({
+          name: customerName,
+          phone: customerPhone || null,
+          address: customerAddress || null,
+        })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+      return data.id;
+    } catch (error) {
+      console.error('Error creating customer:', error);
+      return null;
+    }
+  };
 
   // Calculate totals
   const itemsTotal = useMemo(() => {
@@ -225,6 +319,8 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
 
   // Reset form
   const resetForm = () => {
+    setSelectedCustomer(null);
+    setIsNewCustomer(false);
     setCustomerName('');
     setCustomerPhone('');
     setCustomerAddress('');
@@ -243,7 +339,7 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
   };
 
   // Create order
-  const handleCreateOrder = () => {
+  const handleCreateOrder = async () => {
     if (!customerName || !customerPhone || items.length === 0) return;
     
     const needsPickup = receptionType === 'pickup';
@@ -252,6 +348,27 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
     
     if (requiresAddress && !customerAddress) return;
 
+    // Get or create customer ID
+    let customerId: string;
+    if (selectedCustomer) {
+      customerId = selectedCustomer.id;
+      // Update customer address if changed
+      if (customerAddress && customerAddress !== selectedCustomer.address) {
+        await supabase
+          .from('customers')
+          .update({ address: customerAddress })
+          .eq('id', customerId);
+      }
+    } else {
+      // Create new customer
+      const newId = await createCustomer();
+      if (!newId) {
+        console.error('Failed to create customer');
+        return;
+      }
+      customerId = newId;
+    }
+
     const ticketCode = generateTicketCode();
     const zone = activeDeliveryZones.find(z => z.id === selectedZone);
     
@@ -259,7 +376,7 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
       id: crypto.randomUUID(),
       ticketCode,
       qrCode: ticketCode,
-      customerId: crypto.randomUUID(),
+      customerId,
       customerName,
       customerPhone,
       customerAddress: requiresAddress ? customerAddress : undefined,
@@ -319,9 +436,108 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
         <div className="space-y-6">
           {/* Customer Info */}
           <div className="space-y-4">
-            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-              Datos del Cliente
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                Datos del Cliente
+              </h3>
+              {selectedCustomer && (
+                <Badge variant="secondary" className="gap-1">
+                  <Check className="w-3 h-3" />
+                  Cliente existente
+                </Badge>
+              )}
+              {isNewCustomer && (
+                <Badge variant="outline" className="gap-1">
+                  <UserPlus className="w-3 h-3" />
+                  Cliente nuevo
+                </Badge>
+              )}
+            </div>
+
+            {/* Customer Search */}
+            <div className="space-y-2">
+              <Label>Buscar Cliente Existente</Label>
+              <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={customerSearchOpen}
+                    className="w-full justify-between"
+                  >
+                    {selectedCustomer ? (
+                      <span className="flex items-center gap-2">
+                        <User className="w-4 h-4" />
+                        {selectedCustomer.name}
+                        {selectedCustomer.phone && (
+                          <span className="text-muted-foreground">• {selectedCustomer.phone}</span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground flex items-center gap-2">
+                        <Search className="w-4 h-4" />
+                        Buscar o crear cliente...
+                      </span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar por nombre o teléfono..." />
+                    <CommandList>
+                      <CommandEmpty>
+                        <div className="p-4 text-center">
+                          <p className="text-sm text-muted-foreground mb-2">No se encontró el cliente</p>
+                          <Button size="sm" onClick={handleNewCustomer} className="gap-2">
+                            <UserPlus className="w-4 h-4" />
+                            Crear Cliente Nuevo
+                          </Button>
+                        </div>
+                      </CommandEmpty>
+                      <CommandGroup heading="Clientes">
+                        {customers.map((customer) => (
+                          <CommandItem
+                            key={customer.id}
+                            value={`${customer.name} ${customer.phone || ''}`}
+                            onSelect={() => handleSelectCustomer(customer)}
+                            className="cursor-pointer"
+                          >
+                            <div className="flex items-center gap-3 w-full">
+                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                <User className="w-4 h-4 text-primary" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium truncate">{customer.name}</p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {customer.phone || 'Sin teléfono'}
+                                  {customer.address && ` • ${customer.address}`}
+                                </p>
+                              </div>
+                              {selectedCustomer?.id === customer.id && (
+                                <Check className="w-4 h-4 text-primary" />
+                              )}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                      <CommandGroup>
+                        <CommandItem
+                          onSelect={handleNewCustomer}
+                          className="cursor-pointer border-t"
+                        >
+                          <div className="flex items-center gap-2 text-primary">
+                            <UserPlus className="w-4 h-4" />
+                            <span>Crear Cliente Nuevo</span>
+                          </div>
+                        </CommandItem>
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Customer Form Fields */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="customerName">Nombre *</Label>
@@ -331,7 +547,11 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
                     id="customerName"
                     placeholder="Nombre del cliente"
                     value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
+                    onChange={(e) => {
+                      setCustomerName(e.target.value);
+                      if (selectedCustomer) setSelectedCustomer(null);
+                      setIsNewCustomer(true);
+                    }}
                     className="pl-10"
                   />
                 </div>
@@ -344,7 +564,11 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
                     id="customerPhone"
                     placeholder="Teléfono"
                     value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    onChange={(e) => {
+                      setCustomerPhone(e.target.value);
+                      if (selectedCustomer) setSelectedCustomer(null);
+                      setIsNewCustomer(true);
+                    }}
                     className="pl-10"
                   />
                 </div>
