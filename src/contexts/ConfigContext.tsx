@@ -56,6 +56,18 @@ export interface BusinessSettings {
   currency: string;
 }
 
+export interface TicketSettings {
+  logoUrl: string;
+  showLogo: boolean;
+  showPrices: boolean;
+  showQR: boolean;
+  qrContent: 'ticket_code' | 'payment_link' | 'custom';
+  customQrUrl: string;
+  footerText: string;
+  showFooter: boolean;
+  thankYouMessage: string;
+}
+
 interface ConfigContextType {
   // Categories
   categories: CatalogCategory[];
@@ -86,6 +98,10 @@ interface ConfigContextType {
   // Business
   business: BusinessSettings;
   setBusiness: Dispatch<SetStateAction<BusinessSettings>>;
+  
+  // Ticket Settings
+  ticketSettings: TicketSettings;
+  setTicketSettings: Dispatch<SetStateAction<TicketSettings>>;
   
   // Loading state
   loading: boolean;
@@ -154,6 +170,18 @@ const DEFAULT_BUSINESS: BusinessSettings = {
   currency: 'DOP',
 };
 
+const DEFAULT_TICKET_SETTINGS: TicketSettings = {
+  logoUrl: '',
+  showLogo: false,
+  showPrices: true,
+  showQR: true,
+  qrContent: 'ticket_code',
+  customQrUrl: '',
+  footerText: 'Conserve este ticket para recoger su pedido',
+  showFooter: true,
+  thankYouMessage: '¡Gracias por su preferencia!',
+};
+
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 
 export function ConfigProvider({ children }: { children: ReactNode }) {
@@ -163,6 +191,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [extraServices, setExtraServices] = useState<ExtraService[]>(DEFAULT_EXTRAS);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(DEFAULT_PAYMENTS);
   const [business, setBusiness] = useState<BusinessSettings>(DEFAULT_BUSINESS);
+  const [ticketSettings, setTicketSettings] = useState<TicketSettings>(DEFAULT_TICKET_SETTINGS);
   const [loading, setLoading] = useState(true);
 
   // Load config from database
@@ -199,6 +228,11 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
                 setBusiness({ ...DEFAULT_BUSINESS, ...value } as BusinessSettings);
               }
               break;
+            case 'ticket_settings':
+              if (typeof value === 'object' && value !== null) {
+                setTicketSettings({ ...DEFAULT_TICKET_SETTINGS, ...value } as TicketSettings);
+              }
+              break;
           }
         });
       }
@@ -219,6 +253,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         { key: 'extra_services', value: extraServices as unknown },
         { key: 'payment_methods', value: paymentMethods as unknown },
         { key: 'business', value: business as unknown },
+        { key: 'ticket_settings', value: ticketSettings as unknown },
       ];
 
       for (const config of configs) {
@@ -248,7 +283,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       console.error('Error saving config:', error);
       toast.error('Error al guardar la configuración');
     }
-  }, [categories, operations, deliveryZones, extraServices, paymentMethods, business]);
+  }, [categories, operations, deliveryZones, extraServices, paymentMethods, business, ticketSettings]);
 
   // Load on mount
   useEffect(() => {
@@ -291,6 +326,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         activePaymentMethods,
         business,
         setBusiness,
+        ticketSettings,
+        setTicketSettings,
         loading,
         saveConfig,
       }}
