@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -18,7 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 import {
   Truck,
   Search,
@@ -27,69 +26,24 @@ import {
   Phone,
   Package,
   CheckCircle,
-  Navigation,
   User,
-  ArrowRight,
   Play,
   DollarSign,
-  PackageOpen,
-  Home,
-  AlertCircle,
   ArrowDownToLine,
   ArrowUpFromLine,
+  RefreshCw,
+  AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { MOCK_ORDERS } from '@/lib/mockData';
+import { useOrders } from '@/hooks/useOrders';
+import { useDrivers, Driver } from '@/hooks/useDrivers';
 import { Order, DeliveryServiceStatus } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatCurrency } from '@/lib/currency';
+import { useConfig } from '@/contexts/ConfigContext';
 
-// Mock drivers data
-const MOCK_DRIVERS = [
-  { 
-    id: '1', 
-    name: 'Carlos Mendoza', 
-    phone: '+52 55 1111 2222', 
-    avatar: '🚗',
-    status: 'available' as const,
-    currentOrders: 0,
-    completedToday: 3,
-    zone: 'Norte'
-  },
-  { 
-    id: '2', 
-    name: 'Miguel Ángel', 
-    phone: '+52 55 3333 4444', 
-    avatar: '🏍️',
-    status: 'delivering' as const,
-    currentOrders: 2,
-    completedToday: 5,
-    zone: 'Centro'
-  },
-  { 
-    id: '3', 
-    name: 'José Luis', 
-    phone: '+52 55 5555 6666', 
-    avatar: '🛵',
-    status: 'available' as const,
-    currentOrders: 0,
-    completedToday: 4,
-    zone: 'Sur'
-  },
-  { 
-    id: '4', 
-    name: 'Repartidor Demo', 
-    phone: '+52 55 7777 8888', 
-    avatar: '🚚',
-    status: 'delivering' as const,
-    currentOrders: 1,
-    completedToday: 2,
-    zone: 'Oriente'
-  },
-];
-
-type Driver = typeof MOCK_DRIVERS[0];
 type ServiceTab = 'pickups' | 'deliveries' | 'all';
 
 interface DeliveryTask {
@@ -103,8 +57,20 @@ interface DeliveryTask {
 }
 
 export default function Deliveries() {
-  const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS);
-  const [drivers] = useState<Driver[]>(MOCK_DRIVERS);
+  const { business } = useConfig();
+  const { orders, loading: ordersLoading, fetchOrders } = useOrders();
+  const { 
+    drivers, 
+    loading: driversLoading, 
+    fetchDrivers,
+    assignPickupDriver,
+    assignDeliveryDriver,
+    completePickup,
+    completeDelivery,
+    startPickup,
+    startDelivery,
+  } = useDrivers();
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<ServiceTab>('all');
   const [selectedSlot, setSelectedSlot] = useState<'all' | 'morning' | 'afternoon'>('all');
@@ -113,37 +79,63 @@ export default function Deliveries() {
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [taskToAssign, setTaskToAssign] = useState<DeliveryTask | null>(null);
 
+  const loading = ordersLoading || driversLoading;
+
   // Build delivery tasks from orders
   const deliveryTasks = useMemo((): DeliveryTask[] => {
     const tasks: DeliveryTask[] = [];
     
     orders.forEach(order => {
       // Add pickup task if order needs pickup
-      if (order.needsPickup && order.pickupService) {
+      if (order.needsPickup) {
+        const pickupCompleted = order.pickupService?.status === 'completed';
+        const hasDriver = !!order.pickupService?.driverId;
+        
+        let status: DeliveryServiceStatus = 'pending';
+        if (pickupCompleted) {
+          status = 'completed';
+        } else if (order.status === 'pending_pickup' && hasDriver) {
+          status = 'in_progress';
+        } else if (hasDriver) {
+          status = 'assigned';
+        }
+        
         tasks.push({
           order,
           type: 'pickup',
-          status: order.pickupService.status,
-          address: order.pickupService.address || order.customerAddress || '',
-          slot: order.pickupService.scheduledSlot,
-          driverId: order.pickupService.driverId,
-          notes: order.pickupService.notes,
+          status,
+          address: order.pickupService?.address || order.customerAddress || '',
+          slot: order.pickupService?.scheduledSlot,
+          driverId: order.pickupService?.driverId,
+          notes: order.notes,
         });
       }
       
       // Add delivery task if order needs delivery
-      if (order.needsDelivery && order.deliveryService) {
+      if (order.needsDelivery) {
         // Only show delivery task when order is ready or later
         const readyStatuses = ['ready_delivery', 'in_transit', 'delivered'];
-        if (readyStatuses.includes(order.status) || order.deliveryService.status !== 'pending') {
+        const deliveryCompleted = order.deliveryService?.status === 'completed';
+        const hasDriver = !!order.deliveryService?.driverId;
+        
+        if (readyStatuses.includes(order.status) || deliveryCompleted || hasDriver) {
+          let status: DeliveryServiceStatus = 'pending';
+          if (deliveryCompleted || order.status === 'delivered') {
+            status = 'completed';
+          } else if (order.status === 'in_transit') {
+            status = 'in_progress';
+          } else if (hasDriver) {
+            status = 'assigned';
+          }
+          
           tasks.push({
             order,
             type: 'delivery',
-            status: order.deliveryService.status,
-            address: order.deliveryService.address || order.customerAddress || '',
-            slot: order.deliveryService.scheduledSlot,
-            driverId: order.deliveryService.driverId,
-            notes: order.deliveryService.notes,
+            status,
+            address: order.deliveryService?.address || order.customerAddress || '',
+            slot: order.deliveryService?.scheduledSlot,
+            driverId: order.deliveryService?.driverId,
+            notes: order.notes,
           });
         }
       }
@@ -201,105 +193,56 @@ export default function Deliveries() {
     setShowAssignDialog(true);
   };
 
-  const confirmAssignDriver = (driverId: string) => {
+  const confirmAssignDriver = async (driverId: string) => {
     if (!taskToAssign) return;
     
     const driver = drivers.find(d => d.id === driverId);
+    let success = false;
     
-    setOrders(prev => prev.map(o => {
-      if (o.id === taskToAssign.order.id) {
-        if (taskToAssign.type === 'pickup' && o.pickupService) {
-          return {
-            ...o,
-            pickupService: {
-              ...o.pickupService,
-              status: 'assigned' as const,
-              driverId,
-            },
-            updatedAt: new Date(),
-          };
-        } else if (taskToAssign.type === 'delivery' && o.deliveryService) {
-          return {
-            ...o,
-            deliveryService: {
-              ...o.deliveryService,
-              status: 'assigned' as const,
-              driverId,
-            },
-            deliveryDriverId: driverId,
-            updatedAt: new Date(),
-          };
-        }
-      }
-      return o;
-    }));
+    if (taskToAssign.type === 'pickup') {
+      success = await assignPickupDriver(taskToAssign.order.id, driverId);
+    } else {
+      success = await assignDeliveryDriver(taskToAssign.order.id, driverId);
+    }
     
-    toast.success(`${taskToAssign.type === 'pickup' ? 'Recogida' : 'Entrega'} asignada a ${driver?.name}`);
+    if (success) {
+      toast.success(`${taskToAssign.type === 'pickup' ? 'Recogida' : 'Entrega'} asignada a ${driver?.name}`);
+      await fetchOrders();
+    }
+    
     setShowAssignDialog(false);
     setTaskToAssign(null);
   };
 
-  const handleStartTask = (task: DeliveryTask) => {
-    setOrders(prev => prev.map(o => {
-      if (o.id === task.order.id) {
-        if (task.type === 'pickup' && o.pickupService) {
-          return {
-            ...o,
-            pickupService: {
-              ...o.pickupService,
-              status: 'in_progress' as const,
-            },
-            updatedAt: new Date(),
-          };
-        } else if (task.type === 'delivery' && o.deliveryService) {
-          return {
-            ...o,
-            status: 'in_transit' as const,
-            deliveryService: {
-              ...o.deliveryService,
-              status: 'in_progress' as const,
-            },
-            updatedAt: new Date(),
-          };
-        }
-      }
-      return o;
-    }));
-    toast.success(`${task.type === 'pickup' ? 'Recogida' : 'Entrega'} iniciada`);
+  const handleStartTask = async (task: DeliveryTask) => {
+    let success = false;
+    
+    if (task.type === 'pickup') {
+      success = await startPickup(task.order.id);
+    } else {
+      success = await startDelivery(task.order.id);
+    }
+    
+    if (success) {
+      toast.success(`${task.type === 'pickup' ? 'Recogida' : 'Entrega'} iniciada`);
+      await fetchOrders();
+    }
   };
 
-  const handleCompleteTask = (task: DeliveryTask) => {
-    setOrders(prev => prev.map(o => {
-      if (o.id === task.order.id) {
-        if (task.type === 'pickup' && o.pickupService) {
-          return {
-            ...o,
-            status: 'in_store' as const,
-            pickupService: {
-              ...o.pickupService,
-              status: 'completed' as const,
-              completedAt: new Date(),
-            },
-            updatedAt: new Date(),
-          };
-        } else if (task.type === 'delivery' && o.deliveryService) {
-          return {
-            ...o,
-            status: 'delivered' as const,
-            deliveryService: {
-              ...o.deliveryService,
-              status: 'completed' as const,
-              completedAt: new Date(),
-            },
-            deliveredAt: new Date(),
-            updatedAt: new Date(),
-          };
-        }
-      }
-      return o;
-    }));
-    toast.success(`¡${task.type === 'pickup' ? 'Recogida' : 'Entrega'} completada!`);
-    setSelectedTask(null);
+  const handleCompleteTask = async (task: DeliveryTask) => {
+    let success = false;
+    
+    if (task.type === 'pickup') {
+      success = await completePickup(task.order.id);
+    } else {
+      success = await completeDelivery(task.order.id);
+    }
+    
+    if (success) {
+      toast.success(`¡${task.type === 'pickup' ? 'Recogida' : 'Entrega'} completada!`);
+      await fetchOrders();
+      setSelectedTask(null);
+    }
   };
 
   const getStatusConfig = (status: DeliveryServiceStatus, type: 'pickup' | 'delivery') => {
@@ -332,6 +275,11 @@ export default function Deliveries() {
     return drivers.find(d => d.id === driverId);
   };
 
+  const handleRefresh = async () => {
+    await Promise.all([fetchOrders(), fetchDrivers()]);
+    toast.success('Datos actualizados');
+  };
+
   return (
     <div className="p-4 lg:p-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -344,7 +292,7 @@ export default function Deliveries() {
           <p className="text-muted-foreground">Gestiona servicios a domicilio</p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="relative w-full md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -378,6 +326,10 @@ export default function Deliveries() {
               <SelectItem value="completed">Completados</SelectItem>
             </SelectContent>
           </Select>
+
+          <Button variant="outline" size="icon" onClick={handleRefresh} disabled={loading}>
+            <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+          </Button>
         </div>
       </div>
 
@@ -397,12 +349,12 @@ export default function Deliveries() {
                 <p className="text-xs text-orange-600 dark:text-orange-500">Recogidas Activas</p>
               </div>
             </div>
-            <div className="flex gap-2 mt-2">
+            <div className="flex gap-2 mt-2 flex-wrap">
               <Badge variant="secondary" className="text-xs">
                 {stats.pendingPickups} pendientes
               </Badge>
               <Badge variant="secondary" className="text-xs">
-                {stats.completedPickups} hoy
+                {stats.completedPickups} completadas
               </Badge>
             </div>
           </CardContent>
@@ -422,12 +374,12 @@ export default function Deliveries() {
                 <p className="text-xs text-blue-600 dark:text-blue-500">Entregas Activas</p>
               </div>
             </div>
-            <div className="flex gap-2 mt-2">
+            <div className="flex gap-2 mt-2 flex-wrap">
               <Badge variant="secondary" className="text-xs">
                 {stats.pendingDeliveries} pendientes
               </Badge>
               <Badge variant="secondary" className="text-xs">
-                {stats.completedDeliveries} hoy
+                {stats.completedDeliveries} completadas
               </Badge>
             </div>
           </CardContent>
@@ -491,13 +443,25 @@ export default function Deliveries() {
               </Tabs>
             </CardHeader>
             <CardContent>
-              {filteredTasks.length === 0 ? (
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <RefreshCw className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : filteredTasks.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Package className="w-12 h-12 mx-auto mb-3 opacity-20" />
                   <p>No hay tareas en esta categoría</p>
+                  {drivers.length === 0 && (
+                    <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+                      <AlertCircle className="w-5 h-5 text-amber-600 mx-auto mb-2" />
+                      <p className="text-sm text-amber-700 dark:text-amber-400">
+                        No hay repartidores registrados. Agrega empleados con rol "delivery" en la sección de Empleados.
+                      </p>
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-[600px] overflow-y-auto">
                   {filteredTasks.map((task, index) => {
                     const statusConfig = getStatusConfig(task.status, task.type);
                     const StatusIcon = statusConfig.icon;
@@ -516,12 +480,12 @@ export default function Deliveries() {
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-start gap-3">
                             <div className={cn(
-                              'p-2 rounded-lg text-white',
+                              'p-2 rounded-lg text-white shrink-0',
                               isPickup ? 'bg-gradient-to-br from-orange-500 to-amber-500' : 'bg-gradient-to-br from-blue-500 to-indigo-500'
                             )}>
                               {isPickup ? <ArrowDownToLine className="w-5 h-5" /> : <ArrowUpFromLine className="w-5 h-5" />}
                             </div>
-                            <div>
+                            <div className="min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <Badge variant="outline" className={cn(
                                   'text-xs',
@@ -538,18 +502,19 @@ export default function Deliveries() {
                               </div>
                               <p className="font-medium mt-1">{task.order.customerName}</p>
                               <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                                <MapPin className="w-3 h-3" />
-                                {task.address}
+                                <MapPin className="w-3 h-3 shrink-0" />
+                                <span className="truncate">{task.address || 'Sin dirección'}</span>
                               </p>
+                              {task.order.customerPhone && (
+                                <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                                  <Phone className="w-3 h-3 shrink-0" />
+                                  {task.order.customerPhone}
+                                </p>
+                              )}
                               {driver && (
                                 <p className="text-sm text-primary flex items-center gap-1 mt-1">
                                   <User className="w-3 h-3" />
                                   {driver.avatar} {driver.name}
-                                </p>
-                              )}
-                              {task.notes && (
-                                <p className="text-xs text-muted-foreground mt-1 italic">
-                                  📝 {task.notes}
                                 </p>
                               )}
                             </div>
@@ -563,7 +528,7 @@ export default function Deliveries() {
                             {!task.order.isPaid && task.type === 'delivery' && (
                               <Badge variant="destructive" className="mt-2 flex items-center gap-1">
                                 <DollarSign className="w-3 h-3" />
-                                Cobrar
+                                {formatCurrency(task.order.totalAmount - task.order.paidAmount, business.currency)}
                               </Badge>
                             )}
                           </div>
@@ -582,6 +547,7 @@ export default function Deliveries() {
                                 variant="outline"
                                 onClick={(e) => { e.stopPropagation(); handleAssignDriver(task); }}
                                 className="gap-1"
+                                disabled={drivers.length === 0}
                               >
                                 <User className="w-3 h-3" />
                                 Asignar
@@ -628,54 +594,70 @@ export default function Deliveries() {
                 <User className="w-5 h-5" />
                 Repartidores
               </CardTitle>
-              <CardDescription>Estado actual</CardDescription>
+              <CardDescription>
+                {drivers.length === 0 
+                  ? 'No hay repartidores registrados'
+                  : `${stats.availableDrivers} disponible${stats.availableDrivers !== 1 ? 's' : ''}`
+                }
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {drivers.map((driver) => (
-                <div
-                  key={driver.id}
-                  className={cn(
-                    'p-3 rounded-xl border transition-all',
-                    driver.status === 'available' 
-                      ? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800'
-                      : 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800'
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{driver.avatar}</span>
-                      <div>
-                        <p className="font-medium">{driver.name}</p>
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-                          Zona {driver.zone}
+              {drivers.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  <User className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">Agrega empleados con rol "delivery"</p>
+                </div>
+              ) : (
+                drivers.map((driver) => (
+                  <div
+                    key={driver.id}
+                    className={cn(
+                      'p-3 rounded-xl border transition-all',
+                      driver.status === 'available' 
+                        ? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800'
+                        : driver.status === 'offline'
+                          ? 'bg-gray-50 dark:bg-gray-950/30 border-gray-200 dark:border-gray-800 opacity-60'
+                          : 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800'
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{driver.avatar}</span>
+                        <div>
+                          <p className="font-medium">{driver.name}</p>
+                          {driver.phone && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Phone className="w-3 h-3" />
+                              {driver.phone}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant={
+                          driver.status === 'available' ? 'default' : 
+                          driver.status === 'offline' ? 'secondary' : 'outline'
+                        } className={cn(
+                          driver.status === 'available' && 'bg-green-600',
+                          driver.status === 'delivering' && 'bg-blue-600 text-white'
+                        )}>
+                          {driver.status === 'available' ? 'Disponible' : 
+                           driver.status === 'offline' ? 'Offline' : 'En ruta'}
+                        </Badge>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {driver.completedToday} completadas hoy
                         </p>
                       </div>
                     </div>
-                    <Badge 
-                      variant={driver.status === 'available' ? 'default' : 'secondary'}
-                      className={driver.status === 'available' ? 'bg-green-600' : 'bg-blue-500 text-white'}
-                    >
-                      {driver.status === 'available' ? 'Libre' : 'En ruta'}
-                    </Badge>
                   </div>
-                  
-                  <div className="flex items-center gap-4 mt-2 pt-2 border-t border-dashed">
-                    <span className="text-xs text-muted-foreground">
-                      📦 {driver.currentOrders} activos
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      ✅ {driver.completedToday} hoy
-                    </span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </CardContent>
           </Card>
 
-          {/* Task Details */}
+          {/* Selected Task Details */}
           {selectedTask && (
-            <Card>
+            <Card className="border-primary">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   {selectedTask.type === 'pickup' ? (
@@ -683,83 +665,75 @@ export default function Deliveries() {
                   ) : (
                     <ArrowUpFromLine className="w-5 h-5 text-blue-500" />
                   )}
-                  {selectedTask.type === 'pickup' ? 'Recogida' : 'Entrega'}
+                  Detalles de la tarea
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Ticket</p>
-                  <p className="font-mono font-bold text-lg">{selectedTask.order.ticketCode}</p>
+                  <p className="font-mono font-bold">{selectedTask.order.ticketCode}</p>
                 </div>
-                
-                <Separator />
-                
                 <div>
                   <p className="text-sm text-muted-foreground">Cliente</p>
                   <p className="font-medium">{selectedTask.order.customerName}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Phone className="w-3 h-3 text-muted-foreground" />
-                    <a 
-                      href={`tel:${selectedTask.order.customerPhone}`} 
-                      className="text-sm text-primary hover:underline"
-                    >
-                      {selectedTask.order.customerPhone}
-                    </a>
-                  </div>
+                  {selectedTask.order.customerPhone && (
+                    <p className="text-sm text-muted-foreground">{selectedTask.order.customerPhone}</p>
+                  )}
                 </div>
-                
-                <Separator />
-                
                 <div>
                   <p className="text-sm text-muted-foreground">Dirección</p>
-                  <p className="font-medium flex items-start gap-2">
-                    <MapPin className="w-4 h-4 mt-0.5 text-primary shrink-0" />
-                    {selectedTask.address}
-                  </p>
-                  <Button variant="outline" size="sm" className="mt-2 gap-2 w-full">
-                    <Navigation className="w-4 h-4" />
-                    Abrir en Maps
-                  </Button>
+                  <p className="text-sm">{selectedTask.address || 'Sin dirección'}</p>
                 </div>
-
-                {/* Service badges */}
-                <div className="flex flex-wrap gap-2">
-                  {selectedTask.order.needsPickup && (
-                    <Badge variant={selectedTask.order.pickupService?.status === 'completed' ? 'default' : 'outline'} 
-                           className={selectedTask.order.pickupService?.status === 'completed' ? 'bg-green-600' : ''}>
-                      {selectedTask.order.pickupService?.status === 'completed' ? '✅' : '📦'} Recogida
-                    </Badge>
-                  )}
-                  {selectedTask.order.needsDelivery && (
-                    <Badge variant={selectedTask.order.deliveryService?.status === 'completed' ? 'default' : 'outline'}
-                           className={selectedTask.order.deliveryService?.status === 'completed' ? 'bg-green-600' : ''}>
-                      {selectedTask.order.deliveryService?.status === 'completed' ? '✅' : '🚚'} Entrega
-                    </Badge>
-                  )}
-                </div>
-                
-                <Separator />
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Total</span>
-                  <span className="font-bold text-lg">${selectedTask.order.totalAmount.toFixed(2)}</span>
-                </div>
-                
-                {!selectedTask.order.isPaid && selectedTask.type === 'delivery' && (
-                  <div className="p-3 bg-destructive/10 rounded-lg flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-destructive" />
-                    <span className="text-sm text-destructive">
-                      Cobrar ${(selectedTask.order.totalAmount - selectedTask.order.paidAmount).toFixed(2)} al entregar
-                    </span>
+                {selectedTask.type === 'delivery' && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Monto</p>
+                    <p className="font-bold text-lg">
+                      {formatCurrency(selectedTask.order.totalAmount, business.currency)}
+                    </p>
+                    {!selectedTask.order.isPaid && (
+                      <Badge variant="destructive" className="mt-1">
+                        Pendiente: {formatCurrency(selectedTask.order.totalAmount - selectedTask.order.paidAmount, business.currency)}
+                      </Badge>
+                    )}
                   </div>
                 )}
-                
                 {selectedTask.notes && (
-                  <div className="p-3 bg-muted rounded-lg">
-                    <p className="text-sm font-medium">Notas:</p>
-                    <p className="text-sm text-muted-foreground">{selectedTask.notes}</p>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Notas</p>
+                    <p className="text-sm">{selectedTask.notes}</p>
                   </div>
                 )}
+                
+                <div className="pt-4 border-t space-y-2">
+                  {selectedTask.status === 'pending' && (
+                    <Button 
+                      className="w-full gap-2" 
+                      onClick={() => handleAssignDriver(selectedTask)}
+                      disabled={drivers.length === 0}
+                    >
+                      <User className="w-4 h-4" />
+                      Asignar Repartidor
+                    </Button>
+                  )}
+                  {selectedTask.status === 'assigned' && (
+                    <Button 
+                      className="w-full gap-2" 
+                      onClick={() => handleStartTask(selectedTask)}
+                    >
+                      <Play className="w-4 h-4" />
+                      Iniciar {selectedTask.type === 'pickup' ? 'Recogida' : 'Entrega'}
+                    </Button>
+                  )}
+                  {selectedTask.status === 'in_progress' && (
+                    <Button 
+                      className="w-full gap-2 bg-green-600 hover:bg-green-700" 
+                      onClick={() => handleCompleteTask(selectedTask)}
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      Marcar como Completado
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
           )}
@@ -770,37 +744,48 @@ export default function Deliveries() {
       <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              Asignar Repartidor - {taskToAssign?.type === 'pickup' ? 'Recogida' : 'Entrega'}
-            </DialogTitle>
+            <DialogTitle>Asignar Repartidor</DialogTitle>
             <DialogDescription>
-              Pedido {taskToAssign?.order.ticketCode} • {taskToAssign?.order.customerName}
+              Selecciona un repartidor para esta {taskToAssign?.type === 'pickup' ? 'recogida' : 'entrega'}
             </DialogDescription>
           </DialogHeader>
-          
           <div className="space-y-3 mt-4">
-          {drivers.map((driver) => (
-              <button
-                key={driver.id}
-                onClick={() => confirmAssignDriver(driver.id)}
-                className="w-full p-4 rounded-xl border text-left transition-all hover:border-primary hover:bg-primary/5"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{driver.avatar}</span>
-                    <div>
-                      <p className="font-medium">{driver.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Zona {driver.zone} • {driver.currentOrders} tareas activas
-                      </p>
+            {drivers.filter(d => d.status !== 'offline').length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                <User className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                <p>No hay repartidores disponibles</p>
+              </div>
+            ) : (
+              drivers.filter(d => d.status !== 'offline').map((driver) => (
+                <div
+                  key={driver.id}
+                  className={cn(
+                    'p-4 rounded-xl border cursor-pointer transition-all hover:border-primary',
+                    driver.status === 'available' 
+                      ? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800'
+                      : 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800'
+                  )}
+                  onClick={() => confirmAssignDriver(driver.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{driver.avatar}</span>
+                      <div>
+                        <p className="font-medium">{driver.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {driver.currentOrders} en curso • {driver.completedToday} hoy
+                        </p>
+                      </div>
                     </div>
+                    <Badge variant={driver.status === 'available' ? 'default' : 'secondary'} className={cn(
+                      driver.status === 'available' && 'bg-green-600'
+                    )}>
+                      {driver.status === 'available' ? 'Disponible' : 'En ruta'}
+                    </Badge>
                   </div>
-                  <Badge variant={driver.status === 'available' ? 'default' : 'secondary'}>
-                    {driver.status === 'available' ? 'Disponible' : `En ruta (${driver.currentOrders})`}
-                  </Badge>
                 </div>
-              </button>
-            ))}
+              ))
+            )}
           </div>
         </DialogContent>
       </Dialog>
