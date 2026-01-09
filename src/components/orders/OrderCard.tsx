@@ -21,9 +21,10 @@ import { es } from 'date-fns/locale';
 interface OrderCardProps {
   order: Order;
   onViewDetails: (order: Order) => void;
+  isNew?: boolean;
 }
 
-export function OrderCard({ order, onViewDetails }: OrderCardProps) {
+export function OrderCard({ order, onViewDetails, isNew = false }: OrderCardProps) {
   const statusConfig = ORDER_STATUS_CONFIG[order.status];
 
   return (
@@ -31,7 +32,8 @@ export function OrderCard({ order, onViewDetails }: OrderCardProps) {
       className={cn(
         'group cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-primary/30',
         'border-l-4',
-        statusConfig.color.replace('text-', 'border-l-')
+        statusConfig.color.replace('text-', 'border-l-'),
+        isNew && 'ring-2 ring-primary ring-offset-2 animate-pulse bg-primary/5'
       )}
       onClick={() => onViewDetails(order)}
     >

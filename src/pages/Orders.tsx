@@ -30,7 +30,7 @@ import { useOrders } from '@/hooks/useOrders';
 type SortOption = 'newest' | 'oldest' | 'amount_high' | 'amount_low';
 
 export default function Orders() {
-  const { orders, loading, fetchOrders, createOrder, updateOrderStatus } = useOrders();
+  const { orders, loading, newOrderIds, fetchOrders, createOrder, updateOrderStatus } = useOrders();
   const [activeStatus, setActiveStatus] = useState<OrderStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
@@ -216,6 +216,7 @@ export default function Orders() {
               key={order.id}
               order={order}
               onViewDetails={handleViewDetails}
+              isNew={newOrderIds.has(order.id)}
             />
           ))
         ) : (
