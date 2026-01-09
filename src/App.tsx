@@ -21,13 +21,15 @@ import Catalog from "./pages/Catalog";
 import Settings from "./pages/Settings";
 import CashRegister from "./pages/CashRegister";
 import Employees from "./pages/Employees";
+import EmployeePortal from "./pages/EmployeePortal";
+import FirstLoginSetup from "./pages/FirstLoginSetup";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
 // Protected Route wrapper
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   
   if (isLoading) {
     return (
@@ -40,13 +42,18 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
+
+  // Check if user needs to complete first login setup
+  if (user && (user.mustChangePassword || !user.profileCompleted)) {
+    return <Navigate to="/setup" replace />;
+  }
   
   return <>{children}</>;
 }
 
 // Public Route wrapper (redirects to dashboard if already logged in)
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   
   if (isLoading) {
     return (
@@ -57,6 +64,34 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   }
   
   if (isAuthenticated) {
+    // Check if user needs to complete first login setup
+    if (user && (user.mustChangePassword || !user.profileCompleted)) {
+      return <Navigate to="/setup" replace />;
+    }
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  return <>{children}</>;
+}
+
+// Setup Route wrapper (for first login setup)
+function SetupRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading, user } = useAuth();
+  
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // If user doesn't need setup, redirect to dashboard
+  if (user && !user.mustChangePassword && user.profileCompleted) {
     return <Navigate to="/dashboard" replace />;
   }
   
@@ -75,7 +110,23 @@ function AppRoutes() {
           </PublicRoute>
         }
       />
+      <Route
+        path="/setup"
+        element={
+          <SetupRoute>
+            <FirstLoginSetup />
+          </SetupRoute>
+        }
+      />
       <Route element={<AppLayout />}>
+        <Route
+          path="/my-portal"
+          element={
+            <ProtectedRoute>
+              <EmployeePortal />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/dashboard"
           element={

@@ -698,8 +698,10 @@ export type Database = {
           id: string
           is_active: boolean | null
           last_login: string | null
+          must_change_password: boolean | null
           name: string
           phone: string | null
+          profile_completed: boolean | null
           updated_at: string | null
         }
         Insert: {
@@ -710,8 +712,10 @@ export type Database = {
           id: string
           is_active?: boolean | null
           last_login?: string | null
+          must_change_password?: boolean | null
           name: string
           phone?: string | null
+          profile_completed?: boolean | null
           updated_at?: string | null
         }
         Update: {
@@ -722,8 +726,10 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_login?: string | null
+          must_change_password?: boolean | null
           name?: string
           phone?: string | null
+          profile_completed?: boolean | null
           updated_at?: string | null
         }
         Relationships: []

@@ -42,11 +42,13 @@ import {
   FileText,
   Loader2,
   Key,
+  UserPlus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { CreateEmployeeModal } from './CreateEmployeeModal';
 
 type AppRole = 'admin' | 'cajero' | 'operador' | 'delivery';
 
@@ -138,6 +140,8 @@ export function EmployeeList({ employees, onRefresh, currentUserId }: EmployeeLi
   
   const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const filteredEmployees = employees.filter(emp => {
     const matchesSearch = 
@@ -329,6 +333,10 @@ export function EmployeeList({ employees, onRefresh, currentUserId }: EmployeeLi
             <SelectItem value="inactive">Inactivos</SelectItem>
           </SelectContent>
         </Select>
+        <Button onClick={() => setIsCreateModalOpen(true)} className="gap-2">
+          <UserPlus className="w-4 h-4" />
+          Nuevo Empleado
+        </Button>
       </div>
 
       {/* Employees Table */}
