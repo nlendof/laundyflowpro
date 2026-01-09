@@ -208,9 +208,29 @@ export function useInventory() {
   // Get low stock items
   const getLowStockItems = useCallback(() => items.filter(i => i.currentStock < i.minStock), [items]);
 
-  // Initial fetch
+  // Initial fetch and real-time subscription
   useEffect(() => {
     fetchInventory();
+
+    // Subscribe to real-time changes
+    const channel = supabase
+      .channel('inventory-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'inventory',
+        },
+        () => {
+          fetchInventory();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchInventory]);
 
   return {
