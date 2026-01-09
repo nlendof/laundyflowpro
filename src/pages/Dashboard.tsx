@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useDashboardStats } from '@/hooks/useDashboardStats';
+import { useDashboardStats, DatePeriod } from '@/hooks/useDashboardStats';
 import { StatCard } from '@/components/StatCard';
 import { OrderStatusFlow } from '@/components/OrderStatusFlow';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -7,6 +8,7 @@ import { ORDER_STATUS_CONFIG } from '@/lib/constants';
 import { formatCurrency } from '@/lib/currency';
 import { useConfig } from '@/contexts/ConfigContext';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
 import {
   Package,
@@ -17,6 +19,7 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
+  Calendar,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -30,9 +33,24 @@ import {
   Bar,
 } from 'recharts';
 
+const PERIOD_LABELS: Record<DatePeriod, string> = {
+  today: 'Hoy',
+  week: 'Esta Semana',
+  month: 'Este Mes',
+  year: 'Este Año',
+};
+
+const PERIOD_CHART_TITLES: Record<DatePeriod, string> = {
+  today: 'Ingresos por Hora',
+  week: 'Ingresos Semanales',
+  month: 'Ingresos Mensuales',
+  year: 'Ingresos Anuales',
+};
+
 export default function Dashboard() {
   const { user } = useAuth();
-  const { stats, loading } = useDashboardStats();
+  const [period, setPeriod] = useState<DatePeriod>('today');
+  const { stats, loading } = useDashboardStats(period);
   const { business } = useConfig();
   const navigate = useNavigate();
   const currency = business.currency;
@@ -64,41 +82,54 @@ export default function Dashboard() {
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">
-            Bienvenido, {user?.name}. Aquí está el resumen de hoy.
+            Bienvenido, {user?.name}. Aquí está el resumen de {PERIOD_LABELS[period].toLowerCase()}.
           </p>
         </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Clock className="w-4 h-4" />
-          {new Date().toLocaleDateString('es-MX', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          })}
+        <div className="flex items-center gap-4">
+          <Tabs value={period} onValueChange={(v) => setPeriod(v as DatePeriod)}>
+            <TabsList>
+              <TabsTrigger value="today" className="gap-1">
+                <Calendar className="w-3 h-3" />
+                Hoy
+              </TabsTrigger>
+              <TabsTrigger value="week">Semana</TabsTrigger>
+              <TabsTrigger value="month">Mes</TabsTrigger>
+              <TabsTrigger value="year">Año</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Clock className="w-4 h-4" />
+            {new Date().toLocaleDateString('es-MX', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+            })}
+          </div>
         </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
-          title="Pedidos Hoy"
-          value={stats.todayOrders}
-          subtitle={`${stats.todayPendingOrders} pendientes`}
+          title={`Pedidos ${PERIOD_LABELS[period]}`}
+          value={stats.periodOrders}
+          subtitle={`${stats.periodPendingOrders} pendientes`}
           icon={Package}
-          trend={stats.todayOrdersTrend !== 0 ? { 
-            value: Math.abs(stats.todayOrdersTrend), 
-            isPositive: stats.todayOrdersTrend > 0 
+          trend={stats.ordersTrend !== 0 ? { 
+            value: Math.abs(stats.ordersTrend), 
+            isPositive: stats.ordersTrend > 0 
           } : undefined}
           variant="primary"
         />
         <StatCard
-          title="Ingresos del Día"
-          value={formatCurrency(stats.todayRevenue, currency)}
-          subtitle={`Meta: ${formatCurrency(stats.dailyGoal, currency)}`}
+          title={`Ingresos ${PERIOD_LABELS[period]}`}
+          value={formatCurrency(stats.periodRevenue, currency)}
+          subtitle={period === 'today' ? `Meta: ${formatCurrency(stats.dailyGoal, currency)}` : 'Total del período'}
           icon={DollarSign}
-          trend={stats.todayRevenueTrend !== 0 ? { 
-            value: Math.abs(stats.todayRevenueTrend), 
-            isPositive: stats.todayRevenueTrend > 0 
+          trend={stats.revenueTrend !== 0 ? { 
+            value: Math.abs(stats.revenueTrend), 
+            isPositive: stats.revenueTrend > 0 
           } : undefined}
           variant="success"
         />
@@ -141,13 +172,13 @@ export default function Dashboard() {
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Weekly Revenue Chart */}
+        {/* Revenue Chart */}
         <div className="bg-card rounded-xl border shadow-sm p-6">
-          <h2 className="text-lg font-semibold mb-4">Ingresos Semanales</h2>
+          <h2 className="text-lg font-semibold mb-4">{PERIOD_CHART_TITLES[period]}</h2>
           <div className="h-[300px]">
-            {stats.weeklyRevenue.length > 0 ? (
+            {stats.chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={stats.weeklyRevenue}>
+                <AreaChart data={stats.chartData}>
                   <defs>
                     <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
@@ -155,7 +186,7 @@ export default function Dashboard() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
                   <Tooltip
                     contentStyle={{
@@ -176,7 +207,7 @@ export default function Dashboard() {
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
-                No hay datos de ingresos esta semana
+                No hay datos de ingresos en este período
               </div>
             )}
           </div>
@@ -214,7 +245,7 @@ export default function Dashboard() {
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
-                No hay datos de servicios
+                No hay datos de servicios en este período
               </div>
             )}
           </div>
@@ -322,7 +353,7 @@ export default function Dashboard() {
           </div>
         )}
         
-        {stats.todayRevenue >= stats.dailyGoal ? (
+        {period === 'today' && stats.periodRevenue >= stats.dailyGoal ? (
           <div className="bg-status-delivered-bg border border-status-delivered/20 rounded-xl p-6">
             <div className="flex items-start gap-4">
               <div className="p-2 bg-status-delivered/10 rounded-lg">
@@ -336,6 +367,26 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+        ) : period === 'today' ? (
+          <div className="bg-muted/50 border rounded-xl p-6">
+            <div className="flex items-start gap-4">
+              <div className="p-2 bg-muted rounded-lg">
+                <TrendingUp className="w-6 h-6 text-muted-foreground" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold">Progreso de Meta</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {formatCurrency(stats.periodRevenue, currency)} de {formatCurrency(stats.dailyGoal, currency)} ({Math.round((stats.periodRevenue / stats.dailyGoal) * 100)}%)
+                </p>
+                <div className="mt-2 w-full bg-muted rounded-full h-2">
+                  <div 
+                    className="bg-primary h-2 rounded-full transition-all"
+                    style={{ width: `${Math.min((stats.periodRevenue / stats.dailyGoal) * 100, 100)}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="bg-muted/50 border rounded-xl p-6">
             <div className="flex items-start gap-4">
@@ -343,16 +394,10 @@ export default function Dashboard() {
                 <TrendingUp className="w-6 h-6 text-muted-foreground" />
               </div>
               <div>
-                <h3 className="font-semibold">Progreso de Meta</h3>
+                <h3 className="font-semibold">Resumen del Período</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {formatCurrency(stats.todayRevenue, currency)} de {formatCurrency(stats.dailyGoal, currency)} ({Math.round((stats.todayRevenue / stats.dailyGoal) * 100)}%)
+                  {stats.periodOrders} pedidos con ingresos de {formatCurrency(stats.periodRevenue, currency)}
                 </p>
-                <div className="mt-2 w-full bg-muted rounded-full h-2">
-                  <div 
-                    className="bg-primary h-2 rounded-full transition-all"
-                    style={{ width: `${Math.min((stats.todayRevenue / stats.dailyGoal) * 100, 100)}%` }}
-                  />
-                </div>
               </div>
             </div>
           </div>

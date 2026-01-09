@@ -1,19 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { OrderStatus } from '@/types';
-import { startOfDay, endOfDay, subDays, startOfWeek, format } from 'date-fns';
+import { startOfDay, endOfDay, subDays, startOfWeek, startOfMonth, startOfYear, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+export type DatePeriod = 'today' | 'week' | 'month' | 'year';
+
 interface DashboardStats {
-  todayOrders: number;
-  todayPendingOrders: number;
-  todayRevenue: number;
+  periodOrders: number;
+  periodPendingOrders: number;
+  periodRevenue: number;
   dailyGoal: number;
   inProcessOrders: number;
   readyForDelivery: number;
   inTransitOrders: number;
   statusCounts: Record<OrderStatus, number>;
-  weeklyRevenue: { day: string; revenue: number; orders: number }[];
+  chartData: { label: string; revenue: number; orders: number }[];
   topServices: { name: string; count: number }[];
   recentOrders: {
     id: string;
@@ -24,14 +26,14 @@ interface DashboardStats {
     items: number;
   }[];
   lowStockItems: { name: string; current: number; min: number }[];
-  todayOrdersTrend: number;
-  todayRevenueTrend: number;
+  ordersTrend: number;
+  revenueTrend: number;
 }
 
 const defaultStats: DashboardStats = {
-  todayOrders: 0,
-  todayPendingOrders: 0,
-  todayRevenue: 0,
+  periodOrders: 0,
+  periodPendingOrders: 0,
+  periodRevenue: 0,
   dailyGoal: 1500,
   inProcessOrders: 0,
   readyForDelivery: 0,
@@ -46,73 +48,116 @@ const defaultStats: DashboardStats = {
     in_transit: 0,
     delivered: 0,
   },
-  weeklyRevenue: [],
+  chartData: [],
   topServices: [],
   recentOrders: [],
   lowStockItems: [],
-  todayOrdersTrend: 0,
-  todayRevenueTrend: 0,
+  ordersTrend: 0,
+  revenueTrend: 0,
 };
 
-export function useDashboardStats() {
+function getDateRange(period: DatePeriod): { start: Date; end: Date; prevStart: Date; prevEnd: Date } {
+  const now = new Date();
+  const today = startOfDay(now);
+  
+  switch (period) {
+    case 'today':
+      return {
+        start: today,
+        end: endOfDay(now),
+        prevStart: startOfDay(subDays(now, 1)),
+        prevEnd: endOfDay(subDays(now, 1)),
+      };
+    case 'week':
+      const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+      return {
+        start: weekStart,
+        end: endOfDay(now),
+        prevStart: subDays(weekStart, 7),
+        prevEnd: subDays(weekStart, 1),
+      };
+    case 'month':
+      const monthStart = startOfMonth(now);
+      return {
+        start: monthStart,
+        end: endOfDay(now),
+        prevStart: startOfMonth(subDays(monthStart, 1)),
+        prevEnd: subDays(monthStart, 1),
+      };
+    case 'year':
+      const yearStart = startOfYear(now);
+      return {
+        start: yearStart,
+        end: endOfDay(now),
+        prevStart: startOfYear(subDays(yearStart, 1)),
+        prevEnd: subDays(yearStart, 1),
+      };
+  }
+}
+
+export function useDashboardStats(period: DatePeriod = 'today') {
   const [stats, setStats] = useState<DashboardStats>(defaultStats);
   const [loading, setLoading] = useState(true);
 
   const fetchStats = useCallback(async () => {
     try {
       setLoading(true);
-      const today = new Date();
-      const todayStart = startOfDay(today).toISOString();
-      const todayEnd = endOfDay(today).toISOString();
-      const yesterdayStart = startOfDay(subDays(today, 1)).toISOString();
-      const yesterdayEnd = endOfDay(subDays(today, 1)).toISOString();
-      const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+      const { start, end, prevStart, prevEnd } = getDateRange(period);
+      const startISO = start.toISOString();
+      const endISO = end.toISOString();
+      const prevStartISO = prevStart.toISOString();
+      const prevEndISO = prevEnd.toISOString();
 
-      // Fetch all orders for stats calculation
+      // Fetch all orders
       const { data: allOrders, error: ordersError } = await supabase
         .from('orders')
         .select('id, status, total_amount, created_at, is_paid, paid_amount, customer_name, ticket_code');
 
       if (ordersError) throw ordersError;
 
-      // Fetch order items for recent orders
+      // Fetch order items
       const { data: orderItems, error: itemsError } = await supabase
         .from('order_items')
         .select('order_id, name, quantity');
 
       if (itemsError) throw itemsError;
 
-      // Fetch low stock inventory items
+      // Fetch low stock inventory
       const { data: inventory, error: inventoryError } = await supabase
         .from('inventory')
-        .select('name, current_stock, min_stock')
-        .lt('current_stock', supabase.rpc ? 100000 : 100000); // Get all, filter below
+        .select('name, current_stock, min_stock');
 
       if (inventoryError) throw inventoryError;
 
-      // Fetch cash register entries for today
-      const { data: cashEntries, error: cashError } = await supabase
+      // Filter orders by period
+      const periodOrders = allOrders?.filter(o => {
+        const createdAt = new Date(o.created_at || '');
+        return createdAt >= start && createdAt <= end;
+      }) || [];
+
+      // Previous period orders for trend
+      const prevPeriodOrders = allOrders?.filter(o => {
+        const createdAt = new Date(o.created_at || '');
+        return createdAt >= prevStart && createdAt <= prevEnd;
+      }) || [];
+
+      // Fetch cash register entries for current period
+      const { data: cashEntries } = await supabase
         .from('cash_register')
         .select('amount, entry_type, created_at')
         .eq('entry_type', 'income')
-        .gte('created_at', todayStart)
-        .lte('created_at', todayEnd);
+        .gte('created_at', startISO)
+        .lte('created_at', endISO);
 
-      if (cashError) throw cashError;
+      // Fetch cash register for previous period
+      const { data: prevCashEntries } = await supabase
+        .from('cash_register')
+        .select('amount')
+        .eq('entry_type', 'income')
+        .gte('created_at', prevStartISO)
+        .lte('created_at', prevEndISO);
 
-      // Calculate today's orders
-      const todayOrders = allOrders?.filter(o => {
-        const createdAt = new Date(o.created_at || '');
-        return createdAt >= new Date(todayStart) && createdAt <= new Date(todayEnd);
-      }) || [];
-
-      // Calculate yesterday's orders for trend
-      const yesterdayOrders = allOrders?.filter(o => {
-        const createdAt = new Date(o.created_at || '');
-        return createdAt >= new Date(yesterdayStart) && createdAt <= new Date(yesterdayEnd);
-      }) || [];
-
-      // Status counts
+      // Status counts (all time, for overview)
       const statusCounts: Record<OrderStatus, number> = {
         pending_pickup: 0,
         in_store: 0,
@@ -131,65 +176,28 @@ export function useDashboardStats() {
         }
       });
 
-      // In process orders (washing, drying, ironing)
       const inProcessOrders = statusCounts.washing + statusCounts.drying + statusCounts.ironing;
 
-      // Calculate today's revenue from cash register
-      const todayRevenue = cashEntries?.reduce((sum, entry) => sum + Number(entry.amount), 0) || 0;
-
-      // Calculate yesterday's revenue for trend
-      const { data: yesterdayCash } = await supabase
-        .from('cash_register')
-        .select('amount')
-        .eq('entry_type', 'income')
-        .gte('created_at', yesterdayStart)
-        .lte('created_at', yesterdayEnd);
-
-      const yesterdayRevenue = yesterdayCash?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+      // Calculate revenues
+      const periodRevenue = cashEntries?.reduce((sum, entry) => sum + Number(entry.amount), 0) || 0;
+      const prevRevenue = prevCashEntries?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
 
       // Calculate trends
-      const todayOrdersTrend = yesterdayOrders.length > 0
-        ? Math.round(((todayOrders.length - yesterdayOrders.length) / yesterdayOrders.length) * 100)
-        : todayOrders.length > 0 ? 100 : 0;
+      const ordersTrend = prevPeriodOrders.length > 0
+        ? Math.round(((periodOrders.length - prevPeriodOrders.length) / prevPeriodOrders.length) * 100)
+        : periodOrders.length > 0 ? 100 : 0;
 
-      const todayRevenueTrend = yesterdayRevenue > 0
-        ? Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100)
-        : todayRevenue > 0 ? 100 : 0;
+      const revenueTrend = prevRevenue > 0
+        ? Math.round(((periodRevenue - prevRevenue) / prevRevenue) * 100)
+        : periodRevenue > 0 ? 100 : 0;
 
-      // Weekly revenue data
-      const weeklyData: { [key: string]: { revenue: number; orders: number } } = {};
-      const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+      // Build chart data based on period
+      const chartData = buildChartData(period, allOrders || [], start, end);
 
-      // Initialize week days
-      for (let i = 0; i < 7; i++) {
-        const day = subDays(today, 6 - i);
-        const dayKey = format(day, 'yyyy-MM-dd');
-        weeklyData[dayKey] = { revenue: 0, orders: 0 };
-      }
-
-      // Fill in order data
-      allOrders?.forEach(order => {
-        const createdAt = new Date(order.created_at || '');
-        const dayKey = format(createdAt, 'yyyy-MM-dd');
-        if (weeklyData[dayKey]) {
-          weeklyData[dayKey].orders++;
-          if (order.is_paid) {
-            weeklyData[dayKey].revenue += Number(order.total_amount);
-          } else if (order.paid_amount) {
-            weeklyData[dayKey].revenue += Number(order.paid_amount);
-          }
-        }
-      });
-
-      const weeklyRevenue = Object.entries(weeklyData).map(([date, data]) => ({
-        day: dayNames[new Date(date).getDay()],
-        revenue: data.revenue,
-        orders: data.orders,
-      }));
-
-      // Top services from order items
+      // Top services
       const serviceCount: { [key: string]: number } = {};
-      orderItems?.forEach(item => {
+      const periodOrderIds = new Set(periodOrders.map(o => o.id));
+      orderItems?.filter(item => periodOrderIds.has(item.order_id)).forEach(item => {
         serviceCount[item.name] = (serviceCount[item.name] || 0) + Number(item.quantity);
       });
 
@@ -198,7 +206,7 @@ export function useDashboardStats() {
         .sort((a, b) => b.count - a.count)
         .slice(0, 5);
 
-      // Recent orders (last 5)
+      // Recent orders
       const itemCountByOrder: { [orderId: string]: number } = {};
       orderItems?.forEach(item => {
         itemCountByOrder[item.order_id] = (itemCountByOrder[item.order_id] || 0) + Number(item.quantity);
@@ -225,55 +233,119 @@ export function useDashboardStats() {
           min: Number(item.min_stock),
         }));
 
-      // Pending orders count
+      // Pending counts
       const pendingStatuses: OrderStatus[] = ['pending_pickup', 'in_store', 'washing', 'drying', 'ironing'];
-      const todayPendingOrders = pendingStatuses.reduce((sum, status) => sum + statusCounts[status], 0);
+      const periodPendingOrders = pendingStatuses.reduce((sum, status) => sum + statusCounts[status], 0);
 
       setStats({
-        todayOrders: todayOrders.length,
-        todayPendingOrders,
-        todayRevenue,
+        periodOrders: periodOrders.length,
+        periodPendingOrders,
+        periodRevenue,
         dailyGoal: 1500,
         inProcessOrders,
         readyForDelivery: statusCounts.ready_delivery,
         inTransitOrders: statusCounts.in_transit,
         statusCounts,
-        weeklyRevenue,
+        chartData,
         topServices,
         recentOrders,
         lowStockItems,
-        todayOrdersTrend,
-        todayRevenueTrend,
+        ordersTrend,
+        revenueTrend,
       });
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [period]);
+
+function buildChartData(
+  period: DatePeriod,
+  orders: { created_at: string | null; total_amount: number; is_paid: boolean | null; paid_amount: number | null }[],
+  start: Date,
+  end: Date
+): { label: string; revenue: number; orders: number }[] {
+  const data: { [key: string]: { revenue: number; orders: number } } = {};
+  const now = new Date();
+
+  if (period === 'today') {
+    // Hourly for today
+    for (let h = 0; h < 24; h++) {
+      data[`${h.toString().padStart(2, '0')}:00`] = { revenue: 0, orders: 0 };
+    }
+    orders.forEach(order => {
+      const createdAt = new Date(order.created_at || '');
+      if (createdAt >= start && createdAt <= end) {
+        const hour = `${createdAt.getHours().toString().padStart(2, '0')}:00`;
+        if (data[hour]) {
+          data[hour].orders++;
+          data[hour].revenue += order.is_paid ? Number(order.total_amount) : Number(order.paid_amount || 0);
+        }
+      }
+    });
+  } else if (period === 'week') {
+    // Daily for week
+    const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    for (let i = 0; i < 7; i++) {
+      const day = subDays(now, 6 - i);
+      data[format(day, 'yyyy-MM-dd')] = { revenue: 0, orders: 0 };
+    }
+    orders.forEach(order => {
+      const createdAt = new Date(order.created_at || '');
+      const key = format(createdAt, 'yyyy-MM-dd');
+      if (data[key]) {
+        data[key].orders++;
+        data[key].revenue += order.is_paid ? Number(order.total_amount) : Number(order.paid_amount || 0);
+      }
+    });
+    return Object.entries(data).map(([date, vals]) => ({
+      label: dayNames[new Date(date).getDay()],
+      ...vals,
+    }));
+  } else if (period === 'month') {
+    // Weekly for month
+    for (let w = 0; w < 5; w++) {
+      data[`Sem ${w + 1}`] = { revenue: 0, orders: 0 };
+    }
+    orders.forEach(order => {
+      const createdAt = new Date(order.created_at || '');
+      if (createdAt >= start && createdAt <= end) {
+        const weekNum = Math.min(Math.floor((createdAt.getDate() - 1) / 7), 4);
+        const key = `Sem ${weekNum + 1}`;
+        data[key].orders++;
+        data[key].revenue += order.is_paid ? Number(order.total_amount) : Number(order.paid_amount || 0);
+      }
+    });
+  } else {
+    // Monthly for year
+    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    monthNames.forEach(m => {
+      data[m] = { revenue: 0, orders: 0 };
+    });
+    orders.forEach(order => {
+      const createdAt = new Date(order.created_at || '');
+      if (createdAt >= start && createdAt <= end) {
+        const month = monthNames[createdAt.getMonth()];
+        data[month].orders++;
+        data[month].revenue += order.is_paid ? Number(order.total_amount) : Number(order.paid_amount || 0);
+      }
+    });
+  }
+
+  return Object.entries(data).map(([label, vals]) => ({ label, ...vals }));
+}
 
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
 
-  // Set up real-time subscription for orders
+  // Real-time subscription
   useEffect(() => {
     const channel = supabase
       .channel('dashboard-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders' },
-        () => {
-          fetchStats();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'cash_register' },
-        () => {
-          fetchStats();
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchStats())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cash_register' }, () => fetchStats())
       .subscribe();
 
     return () => {
