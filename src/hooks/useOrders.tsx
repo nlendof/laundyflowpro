@@ -334,7 +334,6 @@ export function useOrders(options?: { onNewOrder?: () => void }) {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'orders' },
         (payload) => {
-          console.log('Realtime INSERT:', payload);
           handleRealtimeUpdate({
             eventType: 'INSERT',
             new: payload.new as DbOrder,
@@ -346,7 +345,6 @@ export function useOrders(options?: { onNewOrder?: () => void }) {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'orders' },
         (payload) => {
-          console.log('Realtime UPDATE:', payload);
           handleRealtimeUpdate({
             eventType: 'UPDATE',
             new: payload.new as DbOrder,
@@ -358,7 +356,6 @@ export function useOrders(options?: { onNewOrder?: () => void }) {
         'postgres_changes',
         { event: 'DELETE', schema: 'public', table: 'orders' },
         (payload) => {
-          console.log('Realtime DELETE:', payload);
           handleRealtimeUpdate({
             eventType: 'DELETE',
             new: null,
@@ -366,9 +363,7 @@ export function useOrders(options?: { onNewOrder?: () => void }) {
           });
         }
       )
-      .subscribe((status) => {
-        console.log('Realtime subscription status:', status);
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
