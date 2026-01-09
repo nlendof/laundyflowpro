@@ -35,7 +35,6 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ error: string | null }>;
-  signup: (email: string, password: string, name: string) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -186,35 +185,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signup = async (email: string, password: string, name: string): Promise<{ error: string | null }> => {
-    try {
-      const redirectUrl = `${window.location.origin}/`;
-      
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            name,
-          },
-        },
-      });
-
-      if (error) {
-        if (error.message.includes('User already registered')) {
-          return { error: 'Este correo ya está registrado' };
-        }
-        return { error: error.message };
-      }
-
-      return { error: null };
-    } catch (error) {
-      console.error('Signup error:', error);
-      return { error: 'Error al crear cuenta. Intenta de nuevo.' };
-    }
-  };
-
   const logout = async () => {
     try {
       await supabase.auth.signOut();
@@ -241,7 +211,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!session && !!user,
         isLoading,
         login,
-        signup,
         logout,
         refreshUser,
       }}
