@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Mail, Lock, User, WashingMachine, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Mail, Lock, WashingMachine, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -15,21 +14,10 @@ const loginSchema = z.object({
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
 });
 
-const signupSchema = z.object({
-  name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
-  email: z.string().email('Correo electrónico inválido'),
-  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: 'Las contraseñas no coinciden',
-  path: ['confirmPassword'],
-});
-
 export default function Login() {
   const navigate = useNavigate();
-  const { login, signup, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
   
-  const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
@@ -37,13 +25,6 @@ export default function Login() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginErrors, setLoginErrors] = useState<Record<string, string>>({});
-  
-  // Signup form
-  const [signupName, setSignupName] = useState('');
-  const [signupEmail, setSignupEmail] = useState('');
-  const [signupPassword, setSignupPassword] = useState('');
-  const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
-  const [signupErrors, setSignupErrors] = useState<Record<string, string>>({});
 
   // Redirect if already authenticated
   if (isAuthenticated && !authLoading) {
@@ -79,43 +60,6 @@ export default function Login() {
     }
     
     toast.success('¡Bienvenido!');
-    navigate('/dashboard');
-  };
-
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSignupErrors({});
-    
-    // Validate
-    const result = signupSchema.safeParse({
-      name: signupName,
-      email: signupEmail,
-      password: signupPassword,
-      confirmPassword: signupConfirmPassword,
-    });
-    
-    if (!result.success) {
-      const errors: Record<string, string> = {};
-      result.error.errors.forEach((err) => {
-        if (err.path[0]) {
-          errors[err.path[0] as string] = err.message;
-        }
-      });
-      setSignupErrors(errors);
-      return;
-    }
-    
-    setIsLoading(true);
-    
-    const { error } = await signup(signupEmail, signupPassword, signupName);
-    
-    if (error) {
-      toast.error(error);
-      setIsLoading(false);
-      return;
-    }
-    
-    toast.success('¡Cuenta creada exitosamente!');
     navigate('/dashboard');
   };
 
@@ -164,7 +108,7 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Right Panel - Login/Signup Form */}
+      {/* Right Panel - Login Form */}
       <div className="flex-1 flex items-center justify-center p-4 lg:p-8">
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
@@ -180,188 +124,81 @@ export default function Login() {
 
           <Card className="border-0 shadow-xl">
             <CardHeader className="space-y-1 pb-4">
-              <CardTitle className="text-xl text-center">
-                {activeTab === 'login' ? 'Iniciar Sesión' : 'Crear Cuenta'}
-              </CardTitle>
+              <CardTitle className="text-xl text-center">Iniciar Sesión</CardTitle>
               <CardDescription className="text-center">
-                {activeTab === 'login' 
-                  ? 'Ingresa tus credenciales para acceder'
-                  : 'Completa el formulario para registrarte'
-                }
+                Ingresa tus credenciales para acceder
               </CardDescription>
             </CardHeader>
             
             <CardContent>
-              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'login' | 'signup')}>
-                <TabsList className="grid w-full grid-cols-2 mb-6">
-                  <TabsTrigger value="login">Ingresar</TabsTrigger>
-                  <TabsTrigger value="signup">Registrarse</TabsTrigger>
-                </TabsList>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="login-email">Correo electrónico</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="login-email"
+                      type="email"
+                      placeholder="tu@correo.com"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      className="pl-10"
+                      disabled={isLoading}
+                    />
+                  </div>
+                  {loginErrors.email && (
+                    <p className="text-sm text-destructive">{loginErrors.email}</p>
+                  )}
+                </div>
                 
-                {/* Login Tab */}
-                <TabsContent value="login">
-                  <form onSubmit={handleLogin} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="login-email">Correo electrónico</Label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          id="login-email"
-                          type="email"
-                          placeholder="tu@correo.com"
-                          value={loginEmail}
-                          onChange={(e) => setLoginEmail(e.target.value)}
-                          className="pl-10"
-                          disabled={isLoading}
-                        />
-                      </div>
-                      {loginErrors.email && (
-                        <p className="text-sm text-destructive">{loginErrors.email}</p>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="login-password">Contraseña</Label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          id="login-password"
-                          type={showPassword ? 'text' : 'password'}
-                          placeholder="••••••••"
-                          value={loginPassword}
-                          onChange={(e) => setLoginPassword(e.target.value)}
-                          className="pl-10 pr-10"
-                          disabled={isLoading}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? (
-                            <EyeOff className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <Eye className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </Button>
-                      </div>
-                      {loginErrors.password && (
-                        <p className="text-sm text-destructive">{loginErrors.password}</p>
-                      )}
-                    </div>
-                    
-                    <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Ingresando...
-                        </>
+                <div className="space-y-2">
+                  <Label htmlFor="login-password">Contraseña</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="login-password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      className="pl-10 pr-10"
+                      disabled={isLoading}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
                       ) : (
-                        'Ingresar'
+                        <Eye className="h-4 w-4 text-muted-foreground" />
                       )}
                     </Button>
-                  </form>
-                </TabsContent>
+                  </div>
+                  {loginErrors.password && (
+                    <p className="text-sm text-destructive">{loginErrors.password}</p>
+                  )}
+                </div>
                 
-                {/* Signup Tab */}
-                <TabsContent value="signup">
-                  <form onSubmit={handleSignup} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-name">Nombre completo</Label>
-                      <div className="relative">
-                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          id="signup-name"
-                          type="text"
-                          placeholder="Tu nombre"
-                          value={signupName}
-                          onChange={(e) => setSignupName(e.target.value)}
-                          className="pl-10"
-                          disabled={isLoading}
-                        />
-                      </div>
-                      {signupErrors.name && (
-                        <p className="text-sm text-destructive">{signupErrors.name}</p>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-email">Correo electrónico</Label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          id="signup-email"
-                          type="email"
-                          placeholder="tu@correo.com"
-                          value={signupEmail}
-                          onChange={(e) => setSignupEmail(e.target.value)}
-                          className="pl-10"
-                          disabled={isLoading}
-                        />
-                      </div>
-                      {signupErrors.email && (
-                        <p className="text-sm text-destructive">{signupErrors.email}</p>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-password">Contraseña</Label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          id="signup-password"
-                          type="password"
-                          placeholder="••••••••"
-                          value={signupPassword}
-                          onChange={(e) => setSignupPassword(e.target.value)}
-                          className="pl-10"
-                          disabled={isLoading}
-                        />
-                      </div>
-                      {signupErrors.password && (
-                        <p className="text-sm text-destructive">{signupErrors.password}</p>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-confirm-password">Confirmar contraseña</Label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          id="signup-confirm-password"
-                          type="password"
-                          placeholder="••••••••"
-                          value={signupConfirmPassword}
-                          onChange={(e) => setSignupConfirmPassword(e.target.value)}
-                          className="pl-10"
-                          disabled={isLoading}
-                        />
-                      </div>
-                      {signupErrors.confirmPassword && (
-                        <p className="text-sm text-destructive">{signupErrors.confirmPassword}</p>
-                      )}
-                    </div>
-                    
-                    <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Creando cuenta...
-                        </>
-                      ) : (
-                        'Crear Cuenta'
-                      )}
-                    </Button>
-                  </form>
-                </TabsContent>
-              </Tabs>
+                <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Ingresando...
+                    </>
+                  ) : (
+                    'Ingresar'
+                  )}
+                </Button>
+              </form>
             </CardContent>
           </Card>
 
           <p className="text-center text-sm text-muted-foreground mt-6">
-            El primer usuario registrado será administrador automáticamente.
+            Contacta al administrador para obtener acceso.
           </p>
         </div>
       </div>
