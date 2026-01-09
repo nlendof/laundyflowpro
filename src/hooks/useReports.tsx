@@ -328,7 +328,7 @@ export function useReports(initialFilters?: Partial<ReportFilters>) {
         };
       }).sort((a, b) => b.revenue - a.revenue);
 
-      // Customer stats
+      // Customer stats - use real customer data
       const customerOrderCounts: Record<string, { name: string; orders: number; revenue: number }> = {};
       orders?.forEach(order => {
         const customerId = order.customer_id || order.customer_name;
@@ -347,7 +347,21 @@ export function useReports(initialFilters?: Partial<ReportFilters>) {
         .sort((a, b) => b.revenue - a.revenue)
         .slice(0, 5);
 
-      const uniqueCustomerIds = new Set(orders?.map(o => o.customer_id).filter(Boolean));
+      // Get total customers from DB and calculate new/returning
+      const totalDbCustomers = customers?.length || 0;
+      const customersWithOrdersInPeriod = new Set(orders?.map(o => o.customer_id).filter(Boolean));
+      
+      // New customers: created within the period
+      const newCustomersCount = customers?.filter(c => {
+        const createdAt = new Date(c.created_at);
+        return createdAt >= start && createdAt <= end;
+      }).length || 0;
+      
+      // Returning customers: have orders in this period but were created before
+      const returningCustomersCount = customers?.filter(c => {
+        const createdAt = new Date(c.created_at);
+        return createdAt < start && customersWithOrdersInPeriod.has(c.id);
+      }).length || 0;
 
       // Calculate days in period
       const daysInPeriod = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
@@ -370,9 +384,9 @@ export function useReports(initialFilters?: Partial<ReportFilters>) {
           cancelledOrders: 0, // Status 'cancelled' not in enum
         },
         customerStats: {
-          totalCustomers: uniqueCustomerIds.size,
-          newCustomers: uniqueCustomerIds.size,
-          returningCustomers: 0,
+          totalCustomers: totalDbCustomers,
+          newCustomers: newCustomersCount,
+          returningCustomers: returningCustomersCount,
           topCustomers,
         },
         periodComparison: {
