@@ -47,6 +47,84 @@ export type Database = {
         }
         Relationships: []
       }
+      backup_history: {
+        Row: {
+          backup_date: string
+          created_at: string
+          email_recipient: string | null
+          email_sent: boolean | null
+          error_message: string | null
+          file_size_bytes: number | null
+          id: string
+          status: string
+          tables_backed_up: Json | null
+        }
+        Insert: {
+          backup_date?: string
+          created_at?: string
+          email_recipient?: string | null
+          email_sent?: boolean | null
+          error_message?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          status?: string
+          tables_backed_up?: Json | null
+        }
+        Update: {
+          backup_date?: string
+          created_at?: string
+          email_recipient?: string | null
+          email_sent?: boolean | null
+          error_message?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          status?: string
+          tables_backed_up?: Json | null
+        }
+        Relationships: []
+      }
+      backup_schedules: {
+        Row: {
+          created_at: string
+          day_of_week: number | null
+          frequency: string
+          id: string
+          is_enabled: boolean
+          last_backup_at: string | null
+          next_backup_at: string | null
+          notification_email: string | null
+          tables_to_backup: Json
+          time_of_day: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week?: number | null
+          frequency?: string
+          id?: string
+          is_enabled?: boolean
+          last_backup_at?: string | null
+          next_backup_at?: string | null
+          notification_email?: string | null
+          tables_to_backup?: Json
+          time_of_day?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number | null
+          frequency?: string
+          id?: string
+          is_enabled?: boolean
+          last_backup_at?: string | null
+          next_backup_at?: string | null
+          notification_email?: string | null
+          tables_to_backup?: Json
+          time_of_day?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cash_closings: {
         Row: {
           actual_balance: number | null

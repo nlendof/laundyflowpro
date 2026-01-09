@@ -62,6 +62,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useConfig, CatalogCategory, OperationStep, DeliveryZone, ExtraService, PaymentMethod, BusinessSettings } from '@/contexts/ConfigContext';
 import { BackupSettings } from '@/components/settings/BackupSettings';
+import { BackupScheduleSettings } from '@/components/settings/BackupScheduleSettings';
 import { TicketSettingsTab } from '@/components/settings/TicketSettingsTab';
 
 // ServiceItem is local to Settings (not in context yet)
@@ -1285,6 +1286,7 @@ export default function SettingsPage() {
 
         {/* Backup Settings */}
         <TabsContent value="backup" className="space-y-6">
+          <BackupScheduleSettings />
           <BackupSettings />
         </TabsContent>
       </Tabs>
