@@ -386,6 +386,7 @@ export default function QuickSale() {
         items: orderItems,
         status: 'in_store',
         totalAmount,
+        discountAmount,
         paidAmount: totalAmount, // Quick sale is always fully paid
         isPaid: true,
         isDelivery,

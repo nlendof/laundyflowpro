@@ -594,6 +594,7 @@ export type Database = {
           delivery_cost: number | null
           delivery_driver_id: string | null
           delivery_slot: string | null
+          discount_amount: number | null
           estimated_ready_at: string | null
           id: string
           is_paid: boolean | null
@@ -626,6 +627,7 @@ export type Database = {
           delivery_cost?: number | null
           delivery_driver_id?: string | null
           delivery_slot?: string | null
+          discount_amount?: number | null
           estimated_ready_at?: string | null
           id?: string
           is_paid?: boolean | null
@@ -658,6 +660,7 @@ export type Database = {
           delivery_cost?: number | null
           delivery_driver_id?: string | null
           delivery_slot?: string | null
+          discount_amount?: number | null
           estimated_ready_at?: string | null
           id?: string
           is_paid?: boolean | null
