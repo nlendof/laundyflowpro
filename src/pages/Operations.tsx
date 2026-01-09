@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
 import { Order, OrderStatus } from '@/types';
-import { MOCK_ORDERS } from '@/lib/mockData';
 import { ORDER_STATUS_CONFIG, ORDER_STATUS_FLOW } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -32,11 +31,14 @@ import {
   Pause,
   Truck,
   Zap,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useConfig } from '@/contexts/ConfigContext';
+import { useOrders } from '@/hooks/useOrders';
 
 // Icon mapping
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -256,6 +258,7 @@ function OrderDetailsDialog({ order, isOpen, onClose, onAdvance }: OrderDetailsD
 
 export default function Operations() {
   const { activeOperations, getOperationByKey } = useConfig();
+  const { orders, loading, fetchOrders, updateOrderStatus } = useOrders();
   
   // Filter operation statuses that are active and between in_store and ready_delivery
   const operationKeys = useMemo(() => {
@@ -265,7 +268,6 @@ export default function Operations() {
       .map(op => op.key as OrderStatus);
   }, [activeOperations]);
   
-  const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -308,21 +310,17 @@ export default function Operations() {
   const totalInProcess = ordersByStatus.washing.length + ordersByStatus.drying.length + ordersByStatus.ironing.length;
   const totalReady = ordersByStatus.ready_delivery.length;
 
-  const handleAdvanceStatus = (order: Order) => {
+  const handleAdvanceStatus = async (order: Order) => {
     const currentIndex = ORDER_STATUS_FLOW.indexOf(order.status);
     if (currentIndex < ORDER_STATUS_FLOW.length - 1) {
       const nextStatus = ORDER_STATUS_FLOW[currentIndex + 1] as OrderStatus;
       
-      setOrders(prev =>
-        prev.map(o =>
-          o.id === order.id
-            ? { ...o, status: nextStatus, updatedAt: new Date() }
-            : o
-        )
-      );
-
-      const statusConfig = ORDER_STATUS_CONFIG[nextStatus];
-      toast.success(`${order.ticketCode} → ${statusConfig.labelEs}`);
+      const success = await updateOrderStatus(order.id, nextStatus);
+      
+      if (success) {
+        const statusConfig = ORDER_STATUS_CONFIG[nextStatus];
+        toast.success(`${order.ticketCode} → ${statusConfig.labelEs}`);
+      }
     }
   };
 
@@ -330,6 +328,14 @@ export default function Operations() {
     setSelectedOrder(order);
     setIsDetailsOpen(true);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="h-[calc(100vh-2rem)] flex flex-col p-4 lg:p-6">
@@ -357,6 +363,9 @@ export default function Operations() {
             <p className="text-xs text-green-600 dark:text-green-400">Listos</p>
             <p className="text-2xl font-bold text-green-600 dark:text-green-400">{totalReady}</p>
           </div>
+          <Button variant="outline" size="icon" onClick={() => fetchOrders()}>
+            <RefreshCw className="w-4 h-4" />
+          </Button>
         </div>
       </div>
 
