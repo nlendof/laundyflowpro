@@ -396,6 +396,7 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
       })),
       status: needsPickup ? 'pending_pickup' : 'in_store',
       totalAmount,
+      discountAmount,
       paidAmount: 0,
       isPaid: false,
       isDelivery: needsDelivery,

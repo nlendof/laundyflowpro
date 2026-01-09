@@ -68,6 +68,7 @@ export interface Order {
   items: OrderItem[];
   status: OrderStatus;
   totalAmount: number;
+  discountAmount?: number;        // Discount applied to the order
   paidAmount: number;
   isPaid: boolean;
   // Legacy field for backward compatibility
