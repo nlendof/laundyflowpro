@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Order, OrderStatus } from '@/types';
 import { ORDER_STATUS_FLOW } from '@/lib/constants';
 import { OrderStatusTabs } from '@/components/orders/OrderStatusTabs';
@@ -26,11 +26,15 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrders } from '@/hooks/useOrders';
+import { useNewOrders } from '@/contexts/NewOrdersContext';
 
 type SortOption = 'newest' | 'oldest' | 'amount_high' | 'amount_low';
 
 export default function Orders() {
-  const { orders, loading, newOrderIds, fetchOrders, createOrder, updateOrderStatus } = useOrders();
+  const { incrementCount, clearCount } = useNewOrders();
+  const { orders, loading, newOrderIds, fetchOrders, createOrder, updateOrderStatus } = useOrders({
+    onNewOrder: incrementCount
+  });
   const [activeStatus, setActiveStatus] = useState<OrderStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
@@ -39,6 +43,11 @@ export default function Orders() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
   const [qrOrder, setQrOrder] = useState<Order | null>(null);
+
+  // Clear badge when on orders page
+  useEffect(() => {
+    clearCount();
+  }, [clearCount]);
 
   // Calculate counts
   const statusCounts = useMemo(() => {
