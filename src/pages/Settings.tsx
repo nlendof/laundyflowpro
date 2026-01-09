@@ -56,10 +56,12 @@ import {
   Tag,
   FolderOpen,
   Receipt,
+  Database,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useConfig, CatalogCategory, OperationStep, DeliveryZone, ExtraService, PaymentMethod, BusinessSettings } from '@/contexts/ConfigContext';
+import { BackupSettings } from '@/components/settings/BackupSettings';
 import { TicketSettingsTab } from '@/components/settings/TicketSettingsTab';
 
 // ServiceItem is local to Settings (not in context yet)
@@ -420,6 +422,10 @@ export default function SettingsPage() {
           <TabsTrigger value="appearance" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Palette className="w-4 h-4" />
             Apariencia
+          </TabsTrigger>
+          <TabsTrigger value="backup" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Database className="w-4 h-4" />
+            Backup
           </TabsTrigger>
         </TabsList>
 
@@ -1275,6 +1281,11 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Backup Settings */}
+        <TabsContent value="backup" className="space-y-6">
+          <BackupSettings />
         </TabsContent>
       </Tabs>
 
