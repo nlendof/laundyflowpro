@@ -14,16 +14,15 @@ import { Separator } from '@/components/ui/separator';
 import { StatusBadge } from '@/components/StatusBadge';
 import { OrderStatusFlow } from '@/components/OrderStatusFlow';
 import { OrderQRCode } from '@/components/orders/OrderQRCode';
+import { PrintTicketButton } from '@/components/orders/PrintTicketButton';
 import {
   Phone,
   MapPin,
   Clock,
-  DollarSign,
   Truck,
   User,
   Package,
   QrCode,
-  Printer,
   ArrowRight,
   CheckCircle,
   AlertCircle,
@@ -226,10 +225,7 @@ export function OrderDetailsModal({
 
           {/* Actions */}
           <div className="flex flex-col sm:flex-row gap-3 pt-4">
-            <Button variant="outline" className="flex-1 gap-2">
-              <Printer className="w-4 h-4" />
-              Imprimir Ticket
-            </Button>
+            <PrintTicketButton order={order} variant="outline" className="flex-1" />
             {canAdvance && nextStatusConfig && (
               <Button 
                 className="flex-1 gap-2"
