@@ -18,6 +18,7 @@ import {
   CalendarDays,
   Loader2,
   RefreshCw,
+  HandCoins,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { EmployeeList, type Employee } from '@/components/employees/EmployeeList';
@@ -26,6 +27,7 @@ import { PayrollManagement } from '@/components/employees/PayrollManagement';
 import { ScheduleManagement } from '@/components/employees/ScheduleManagement';
 import { AttendanceManagement } from '@/components/employees/AttendanceManagement';
 import { TimeOffManagement } from '@/components/employees/TimeOffManagement';
+import { LoanManagement } from '@/components/employees/LoanManagement';
 
 type AppRole = 'admin' | 'cajero' | 'operador' | 'delivery';
 
@@ -177,7 +179,7 @@ export default function Employees() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 h-auto">
+        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7 h-auto">
           <TabsTrigger value="list" className="gap-2 py-2">
             <Users className="w-4 h-4" />
             <span className="hidden sm:inline">Empleados</span>
@@ -189,6 +191,10 @@ export default function Employees() {
           <TabsTrigger value="payroll" className="gap-2 py-2">
             <Receipt className="w-4 h-4" />
             <span className="hidden sm:inline">Nómina</span>
+          </TabsTrigger>
+          <TabsTrigger value="loans" className="gap-2 py-2">
+            <HandCoins className="w-4 h-4" />
+            <span className="hidden sm:inline">Préstamos</span>
           </TabsTrigger>
           <TabsTrigger value="schedules" className="gap-2 py-2">
             <Calendar className="w-4 h-4" />
@@ -218,6 +224,10 @@ export default function Employees() {
 
         <TabsContent value="payroll">
           <PayrollManagement employees={employees} />
+        </TabsContent>
+
+        <TabsContent value="loans">
+          <LoanManagement employees={employees} />
         </TabsContent>
 
         <TabsContent value="schedules">
