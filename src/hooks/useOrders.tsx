@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useAuth } from './useAuth';
 import { Tables, TablesInsert } from '@/integrations/supabase/types';
 import { Package } from 'lucide-react';
+import { playNotificationSound } from '@/lib/notificationSound';
 
 type DbOrder = Tables<'orders'>;
 type DbOrderItem = Tables<'order_items'>;
@@ -303,6 +304,9 @@ export function useOrders() {
             return next;
           });
         }, 5000);
+        
+        // Play notification sound
+        playNotificationSound();
         
         // Show toast notification
         toast.success(`Nuevo pedido: ${mappedOrder.ticketCode}`, {
