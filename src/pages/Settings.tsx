@@ -64,6 +64,7 @@ import { useConfig, CatalogCategory, OperationStep, DeliveryZone, ExtraService, 
 import { BackupSettings } from '@/components/settings/BackupSettings';
 import { BackupScheduleSettings } from '@/components/settings/BackupScheduleSettings';
 import { TicketSettingsTab } from '@/components/settings/TicketSettingsTab';
+import { DataExportSettings } from '@/components/settings/DataExportSettings';
 
 // ServiceItem is local to Settings (not in context yet)
 interface ServiceItem {
@@ -1286,6 +1287,7 @@ export default function SettingsPage() {
 
         {/* Backup Settings */}
         <TabsContent value="backup" className="space-y-6">
+          <DataExportSettings />
           <BackupScheduleSettings />
           <BackupSettings />
         </TabsContent>
