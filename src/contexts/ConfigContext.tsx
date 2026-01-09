@@ -198,11 +198,26 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const loadConfig = useCallback(async () => {
     try {
       setLoading(true);
+      
+      // Check if user is authenticated first
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        // Use defaults when not authenticated
+        return;
+      }
+
       const { data, error } = await supabase
         .from('system_config')
         .select('*');
 
-      if (error) throw error;
+      if (error) {
+        // If permission denied, just use defaults
+        if (error.code === '42501' || error.message?.includes('permission')) {
+          console.log('Config: Using defaults (no permission)');
+          return;
+        }
+        throw error;
+      }
 
       if (data && data.length > 0) {
         data.forEach(config => {
@@ -246,6 +261,13 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   // Save config to database
   const saveConfig = useCallback(async () => {
     try {
+      // Check if user is authenticated
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        toast.error('Debes iniciar sesión para guardar la configuración');
+        return;
+      }
+
       const configs = [
         { key: 'categories', value: categories as unknown },
         { key: 'operations', value: operations as unknown },
