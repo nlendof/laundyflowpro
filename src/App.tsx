@@ -24,6 +24,7 @@ import CashRegister from "./pages/CashRegister";
 import Employees from "./pages/Employees";
 import EmployeePortal from "./pages/EmployeePortal";
 import FirstLoginSetup from "./pages/FirstLoginSetup";
+import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -204,10 +205,7 @@ function AppRoutes() {
           path="/reports"
           element={
             <ProtectedRoute>
-              <div className="p-8">
-                <h1 className="text-2xl font-bold">Reportes</h1>
-                <p className="text-muted-foreground">Módulo en desarrollo...</p>
-              </div>
+              <Reports />
             </ProtectedRoute>
           }
         />

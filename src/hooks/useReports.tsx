@@ -292,7 +292,7 @@ export function useReports(initialFilters?: Partial<ReportFilters>) {
           serviceStats[name] = { quantity: 0, revenue: 0 };
         }
         serviceStats[name].quantity += Number(item.quantity);
-        serviceStats[name].revenue += Number(item.total);
+        serviceStats[name].revenue += Number(item.quantity) * Number(item.unit_price);
       });
 
       const totalServiceRevenue = Object.values(serviceStats).reduce((sum, s) => sum + s.revenue, 0);
@@ -321,7 +321,7 @@ export function useReports(initialFilters?: Partial<ReportFilters>) {
         const emp = employeesData?.find(e => e.id === id);
         return {
           id,
-          name: emp ? `${emp.first_name} ${emp.last_name}` : 'Desconocido',
+          name: emp?.name || 'Desconocido',
           ordersProcessed: vals.ordersProcessed,
           revenue: vals.revenue,
           avgTime: 0,
@@ -367,7 +367,7 @@ export function useReports(initialFilters?: Partial<ReportFilters>) {
           totalOrders: orders?.length || 0,
           completedOrders,
           pendingOrders,
-          cancelledOrders: orders?.filter(o => o.status === 'cancelled').length || 0,
+          cancelledOrders: 0, // Status 'cancelled' not in enum
         },
         customerStats: {
           totalCustomers: uniqueCustomerIds.size,
@@ -388,9 +388,11 @@ export function useReports(initialFilters?: Partial<ReportFilters>) {
       });
 
       // Set employees and categories for filters
-      setEmployees(employeesData?.map(e => ({ id: e.id, name: `${e.first_name} ${e.last_name}` })) || []);
+      setEmployees(employeesData?.map(e => ({ id: e.id, name: e.name })) || []);
       
-      const uniqueCategories = [...new Set(orderItems?.map(i => i.category).filter(Boolean))];
+      // Get categories from catalog services instead
+      const { data: servicesData } = await supabase.from('catalog_services').select('category');
+      const uniqueCategories = [...new Set(servicesData?.map(s => s.category).filter(Boolean))];
       setCategories(uniqueCategories as string[]);
 
     } catch (error) {
