@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -15,6 +15,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Table,
   TableBody,
@@ -43,6 +53,7 @@ import {
   Loader2,
   Key,
   UserPlus,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -140,8 +151,11 @@ export function EmployeeList({ employees, onRefresh, currentUserId }: EmployeeLi
   
   const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-  
+
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const filteredEmployees = employees.filter(emp => {
     const matchesSearch = 
@@ -299,6 +313,28 @@ export function EmployeeList({ employees, onRefresh, currentUserId }: EmployeeLi
     }
   };
 
+  const handleDeleteEmployee = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      const res = await supabase.functions.invoke('delete-employee', {
+        body: { userId: deleteTarget.id },
+      });
+
+      if (res.error) throw new Error(res.error.message);
+      if (res.data?.error) throw new Error(res.data.error);
+
+      toast.success('Empleado eliminado');
+      setDeleteTarget(null);
+      onRefresh();
+    } catch (e) {
+      console.error('Error deleting employee:', e);
+      toast.error(e instanceof Error ? e.message : 'Error al eliminar empleado');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Filters */}
@@ -442,10 +478,20 @@ export function EmployeeList({ employees, onRefresh, currentUserId }: EmployeeLi
                               <Pencil className="w-4 h-4" />
                             </Button>
                             {!isCurrentUser && (
-                              <Switch
-                                checked={employee.is_active}
-                                onCheckedChange={() => handleToggleActive(employee)}
-                              />
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setDeleteTarget(employee)}
+                                  title="Eliminar"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                                <Switch
+                                  checked={employee.is_active}
+                                  onCheckedChange={() => handleToggleActive(employee)}
+                                />
+                              </>
                             )}
                           </div>
                         </TableCell>
@@ -568,6 +614,31 @@ export function EmployeeList({ employees, onRefresh, currentUserId }: EmployeeLi
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirm */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar empleado</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción elimina la cuenta y revoca el acceso. ¿Seguro que deseas eliminar a {deleteTarget?.name}?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: 'destructive' })}
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteEmployee();
+              }}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Eliminando…' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Create Employee Modal */}
       <CreateEmployeeModal

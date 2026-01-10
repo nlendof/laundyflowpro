@@ -52,12 +52,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-
-  // Check if user needs to complete first login setup
-  if (user && (user.mustChangePassword || !user.profileCompleted)) {
-    return <Navigate to="/setup" replace />;
-  }
-  
   return <>{children}</>;
 }
 
@@ -74,10 +68,6 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   }
   
   if (isAuthenticated) {
-    // Check if user needs to complete first login setup
-    if (user && (user.mustChangePassword || !user.profileCompleted)) {
-      return <Navigate to="/setup" replace />;
-    }
     return <Navigate to="/dashboard" replace />;
   }
   
@@ -100,12 +90,8 @@ function SetupRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  // If user doesn't need setup, redirect to dashboard
-  if (user && !user.mustChangePassword && user.profileCompleted) {
-    return <Navigate to="/dashboard" replace />;
-  }
-  
-  return <>{children}</>;
+  // /setup ya no es obligatorio. Si el usuario entra aquí, lo enviamos al dashboard.
+  return <Navigate to="/dashboard" replace />;
 }
 
 function AppRoutes() {
