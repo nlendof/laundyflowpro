@@ -43,6 +43,9 @@ import {
   Phone,
   Mail,
   Briefcase,
+  Lock,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, differenceInDays } from 'date-fns';
@@ -114,6 +117,12 @@ export default function EmployeePortal() {
     reason: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Password change modal
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [passwordData, setPasswordData] = useState({ newPassword: '', confirmPassword: '' });
+  const [showPassword, setShowPassword] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   const fetchData = async () => {
     if (!user?.id) return;
@@ -210,6 +219,38 @@ export default function EmployeePortal() {
     }
   };
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (passwordData.newPassword.length < 6) {
+      toast.error('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error('Las contraseñas no coinciden');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: passwordData.newPassword,
+      });
+
+      if (error) throw error;
+
+      toast.success('Contraseña actualizada');
+      setIsPasswordModalOpen(false);
+      setPasswordData({ newPassword: '', confirmPassword: '' });
+    } catch (error) {
+      console.error('Error changing password:', error);
+      toast.error('Error al cambiar la contraseña');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-MX', {
       style: 'currency',
@@ -261,9 +302,15 @@ export default function EmployeePortal() {
         {/* Profile Tab */}
         <TabsContent value="profile">
           <Card>
-            <CardHeader>
-              <CardTitle>Mi Perfil</CardTitle>
-              <CardDescription>Tu información personal en el sistema</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Mi Perfil</CardTitle>
+                <CardDescription>Tu información personal en el sistema</CardDescription>
+              </div>
+              <Button variant="outline" onClick={() => setIsPasswordModalOpen(true)} className="gap-2">
+                <Lock className="w-4 h-4" />
+                Cambiar Contraseña
+              </Button>
             </CardHeader>
             <CardContent>
               <div className="flex flex-col md:flex-row gap-6">
@@ -631,6 +678,69 @@ export default function EmployeePortal() {
                   </>
                 ) : (
                   'Enviar Solicitud'
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Password Change Modal */}
+      <Dialog open={isPasswordModalOpen} onOpenChange={setIsPasswordModalOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="w-5 h-5" />
+              Cambiar Contraseña
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleChangePassword} className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">Nueva contraseña</Label>
+              <div className="relative">
+                <Input
+                  id="new-password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Mínimo 6 caracteres"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                  disabled={isChangingPassword}
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirmar contraseña</Label>
+              <Input
+                id="confirm-password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Repite la contraseña"
+                value={passwordData.confirmPassword}
+                onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                disabled={isChangingPassword}
+              />
+            </div>
+            <DialogFooter className="gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setIsPasswordModalOpen(false)} disabled={isChangingPassword}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isChangingPassword}>
+                {isChangingPassword ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  'Guardar'
                 )}
               </Button>
             </DialogFooter>

@@ -209,7 +209,7 @@ export function CreateEmployeeModal({ isOpen, onClose, onSuccess }: CreateEmploy
               </div>
               
                <p className="text-xs text-muted-foreground mt-4">
-                 Al ingresar por primera vez, se le pedirá cambiar la contraseña y completar su perfil.
+                 El empleado puede cambiar su contraseña desde su perfil en "Mi Portal" → "Cambiar Contraseña".
                </p>
              </div>
 
