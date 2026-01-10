@@ -494,9 +494,9 @@ export default function QuickSale() {
   const currentColors = activeTab === 'services' ? SERVICE_COLORS : ARTICLE_COLORS;
 
   return (
-    <div className="h-[calc(100vh-2rem)] flex flex-col lg:flex-row gap-4 p-4 lg:p-6">
-      {/* Left Panel - Services/Articles */}
-      <div className="flex-1 flex flex-col min-w-0">
+    <div className="h-[calc(100vh-2rem)] flex flex-col lg:flex-row gap-4 p-4 lg:p-6 overflow-hidden">
+      {/* Left Panel - Services/Articles - REDUCED SIZE */}
+      <div className="lg:w-[45%] flex flex-col min-w-0 lg:max-h-full overflow-hidden">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
           <div>
@@ -551,7 +551,7 @@ export default function QuickSale() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 lg:gap-3">
               {currentItems.map((item, index) => {
                 const inCart = cart.find(c => c.catalogItemId === item.id);
                 const Icon = item.pricingType === 'weight' ? Scale : Hash;
@@ -562,10 +562,10 @@ export default function QuickSale() {
                     key={item.id}
                     onClick={() => addToCart(item)}
                     className={cn(
-                      'relative p-4 lg:p-6 rounded-2xl border-2 transition-all duration-200',
+                      'relative p-3 lg:p-4 rounded-xl border-2 transition-all duration-200',
                       'hover:scale-[1.02] active:scale-[0.98]',
-                      'flex flex-col items-center justify-center text-center gap-2',
-                      'min-h-[120px] lg:min-h-[150px]',
+                      'flex flex-col items-center justify-center text-center gap-1',
+                      'min-h-[100px] lg:min-h-[120px]',
                       inCart 
                         ? 'border-primary bg-primary/10 ring-2 ring-primary/20' 
                         : 'border-border hover:border-primary/50 bg-card'
@@ -576,17 +576,17 @@ export default function QuickSale() {
                         {inCart.quantity}
                       </Badge>
                     )}
-                    <div className={cn('w-12 h-12 lg:w-14 lg:h-14 rounded-xl flex items-center justify-center text-white', colorClass)}>
+                    <div className={cn('w-10 h-10 lg:w-12 lg:h-12 rounded-lg flex items-center justify-center text-white', colorClass)}>
                       {activeTab === 'services' ? (
-                        <Sparkles className="w-6 h-6 lg:w-7 lg:h-7" />
+                        <Sparkles className="w-5 h-5 lg:w-6 lg:h-6" />
                       ) : (
-                        <Shirt className="w-6 h-6 lg:w-7 lg:h-7" />
+                        <Shirt className="w-5 h-5 lg:w-6 lg:h-6" />
                       )}
                     </div>
-                    <span className="font-semibold text-sm lg:text-base line-clamp-2">{item.name}</span>
-                    <div className="flex items-center gap-1 text-primary font-bold text-lg lg:text-xl">
+                    <span className="font-semibold text-xs lg:text-sm line-clamp-2">{item.name}</span>
+                    <div className="flex items-center gap-1 text-primary font-bold text-base lg:text-lg">
                       <span>${item.price.toFixed(2)}</span>
-                      <span className="text-xs text-muted-foreground font-normal">
+                      <span className="text-[10px] text-muted-foreground font-normal">
                         /{getPricingUnit(item.pricingType)}
                       </span>
                     </div>
@@ -636,8 +636,8 @@ export default function QuickSale() {
         </div>
       </div>
 
-      {/* Right Panel - Cart & Checkout */}
-      <div className="w-full lg:w-[400px] flex flex-col bg-card rounded-2xl border shadow-lg overflow-hidden">
+      {/* Right Panel - Cart & Checkout - INCREASED SIZE */}
+      <div className="flex-1 lg:w-[55%] flex flex-col bg-card rounded-2xl border shadow-lg overflow-hidden">
         {/* Customer Info */}
         <div className="p-4 border-b bg-muted/30">
           <div className="grid gap-3">

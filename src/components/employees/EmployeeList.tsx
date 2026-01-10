@@ -568,6 +568,16 @@ export function EmployeeList({ employees, onRefresh, currentUserId }: EmployeeLi
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Create Employee Modal */}
+      <CreateEmployeeModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={() => {
+          setIsCreateModalOpen(false);
+          onRefresh();
+        }}
+      />
     </div>
   );
 }

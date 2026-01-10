@@ -32,7 +32,7 @@ type SortOption = 'newest' | 'oldest' | 'amount_high' | 'amount_low';
 
 export default function Orders() {
   const { incrementCount, clearCount } = useNewOrders();
-  const { orders, loading, newOrderIds, fetchOrders, createOrder, updateOrderStatus } = useOrders({
+  const { orders, loading, newOrderIds, fetchOrders, createOrder, updateOrderStatus, updateOrderPayment } = useOrders({
     onNewOrder: incrementCount
   });
   const [activeStatus, setActiveStatus] = useState<OrderStatus | 'all'>('all');
@@ -131,6 +131,33 @@ export default function Orders() {
         toast.success(`Pedido ${order.ticketCode} avanzado a: ${nextStatus}`);
       }
     }
+  };
+
+  const handleRegressStatus = async (order: Order) => {
+    const currentIndex = ORDER_STATUS_FLOW.indexOf(order.status);
+    if (currentIndex > 0) {
+      const prevStatus = ORDER_STATUS_FLOW[currentIndex - 1] as OrderStatus;
+      const success = await updateOrderStatus(order.id, prevStatus);
+      
+      if (success) {
+        if (selectedOrder?.id === order.id) {
+          setSelectedOrder(prev => 
+            prev ? { ...prev, status: prevStatus, updatedAt: new Date() } : null
+          );
+        }
+        toast.success(`Pedido ${order.ticketCode} retrocedido a: ${prevStatus}`);
+      }
+    }
+  };
+
+  const handleUpdatePayment = async (orderId: string, paidAmount: number, isPaid: boolean) => {
+    const success = await updateOrderPayment(orderId, paidAmount, isPaid);
+    if (success && selectedOrder?.id === orderId) {
+      setSelectedOrder(prev => 
+        prev ? { ...prev, paidAmount, isPaid, updatedAt: new Date() } : null
+      );
+    }
+    return success;
   };
 
   const handleCreateOrder = async (newOrder: Order) => {
@@ -256,6 +283,8 @@ export default function Orders() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onAdvanceStatus={handleAdvanceStatus}
+        onRegressStatus={handleRegressStatus}
+        onUpdatePayment={handleUpdatePayment}
       />
 
       {/* New Order Modal */}
