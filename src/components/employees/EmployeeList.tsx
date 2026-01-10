@@ -97,10 +97,13 @@ const MODULES = [
   { key: 'operations', label: 'Operaciones', icon: Settings },
   { key: 'deliveries', label: 'Entregas', icon: Truck },
   { key: 'cash_register', label: 'Caja', icon: Wallet },
+  { key: 'customers', label: 'Clientes', icon: Users },
   { key: 'inventory', label: 'Inventario', icon: Package },
+  { key: 'purchases', label: 'Compras', icon: Package },
   { key: 'catalog', label: 'Catálogo', icon: FileText },
   { key: 'reports', label: 'Reportes', icon: FileText },
   { key: 'employees', label: 'Empleados', icon: Users },
+  { key: 'audit', label: 'Auditoría', icon: FileText },
   { key: 'settings', label: 'Configuración', icon: Settings },
 ] as const;
 
@@ -108,7 +111,7 @@ type ModuleKey = typeof MODULES[number]['key'];
 
 const DEFAULT_PERMISSIONS: Record<AppRole, ModuleKey[]> = {
   admin: MODULES.map(m => m.key),
-  cajero: ['dashboard', 'pos', 'orders', 'cash_register'],
+  cajero: ['dashboard', 'pos', 'orders', 'cash_register', 'customers'],
   operador: ['dashboard', 'orders', 'operations'],
   delivery: ['dashboard', 'deliveries'],
 };
