@@ -170,7 +170,6 @@ Deno.serve(async (req) => {
 
     const origin = appUrl || req.headers.get('origin') || '';
     const loginUrl = origin ? `${origin}/login` : '';
-    const setupUrl = origin ? `${origin}/setup` : '';
 
     if (resend) {
       try {
@@ -183,9 +182,9 @@ Deno.serve(async (req) => {
               <h2 style="margin: 0 0 12px">Bienvenido/a</h2>
               <p>Se creó tu cuenta en el sistema de la lavandería. Tus credenciales son:</p>
               <p><strong>Correo:</strong> ${email}<br />
-                 <strong>Contraseña temporal:</strong> ${password}</p>
+                 <strong>Contraseña:</strong> ${password}</p>
               ${loginUrl ? `<p><a href="${loginUrl}" target="_blank">Ingresar al sistema</a></p>` : ''}
-              ${setupUrl ? `<p>Al ingresar por primera vez, el sistema te pedirá cambiar la contraseña y completar tu perfil: <a href="${setupUrl}" target="_blank">${setupUrl}</a></p>` : '<p>Al ingresar por primera vez, el sistema te pedirá cambiar la contraseña y completar tu perfil.</p>'}
+              <p>Luego de ingresar, si lo deseas puedes cambiar tu contraseña desde <strong>Mi Portal</strong> → <strong>Cambiar Contraseña</strong>.</p>
               <p style="color: #666; font-size: 12px">Si no solicitaste este acceso, ignora este correo y avisa al administrador.</p>
             </div>
           `,
