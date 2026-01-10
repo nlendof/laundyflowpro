@@ -1,0 +1,176 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface CreateEmployeeRequest {
+  email: string;
+  password: string;
+  name: string;
+  phone?: string;
+  role: 'admin' | 'cajero' | 'operador' | 'delivery';
+  permissions: string[];
+}
+
+Deno.serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    // Verify the request has valid auth
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'No autorizado' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create Supabase client with service role to create users
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    
+    // First verify the requesting user is an admin using their token
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    
+    const { data: { user: requestingUser }, error: userError } = await userClient.auth.getUser();
+    
+    if (userError || !requestingUser) {
+      return new Response(
+        JSON.stringify({ error: 'No autorizado' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if the requesting user is an admin
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+    
+    const { data: roleData, error: roleError } = await adminClient
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', requestingUser.id)
+      .maybeSingle();
+
+    if (roleError || roleData?.role !== 'admin') {
+      return new Response(
+        JSON.stringify({ error: 'Solo los administradores pueden crear empleados' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Parse request body
+    const body: CreateEmployeeRequest = await req.json();
+    const { email, password, name, phone, role, permissions } = body;
+
+    // Validate input
+    if (!email || !password || !name || !role) {
+      return new Response(
+        JSON.stringify({ error: 'Datos incompletos' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create user with admin client (service role)
+    const { data: authData, error: createError } = await adminClient.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true, // Auto-confirm the email
+      user_metadata: { name }
+    });
+
+    if (createError) {
+      console.error('Error creating user:', createError);
+      
+      if (createError.message.includes('already') || createError.message.includes('exists')) {
+        return new Response(
+          JSON.stringify({ error: 'Este correo ya está registrado' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      return new Response(
+        JSON.stringify({ error: createError.message }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!authData.user) {
+      return new Response(
+        JSON.stringify({ error: 'No se pudo crear el usuario' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const userId = authData.user.id;
+
+    // Wait a moment for the trigger to create the profile
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Update profile with additional data
+    const { error: profileError } = await adminClient
+      .from('profiles')
+      .update({
+        name,
+        phone: phone || null,
+        must_change_password: false, // Optional password change
+        profile_completed: true,
+      })
+      .eq('id', userId);
+
+    if (profileError) {
+      console.error('Profile update error:', profileError);
+    }
+
+    // Update the role
+    const { error: roleUpdateError } = await adminClient
+      .from('user_roles')
+      .update({ role })
+      .eq('user_id', userId);
+
+    if (roleUpdateError) {
+      console.error('Role update error:', roleUpdateError);
+    }
+
+    // Update permissions
+    await adminClient
+      .from('user_permissions')
+      .delete()
+      .eq('user_id', userId);
+
+    if (permissions && permissions.length > 0) {
+      const { error: permError } = await adminClient
+        .from('user_permissions')
+        .insert(permissions.map(moduleKey => ({
+          user_id: userId,
+          module_key: moduleKey,
+        })));
+      
+      if (permError) {
+        console.error('Permissions error:', permError);
+      }
+    }
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        userId,
+        message: 'Empleado creado exitosamente'
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Error interno del servidor' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
