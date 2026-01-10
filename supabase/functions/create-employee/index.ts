@@ -1,11 +1,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
+import { Resend } from 'https://esm.sh/resend@2.0.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const resendApiKey = Deno.env.get('RESEND_API_KEY') ?? '';
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
+
 interface CreateEmployeeRequest {
+  appUrl?: string;
   email: string;
   password: string;
   name: string;
@@ -67,7 +72,7 @@ Deno.serve(async (req) => {
 
     // Parse request body
     const body: CreateEmployeeRequest = await req.json();
-    const { email, password, name, phone, role, permissions } = body;
+    const { appUrl, email, password, name, phone, role, permissions } = body;
 
     // Validate input
     if (!email || !password || !name || !role) {
@@ -119,8 +124,8 @@ Deno.serve(async (req) => {
       .update({
         name,
         phone: phone || null,
-        must_change_password: false, // Optional password change
-        profile_completed: true,
+        must_change_password: true,
+        profile_completed: false,
       })
       .eq('id', userId);
 
@@ -147,21 +152,62 @@ Deno.serve(async (req) => {
     if (permissions && permissions.length > 0) {
       const { error: permError } = await adminClient
         .from('user_permissions')
-        .insert(permissions.map(moduleKey => ({
-          user_id: userId,
-          module_key: moduleKey,
-        })));
-      
+        .insert(
+          permissions.map((moduleKey) => ({
+            user_id: userId,
+            module_key: moduleKey,
+          }))
+        );
+
       if (permError) {
         console.error('Permissions error:', permError);
       }
     }
 
+    // Send credentials email (best-effort)
+    let emailSent = false;
+    let emailError: string | null = null;
+
+    const origin = appUrl || req.headers.get('origin') || '';
+    const loginUrl = origin ? `${origin}/login` : '';
+    const setupUrl = origin ? `${origin}/setup` : '';
+
+    if (resend) {
+      try {
+        const { error: sendError } = await resend.emails.send({
+          from: 'LaundyFlow <onboarding@resend.dev>',
+          to: [email],
+          subject: 'Tus credenciales de acceso',
+          html: `
+            <div style="font-family: ui-sans-serif, system-ui; line-height: 1.6">
+              <h2 style="margin: 0 0 12px">Bienvenido/a</h2>
+              <p>Se creó tu cuenta en el sistema de la lavandería. Tus credenciales son:</p>
+              <p><strong>Correo:</strong> ${email}<br />
+                 <strong>Contraseña temporal:</strong> ${password}</p>
+              ${loginUrl ? `<p><a href="${loginUrl}" target="_blank">Ingresar al sistema</a></p>` : ''}
+              ${setupUrl ? `<p>Al ingresar por primera vez, el sistema te pedirá cambiar la contraseña y completar tu perfil: <a href="${setupUrl}" target="_blank">${setupUrl}</a></p>` : '<p>Al ingresar por primera vez, el sistema te pedirá cambiar la contraseña y completar tu perfil.</p>'}
+              <p style="color: #666; font-size: 12px">Si no solicitaste este acceso, ignora este correo y avisa al administrador.</p>
+            </div>
+          `,
+        });
+
+        if (sendError) throw sendError;
+        emailSent = true;
+      } catch (e) {
+        console.error('Email send error:', e);
+        emailError = e instanceof Error ? e.message : 'Error enviando email';
+      }
+    } else {
+      emailError = 'RESEND_API_KEY no configurada';
+    }
+
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         userId,
-        message: 'Empleado creado exitosamente'
+        message: 'Empleado creado exitosamente',
+        emailSent,
+        emailError,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

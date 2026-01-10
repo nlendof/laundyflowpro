@@ -104,6 +104,7 @@ export function CreateEmployeeModal({ isOpen, onClose, onSuccess }: CreateEmploy
 
       const response = await supabase.functions.invoke('create-employee', {
         body: {
+          appUrl: window.location.origin,
           email: formData.email,
           password: formData.password,
           name: formData.name,
@@ -133,6 +134,9 @@ export function CreateEmployeeModal({ isOpen, onClose, onSuccess }: CreateEmploy
       });
 
       toast.success('Empleado creado exitosamente');
+      if (response.data?.emailSent === false) {
+        toast.message(`No se pudo enviar el correo: ${response.data?.emailError ?? 'Error desconocido'}`);
+      }
       onSuccess();
     } catch (error) {
       console.error('Error creating employee:', error);
@@ -204,10 +208,10 @@ export function CreateEmployeeModal({ isOpen, onClose, onSuccess }: CreateEmploy
                 </div>
               </div>
               
-              <p className="text-xs text-muted-foreground mt-4">
-                El empleado puede cambiar su contraseña desde su perfil cuando lo desee.
-              </p>
-            </div>
+               <p className="text-xs text-muted-foreground mt-4">
+                 Al ingresar por primera vez, se le pedirá cambiar la contraseña y completar su perfil.
+               </p>
+             </div>
 
             <DialogFooter>
               <Button onClick={handleClose}>Cerrar</Button>
