@@ -6,6 +6,7 @@ import { useAuth } from './useAuth';
 import { Tables, TablesInsert } from '@/integrations/supabase/types';
 import { Package } from 'lucide-react';
 import { playNotificationSound } from '@/lib/notificationSound';
+import { notifyNewOrder, notifyOrderStatusChange, getNotificationPermission } from '@/lib/pushNotifications';
 
 type DbOrder = Tables<'orders'>;
 type DbOrderItem = Tables<'order_items'>;
@@ -311,6 +312,11 @@ export function useOrders(options?: { onNewOrder?: () => void }) {
         // Play notification sound
         playNotificationSound();
         
+        // Send push notification if permission granted
+        if (getNotificationPermission() === 'granted') {
+          notifyNewOrder(mappedOrder.ticketCode, mappedOrder.customerName);
+        }
+        
         // Trigger callback for external listeners (e.g., sidebar badge)
         onNewOrderRef.current?.();
         
@@ -322,6 +328,19 @@ export function useOrders(options?: { onNewOrder?: () => void }) {
         });
       }
     } else if (eventType === 'UPDATE') {
+      // Check if status changed for push notification
+      const oldOrder = orders.find(o => o.id === newRecord.id);
+      if (oldOrder && oldOrder.status !== mappedOrder.status) {
+        // Send push notification for status change if permission granted
+        if (getNotificationPermission() === 'granted') {
+          notifyOrderStatusChange(
+            mappedOrder.ticketCode,
+            mappedOrder.customerName,
+            mappedOrder.status
+          );
+        }
+      }
+      
       setOrders(prev => prev.map(order => 
         order.id === newRecord.id ? mappedOrder : order
       ));
