@@ -124,8 +124,8 @@ Deno.serve(async (req) => {
       .update({
         name,
         phone: phone || null,
-        must_change_password: true,
-        profile_completed: false,
+        must_change_password: false,
+        profile_completed: true,
       })
       .eq('id', userId);
 
