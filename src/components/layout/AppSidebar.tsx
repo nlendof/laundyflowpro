@@ -24,30 +24,30 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
-import { UserRole } from '@/types';
+
 
 interface NavItem {
   icon: React.ElementType;
   label: string;
   path: string;
-  roles: UserRole[];
+  permissionKey: string;
 }
 
 const navItems: NavItem[] = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard', roles: ['admin'] },
-  { icon: ShoppingCart, label: 'Venta Rápida', path: '/pos', roles: ['admin', 'cajero'] },
-  { icon: Package, label: 'Pedidos', path: '/orders', roles: ['admin', 'cajero', 'operador'] },
-  { icon: WashingMachine, label: 'Operaciones', path: '/operations', roles: ['admin', 'operador'] },
-  { icon: Truck, label: 'Entregas', path: '/deliveries', roles: ['admin', 'delivery'] },
-  { icon: DollarSign, label: 'Caja', path: '/cash-register', roles: ['admin', 'cajero'] },
-  { icon: UserCircle, label: 'Clientes', path: '/customers', roles: ['admin', 'cajero'] },
-  { icon: Boxes, label: 'Inventario', path: '/inventory', roles: ['admin'] },
-  { icon: ShoppingBag, label: 'Compras', path: '/purchases', roles: ['admin', 'operador'] },
-  { icon: Tag, label: 'Catálogo', path: '/catalog', roles: ['admin'] },
-  { icon: BarChart3, label: 'Reportes', path: '/reports', roles: ['admin'] },
-  { icon: Users, label: 'Empleados', path: '/employees', roles: ['admin'] },
-  { icon: FileText, label: 'Auditoría', path: '/audit-logs', roles: ['admin'] },
-  { icon: Settings, label: 'Configuración', path: '/settings', roles: ['admin'] },
+  { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard', permissionKey: 'dashboard' },
+  { icon: ShoppingCart, label: 'Venta Rápida', path: '/pos', permissionKey: 'pos' },
+  { icon: Package, label: 'Pedidos', path: '/orders', permissionKey: 'orders' },
+  { icon: WashingMachine, label: 'Operaciones', path: '/operations', permissionKey: 'operations' },
+  { icon: Truck, label: 'Entregas', path: '/deliveries', permissionKey: 'deliveries' },
+  { icon: DollarSign, label: 'Caja', path: '/cash-register', permissionKey: 'cash_register' },
+  { icon: UserCircle, label: 'Clientes', path: '/customers', permissionKey: 'customers' },
+  { icon: Boxes, label: 'Inventario', path: '/inventory', permissionKey: 'inventory' },
+  { icon: ShoppingBag, label: 'Compras', path: '/purchases', permissionKey: 'purchases' },
+  { icon: Tag, label: 'Catálogo', path: '/catalog', permissionKey: 'catalog' },
+  { icon: BarChart3, label: 'Reportes', path: '/reports', permissionKey: 'reports' },
+  { icon: Users, label: 'Empleados', path: '/employees', permissionKey: 'employees' },
+  { icon: FileText, label: 'Auditoría', path: '/audit-logs', permissionKey: 'audit' },
+  { icon: Settings, label: 'Configuración', path: '/settings', permissionKey: 'settings' },
 ];
 
 export function AppSidebar() {
@@ -59,7 +59,7 @@ export function AppSidebar() {
   if (!user) return null;
 
   const roleConfig = ROLE_CONFIG[user.role];
-  const filteredNavItems = navItems.filter(item => item.roles.includes(user.role));
+  const filteredNavItems = navItems.filter(item => user.permissions.includes(item.permissionKey));
 
   return (
     <aside
