@@ -65,6 +65,7 @@ import { BackupSettings } from '@/components/settings/BackupSettings';
 import { BackupScheduleSettings } from '@/components/settings/BackupScheduleSettings';
 import { TicketSettingsTab } from '@/components/settings/TicketSettingsTab';
 import { DataExportSettings } from '@/components/settings/DataExportSettings';
+import { NotificationSettings } from '@/components/settings/NotificationSettings';
 
 // ServiceItem is local to Settings (not in context yet)
 interface ServiceItem {
@@ -852,6 +853,9 @@ export default function SettingsPage() {
 
         {/* Notifications Settings */}
         <TabsContent value="notifications" className="space-y-6">
+          {/* Push Notifications */}
+          <NotificationSettings />
+
           <Card>
             <CardHeader>
               <CardTitle>Notificaciones al Cliente</CardTitle>
