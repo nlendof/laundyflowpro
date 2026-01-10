@@ -11,14 +11,15 @@ import { toast } from 'sonner';
 import { Loader2, Lock, User, Phone, CheckCircle, WashingMachine, Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod';
 
-const passwordSchema = z.object({
-  currentPassword: z.string().min(1, 'Ingresa tu contraseña actual'),
-  newPassword: z.string().min(6, 'La nueva contraseña debe tener al menos 6 caracteres'),
-  confirmPassword: z.string(),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: 'Las contraseñas no coinciden',
-  path: ['confirmPassword'],
-});
+const passwordSchema = z
+  .object({
+    newPassword: z.string().min(6, 'La nueva contraseña debe tener al menos 6 caracteres'),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Las contraseñas no coinciden',
+    path: ['confirmPassword'],
+  });
 
 const profileSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
@@ -34,7 +35,6 @@ export default function FirstLoginSetup() {
   
   // Password form
   const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
     newPassword: '',
     confirmPassword: '',
   });
@@ -72,6 +72,11 @@ export default function FirstLoginSetup() {
       return;
     }
 
+    if (!user?.id) {
+      toast.error('No se pudo cargar el usuario. Intenta recargar la página.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -89,10 +94,12 @@ export default function FirstLoginSetup() {
       }
 
       // Mark password as changed
-      await supabase
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({ must_change_password: false })
-        .eq('id', user?.id);
+        .eq('id', user.id);
+
+      if (profileError) throw profileError;
 
       toast.success('Contraseña actualizada');
       setStep(2);
