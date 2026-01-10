@@ -11,6 +11,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { StatusBadge } from '@/components/StatusBadge';
 import { OrderStatusFlow } from '@/components/OrderStatusFlow';
 import { OrderQRCode } from '@/components/orders/OrderQRCode';
@@ -24,35 +26,110 @@ import {
   Package,
   QrCode,
   ArrowRight,
+  ArrowLeft,
   CheckCircle,
   AlertCircle,
   Calendar,
+  CreditCard,
+  Banknote,
+  Smartphone,
+  DollarSign,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { toast } from 'sonner';
 
 interface OrderDetailsModalProps {
   order: Order | null;
   isOpen: boolean;
   onClose: () => void;
   onAdvanceStatus: (order: Order) => void;
+  onRegressStatus?: (order: Order) => void;
+  onUpdatePayment?: (orderId: string, paidAmount: number, isPaid: boolean) => Promise<boolean>;
 }
+
+const PAYMENT_METHODS = [
+  { id: 'cash', name: 'Efectivo', icon: Banknote },
+  { id: 'card', name: 'Tarjeta', icon: CreditCard },
+  { id: 'transfer', name: 'Transferencia', icon: Smartphone },
+];
 
 export function OrderDetailsModal({ 
   order, 
   isOpen, 
   onClose, 
-  onAdvanceStatus 
+  onAdvanceStatus,
+  onRegressStatus,
+  onUpdatePayment,
 }: OrderDetailsModalProps) {
   const [showQR, setShowQR] = useState(false);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [paymentType, setPaymentType] = useState<'full' | 'partial' | 'on_pickup'>('full');
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [partialAmount, setPartialAmount] = useState('');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   if (!order) return null;
 
   const statusConfig = ORDER_STATUS_CONFIG[order.status];
   const currentStatusIndex = ORDER_STATUS_FLOW.indexOf(order.status);
   const canAdvance = currentStatusIndex < ORDER_STATUS_FLOW.length - 1;
+  const canRegress = currentStatusIndex > 0;
   const nextStatus = canAdvance ? ORDER_STATUS_FLOW[currentStatusIndex + 1] : null;
+  const prevStatus = canRegress ? ORDER_STATUS_FLOW[currentStatusIndex - 1] : null;
   const nextStatusConfig = nextStatus ? ORDER_STATUS_CONFIG[nextStatus] : null;
+  const prevStatusConfig = prevStatus ? ORDER_STATUS_CONFIG[prevStatus] : null;
+
+  const pendingAmount = order.totalAmount - order.paidAmount;
+
+  const handlePayment = async () => {
+    if (!onUpdatePayment) return;
+
+    setIsProcessingPayment(true);
+    try {
+      let newPaidAmount = order.paidAmount;
+      let isPaid = false;
+
+      if (paymentType === 'full') {
+        newPaidAmount = order.totalAmount;
+        isPaid = true;
+      } else if (paymentType === 'partial') {
+        const amount = parseFloat(partialAmount);
+        if (isNaN(amount) || amount <= 0) {
+          toast.error('Ingresa un monto válido');
+          return;
+        }
+        if (amount > pendingAmount) {
+          toast.error('El monto no puede ser mayor al pendiente');
+          return;
+        }
+        newPaidAmount = order.paidAmount + amount;
+        isPaid = newPaidAmount >= order.totalAmount;
+      } else if (paymentType === 'on_pickup') {
+        // Just mark as "will pay on pickup" - don't change amounts
+        toast.success('El cliente pagará al retirar');
+        setShowPaymentForm(false);
+        return;
+      }
+
+      const success = await onUpdatePayment(order.id, newPaidAmount, isPaid);
+      if (success) {
+        toast.success(isPaid ? 'Pago completo registrado' : 'Abono registrado');
+        setShowPaymentForm(false);
+        setPartialAmount('');
+      }
+    } catch (error) {
+      toast.error('Error al procesar el pago');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
+
+  const handleRegress = () => {
+    if (onRegressStatus && canRegress) {
+      onRegressStatus(order);
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -168,32 +245,157 @@ export function OrderDetailsModal({
 
           <Separator />
 
-          {/* Payment */}
-          <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl">
-            <div>
-              <p className="text-sm text-muted-foreground">Total del Pedido</p>
-              <p className="text-3xl font-bold text-primary">
-                ${order.totalAmount.toFixed(2)}
-              </p>
-            </div>
-            <div className="text-right">
-              {order.isPaid ? (
-                <Badge className="bg-green-500 text-white gap-1 px-3 py-1.5">
-                  <CheckCircle className="w-4 h-4" />
-                  Pagado
-                </Badge>
-              ) : (
-                <div className="space-y-1">
-                  <Badge variant="destructive" className="gap-1 px-3 py-1.5">
-                    <AlertCircle className="w-4 h-4" />
-                    Pendiente
-                  </Badge>
-                  <p className="text-sm text-muted-foreground">
-                    Pagado: ${order.paidAmount.toFixed(2)}
+          {/* Payment Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl">
+              <div>
+                <p className="text-sm text-muted-foreground">Total del Pedido</p>
+                <p className="text-3xl font-bold text-primary">
+                  ${order.totalAmount.toFixed(2)}
+                </p>
+                {order.discountAmount && order.discountAmount > 0 && (
+                  <p className="text-xs text-green-600">
+                    Descuento aplicado: -${order.discountAmount.toFixed(2)}
                   </p>
-                </div>
-              )}
+                )}
+              </div>
+              <div className="text-right">
+                {order.isPaid ? (
+                  <Badge className="bg-green-500 text-white gap-1 px-3 py-1.5">
+                    <CheckCircle className="w-4 h-4" />
+                    Pagado
+                  </Badge>
+                ) : (
+                  <div className="space-y-1">
+                    <Badge variant="destructive" className="gap-1 px-3 py-1.5">
+                      <AlertCircle className="w-4 h-4" />
+                      Pendiente
+                    </Badge>
+                    <p className="text-sm text-muted-foreground">
+                      Pagado: ${order.paidAmount.toFixed(2)}
+                    </p>
+                    <p className="text-sm font-medium text-destructive">
+                      Pendiente: ${pendingAmount.toFixed(2)}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Payment Actions */}
+            {!order.isPaid && !showPaymentForm && (
+              <Button 
+                variant="outline" 
+                className="w-full gap-2"
+                onClick={() => setShowPaymentForm(true)}
+              >
+                <DollarSign className="w-4 h-4" />
+                Registrar Pago
+              </Button>
+            )}
+
+            {/* Payment Form */}
+            {showPaymentForm && !order.isPaid && (
+              <div className="p-4 border rounded-xl space-y-4 bg-muted/30">
+                <h4 className="font-semibold flex items-center gap-2">
+                  <DollarSign className="w-4 h-4" />
+                  Registrar Pago
+                </h4>
+
+                {/* Payment Type */}
+                <div className="space-y-2">
+                  <Label>Tipo de Pago</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Button
+                      type="button"
+                      variant={paymentType === 'full' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setPaymentType('full')}
+                      className="text-xs"
+                    >
+                      Pago Total
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={paymentType === 'partial' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setPaymentType('partial')}
+                      className="text-xs"
+                    >
+                      Abono
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={paymentType === 'on_pickup' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setPaymentType('on_pickup')}
+                      className="text-xs"
+                    >
+                      Al Retirar
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Partial Amount */}
+                {paymentType === 'partial' && (
+                  <div className="space-y-2">
+                    <Label>Monto del Abono</Label>
+                    <Input
+                      type="number"
+                      placeholder={`Máximo: $${pendingAmount.toFixed(2)}`}
+                      value={partialAmount}
+                      onChange={(e) => setPartialAmount(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                {/* Payment Method */}
+                {paymentType !== 'on_pickup' && (
+                  <div className="space-y-2">
+                    <Label>Método de Pago</Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {PAYMENT_METHODS.map((method) => {
+                        const Icon = method.icon;
+                        return (
+                          <Button
+                            key={method.id}
+                            type="button"
+                            variant={paymentMethod === method.id ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setPaymentMethod(method.id)}
+                            className="gap-1 text-xs"
+                          >
+                            <Icon className="w-3 h-3" />
+                            {method.name}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowPaymentForm(false);
+                      setPartialAmount('');
+                    }}
+                    className="flex-1"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handlePayment}
+                    disabled={isProcessingPayment}
+                    className="flex-1"
+                  >
+                    {isProcessingPayment ? 'Procesando...' : 'Confirmar Pago'}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Notes */}
@@ -226,15 +428,31 @@ export function OrderDetailsModal({
           {/* Actions */}
           <div className="flex flex-col sm:flex-row gap-3 pt-4">
             <PrintTicketButton order={order} variant="outline" className="flex-1" />
-            {canAdvance && nextStatusConfig && (
-              <Button 
-                className="flex-1 gap-2"
-                onClick={() => onAdvanceStatus(order)}
-              >
-                Avanzar a {nextStatusConfig.labelEs}
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            )}
+            
+            <div className="flex gap-2 flex-1">
+              {/* Regress Status Button */}
+              {canRegress && prevStatusConfig && onRegressStatus && (
+                <Button 
+                  variant="outline"
+                  className="flex-1 gap-2"
+                  onClick={handleRegress}
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span className="hidden sm:inline">{prevStatusConfig.labelEs}</span>
+                </Button>
+              )}
+              
+              {/* Advance Status Button */}
+              {canAdvance && nextStatusConfig && (
+                <Button 
+                  className="flex-1 gap-2"
+                  onClick={() => onAdvanceStatus(order)}
+                >
+                  <span className="hidden sm:inline">{nextStatusConfig.labelEs}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
