@@ -95,75 +95,35 @@ export function CreateEmployeeModal({ isOpen, onClose, onSuccess }: CreateEmploy
     setIsLoading(true);
 
     try {
-      // Get service role to create user (using current admin's session for RLS)
-      // First create the auth user using signUp
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            name: formData.name,
-          },
+      // Call edge function to create employee without changing current session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('No hay sesión activa');
+      }
+
+      const response = await supabase.functions.invoke('create-employee', {
+        body: {
+          email: formData.email,
+          password: formData.password,
+          name: formData.name,
+          phone: formData.phone || undefined,
+          role: formData.role,
+          permissions: DEFAULT_PERMISSIONS[formData.role],
         },
       });
 
-      if (authError) {
-        if (authError.message.includes('already registered')) {
+      if (response.error) {
+        throw new Error(response.error.message || 'Error al crear empleado');
+      }
+
+      if (response.data?.error) {
+        if (response.data.error.includes('registrado') || response.data.error.includes('already')) {
           setErrors({ email: 'Este correo ya está registrado' });
         } else {
-          throw authError;
+          throw new Error(response.data.error);
         }
         return;
-      }
-
-      if (!authData.user) {
-        throw new Error('No se pudo crear el usuario');
-      }
-
-      const userId = authData.user.id;
-
-      // Wait a moment for the trigger to create the profile
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Update profile with additional data and flags for first login
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          name: formData.name,
-          phone: formData.phone || null,
-          must_change_password: true,
-          profile_completed: false,
-        })
-        .eq('id', userId);
-
-      if (profileError) {
-        console.error('Profile update error:', profileError);
-      }
-
-      // Update the role (trigger creates default role, we need to update it)
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .update({ role: formData.role })
-        .eq('user_id', userId);
-
-      if (roleError) {
-        console.error('Role update error:', roleError);
-      }
-
-      // Update permissions based on role
-      await supabase
-        .from('user_permissions')
-        .delete()
-        .eq('user_id', userId);
-
-      const permissions = DEFAULT_PERMISSIONS[formData.role];
-      if (permissions.length > 0) {
-        await supabase
-          .from('user_permissions')
-          .insert(permissions.map(moduleKey => ({
-            user_id: userId,
-            module_key: moduleKey,
-          })));
       }
 
       // Store credentials to show to admin
@@ -176,7 +136,7 @@ export function CreateEmployeeModal({ isOpen, onClose, onSuccess }: CreateEmploy
       onSuccess();
     } catch (error) {
       console.error('Error creating employee:', error);
-      toast.error('Error al crear empleado');
+      toast.error(error instanceof Error ? error.message : 'Error al crear empleado');
     } finally {
       setIsLoading(false);
     }
@@ -219,7 +179,7 @@ export function CreateEmployeeModal({ isOpen, onClose, onSuccess }: CreateEmploy
                 </div>
                 
                 <div>
-                  <Label className="text-xs text-muted-foreground">Contraseña temporal</Label>
+                  <Label className="text-xs text-muted-foreground">Contraseña</Label>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 bg-muted px-3 py-2 rounded text-sm font-mono">
                       {showPassword ? createdCredentials.password : '••••••••••••'}
@@ -245,7 +205,7 @@ export function CreateEmployeeModal({ isOpen, onClose, onSuccess }: CreateEmploy
               </div>
               
               <p className="text-xs text-muted-foreground mt-4">
-                El empleado deberá cambiar su contraseña y completar su perfil al iniciar sesión por primera vez.
+                El empleado puede cambiar su contraseña desde su perfil cuando lo desee.
               </p>
             </div>
 
@@ -317,7 +277,7 @@ export function CreateEmployeeModal({ isOpen, onClose, onSuccess }: CreateEmploy
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password">Contraseña temporal *</Label>
+                <Label htmlFor="password">Contraseña *</Label>
                 <Button
                   type="button"
                   variant="link"
@@ -360,9 +320,6 @@ export function CreateEmployeeModal({ isOpen, onClose, onSuccess }: CreateEmploy
                 </Button>
               </div>
               {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
-              <p className="text-xs text-muted-foreground">
-                El empleado deberá cambiar esta contraseña al iniciar sesión.
-              </p>
             </div>
 
             <DialogFooter className="gap-2 pt-4">
