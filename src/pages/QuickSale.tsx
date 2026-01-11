@@ -80,6 +80,14 @@ interface CartItem {
 }
 
 type SaleTab = 'services' | 'articles';
+type SaleType = 'articles_only' | 'with_services';
+
+interface DirectSaleResult {
+  success: boolean;
+  saleType: SaleType;
+  totalAmount: number;
+  itemsSold: string[];
+}
 
 // Colors for service buttons
 const SERVICE_COLORS = [
@@ -139,8 +147,9 @@ export default function QuickSale() {
   const [paymentMethod, setPaymentMethod] = useState<string>('cash');
   const [amountReceived, setAmountReceived] = useState<string>('');
   
-  // Completed order
+  // Completed order/sale
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
+  const [completedDirectSale, setCompletedDirectSale] = useState<DirectSaleResult | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const ticketRef = useRef<HTMLDivElement>(null);
@@ -332,14 +341,96 @@ export default function QuickSale() {
     };
   };
 
-  // Process sale - now persists to database
+  // Check if cart contains only articles (no services)
+  const hasOnlyArticles = useMemo(() => {
+    return cart.length > 0 && cart.every(item => item.type === 'article');
+  }, [cart]);
+
+  const hasServices = useMemo(() => {
+    return cart.some(item => item.type === 'service');
+  }, [cart]);
+
+  // Get items by type
+  const articleItems = useMemo(() => cart.filter(item => item.type === 'article'), [cart]);
+  const serviceItems = useMemo(() => cart.filter(item => item.type === 'service'), [cart]);
+
+  // Process direct article sale (no order created)
+  const processDirectArticleSale = async (customerId: string): Promise<DirectSaleResult> => {
+    const itemsSold: string[] = [];
+    
+    // Build description for cash register
+    const itemsDescription = articleItems.map(item => 
+      `${item.name} x${item.quantity}`
+    ).join(', ');
+
+    // Register in cash register
+    const { error: cashError } = await supabase
+      .from('cash_register')
+      .insert({
+        entry_type: 'income',
+        category: 'sales',
+        amount: totalAmount,
+        description: `Venta de artículos: ${itemsDescription}${customerName ? ` - Cliente: ${customerName}` : ''}`,
+      });
+
+    if (cashError) throw cashError;
+
+    // Deduct from article inventory if they have track_inventory enabled
+    for (const item of articleItems) {
+      const { data: article } = await supabase
+        .from('catalog_articles')
+        .select('id, track_inventory, stock')
+        .eq('id', item.catalogItemId)
+        .single();
+      
+      if (article?.track_inventory) {
+        const newStock = Math.max(0, (article.stock || 0) - item.quantity);
+        await supabase
+          .from('catalog_articles')
+          .update({ stock: newStock })
+          .eq('id', item.catalogItemId);
+      }
+      
+      itemsSold.push(`${item.name} x${item.quantity}`);
+    }
+
+    // Update customer total spent if applicable
+    if (customerId) {
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('total_orders, total_spent')
+        .eq('id', customerId)
+        .single();
+      
+      if (customer) {
+        await supabase
+          .from('customers')
+          .update({
+            total_orders: (customer.total_orders || 0) + 1,
+            total_spent: (customer.total_spent || 0) + totalAmount,
+          })
+          .eq('id', customerId);
+      }
+    }
+
+    return {
+      success: true,
+      saleType: 'articles_only',
+      totalAmount,
+      itemsSold,
+    };
+  };
+
+  // Process sale - now handles both direct sales and orders
   const processSale = async () => {
     if (cart.length === 0) {
       toast.error('Agrega al menos un servicio o artículo');
       return;
     }
-    if (!customerName) {
-      toast.error('Ingresa el nombre del cliente');
+    
+    // Only require customer name for services (orders)
+    if (hasServices && !customerName) {
+      toast.error('Ingresa el nombre del cliente para crear el pedido');
       return;
     }
 
@@ -364,14 +455,27 @@ export default function QuickSale() {
         }
       }
 
-      // Build order items for database
+      // If only articles, process as direct sale (no order)
+      if (hasOnlyArticles) {
+        const result = await processDirectArticleSale(customerId);
+        
+        if (result.success) {
+          setCompletedDirectSale(result);
+          setCompletedOrder(null);
+          setShowSuccess(true);
+          toast.success('¡Venta de artículos completada!');
+        }
+        return;
+      }
+
+      // If has services, create order (with or without articles)
       const orderItems: OrderItem[] = cart.map((item) => ({
         id: item.id,
         name: item.name,
         type: item.pricingType === 'weight' ? 'weight' : 'piece',
         quantity: item.quantity,
         unitPrice: item.unitPrice,
-        extras: selectedExtras,
+        extras: item.type === 'service' ? selectedExtras : [],
       }));
 
       // Create order object
@@ -402,8 +506,9 @@ export default function QuickSale() {
 
       if (createdOrder) {
         setCompletedOrder(createdOrder);
+        setCompletedDirectSale(null);
         setShowSuccess(true);
-        toast.success(`Venta completada: ${createdOrder.ticketCode}`);
+        toast.success(`Pedido creado: ${createdOrder.ticketCode}`);
       }
     } catch (error) {
       console.error('Error processing sale:', error);
@@ -476,6 +581,7 @@ export default function QuickSale() {
     setAmountReceived('');
     setShowSuccess(false);
     setCompletedOrder(null);
+    setCompletedDirectSale(null);
   };
 
   // Get items for current tab with search filter
@@ -504,7 +610,13 @@ export default function QuickSale() {
               <ShoppingCart className="w-8 h-8 text-primary" />
               Venta Rápida
             </h1>
-            <p className="text-muted-foreground">Selecciona servicios o artículos para crear un pedido</p>
+            <p className="text-muted-foreground">
+              {hasOnlyArticles 
+                ? 'Venta directa de artículos (sin pedido)' 
+                : hasServices 
+                  ? 'Se creará un pedido para los servicios' 
+                  : 'Artículos = venta directa | Servicios = genera pedido'}
+            </p>
           </div>
           
           {/* Search */}
@@ -775,6 +887,28 @@ export default function QuickSale() {
 
         {/* Cart Items */}
         <div className="flex-1 overflow-y-auto p-4">
+          {/* Sale type indicator */}
+          {cart.length > 0 && (
+            <div className={cn(
+              "mb-3 p-2 rounded-lg text-center text-sm font-medium",
+              hasOnlyArticles 
+                ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30" 
+                : "bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/30"
+            )}>
+              {hasOnlyArticles ? (
+                <>
+                  <Shirt className="w-4 h-4 inline mr-2" />
+                  Venta directa (sin pedido)
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 inline mr-2" />
+                  Se creará un pedido
+                </>
+              )}
+            </div>
+          )}
+          
           {cart.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
               <ShoppingCart className="w-12 h-12 mb-2 opacity-30" />
@@ -960,17 +1094,22 @@ export default function QuickSale() {
               size="lg" 
               className="flex-1 gap-2"
               onClick={processSale}
-              disabled={cart.length === 0 || !customerName || isProcessing}
+              disabled={cart.length === 0 || (hasServices && !customerName) || isProcessing}
             >
               {isProcessing ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Procesando...
                 </>
+              ) : hasOnlyArticles ? (
+                <>
+                  <Receipt className="w-4 h-4" />
+                  Vender
+                </>
               ) : (
                 <>
                   <Receipt className="w-4 h-4" />
-                  Cobrar
+                  Cobrar y Crear Pedido
                 </>
               )}
             </Button>
@@ -986,19 +1125,45 @@ export default function QuickSale() {
               <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center">
                 <CheckCircle className="w-10 h-10 text-green-500" />
               </div>
-              <span>¡Venta Completada!</span>
+              <span>
+                {completedDirectSale ? '¡Venta Completada!' : '¡Pedido Creado!'}
+              </span>
             </DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
+            {/* Sale type indicator */}
+            {completedDirectSale && (
+              <Badge variant="secondary" className="text-sm">
+                Venta directa de artículos
+              </Badge>
+            )}
+            {completedOrder && (
+              <Badge variant="default" className="text-sm">
+                Pedido: {completedOrder.ticketCode}
+              </Badge>
+            )}
+
             <div className="text-3xl font-bold text-primary">
-              ${totalAmount.toFixed(2)}
+              ${(completedDirectSale?.totalAmount || completedOrder?.totalAmount || totalAmount).toFixed(2)}
             </div>
             
             {paymentMethod === 'cash' && change > 0 && (
               <div className="p-3 bg-green-500/10 rounded-xl">
                 <span className="text-sm text-muted-foreground">Cambio:</span>
                 <p className="text-2xl font-bold text-green-600">${change.toFixed(2)}</p>
+              </div>
+            )}
+
+            {/* Items sold for direct sale */}
+            {completedDirectSale && completedDirectSale.itemsSold.length > 0 && (
+              <div className="text-left p-3 bg-muted/50 rounded-xl">
+                <p className="text-sm font-medium mb-2">Artículos vendidos:</p>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  {completedDirectSale.itemsSold.map((item, idx) => (
+                    <li key={idx}>• {item}</li>
+                  ))}
+                </ul>
               </div>
             )}
 
@@ -1013,15 +1178,16 @@ export default function QuickSale() {
               <Button variant="outline" className="flex-1" onClick={resetSale}>
                 Nueva Venta
               </Button>
-              <Button 
-                variant="outline"
-                className="flex-1 gap-2"
-                onClick={handlePrintTicket}
-                disabled={!completedOrder}
-              >
-                <Printer className="w-4 h-4" />
-                Imprimir
-              </Button>
+              {completedOrder && (
+                <Button 
+                  variant="outline"
+                  className="flex-1 gap-2"
+                  onClick={handlePrintTicket}
+                >
+                  <Printer className="w-4 h-4" />
+                  Imprimir
+                </Button>
+              )}
             </div>
             
             {completedOrder && (
