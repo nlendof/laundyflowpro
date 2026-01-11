@@ -52,6 +52,7 @@ import {
   Loader2,
   UserPlus,
   Check,
+  Package,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -132,9 +133,13 @@ export default function QuickSale() {
   const [selectedCustomer, setSelectedCustomer] = useState<{id: string; name: string; phone: string | null; address: string | null} | null>(null);
   const [isNewCustomer, setIsNewCustomer] = useState(true);
   
-  // Delivery
-  const [isDelivery, setIsDelivery] = useState(false);
-  const [customerAddress, setCustomerAddress] = useState('');
+  // Pickup and Delivery options
+  const [needsPickup, setNeedsPickup] = useState(false);
+  const [needsDelivery, setNeedsDelivery] = useState(false);
+  const [pickupAddress, setPickupAddress] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [pickupSlot, setPickupSlot] = useState<'morning' | 'afternoon' | ''>('');
+  const [deliverySlot, setDeliverySlot] = useState<'morning' | 'afternoon' | ''>('');
   
   // Cart
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -185,7 +190,8 @@ export default function QuickSale() {
     setSelectedCustomer(customer);
     setCustomerName(customer.name);
     setCustomerPhone(customer.phone || '');
-    setCustomerAddress(customer.address || '');
+    setPickupAddress(customer.address || '');
+    setDeliveryAddress(customer.address || '');
     setIsNewCustomer(false);
     setCustomerSearchOpen(false);
   };
@@ -195,7 +201,8 @@ export default function QuickSale() {
     setSelectedCustomer(null);
     setCustomerName('');
     setCustomerPhone('');
-    setCustomerAddress('');
+    setPickupAddress('');
+    setDeliveryAddress('');
     setIsNewCustomer(true);
     setCustomerSearchOpen(false);
   };
@@ -208,7 +215,7 @@ export default function QuickSale() {
         .insert({
           name: customerName.trim(),
           phone: customerPhone.trim() || null,
-          address: customerAddress.trim() || null,
+          address: deliveryAddress.trim() || pickupAddress.trim() || null,
         })
         .select('id')
         .single();
@@ -326,15 +333,28 @@ export default function QuickSale() {
       customerId: '',
       customerName,
       customerPhone,
-      customerAddress: isDelivery ? customerAddress : undefined,
+      customerAddress: needsDelivery ? deliveryAddress : undefined,
       items: orderItems,
-      status: 'in_store',
+      status: needsPickup ? 'pending_pickup' : 'in_store',
       totalAmount,
       paidAmount: paymentMethod === 'cash' ? parseFloat(amountReceived || '0') : totalAmount,
       isPaid: true,
-      isDelivery,
-      needsPickup: false,
-      needsDelivery: isDelivery,
+      isDelivery: needsDelivery,
+      needsPickup,
+      needsDelivery,
+      pickupService: needsPickup ? {
+        type: 'pickup',
+        status: 'pending',
+        address: pickupAddress,
+        scheduledSlot: pickupSlot || undefined,
+      } : undefined,
+      deliveryService: needsDelivery ? {
+        type: 'delivery',
+        status: 'pending',
+        address: deliveryAddress,
+        scheduledSlot: deliverySlot || undefined,
+      } : undefined,
+      deliverySlot: needsDelivery && deliverySlot ? deliverySlot : undefined,
       createdAt: now,
       updatedAt: now,
       notes: '',
@@ -447,10 +467,11 @@ export default function QuickSale() {
         }
       } else if (selectedCustomer) {
         // Update customer address if changed
-        if (customerAddress && customerAddress !== selectedCustomer.address) {
+        const newAddress = deliveryAddress || pickupAddress;
+        if (newAddress && newAddress !== selectedCustomer.address) {
           await supabase
             .from('customers')
-            .update({ address: customerAddress })
+            .update({ address: newAddress })
             .eq('id', selectedCustomer.id);
         }
       }
@@ -486,16 +507,29 @@ export default function QuickSale() {
         customerId,
         customerName,
         customerPhone,
-        customerAddress: isDelivery ? customerAddress : undefined,
+        customerAddress: needsDelivery ? deliveryAddress : undefined,
         items: orderItems,
-        status: 'in_store',
+        status: needsPickup ? 'pending_pickup' : 'in_store',
         totalAmount,
         discountAmount,
         paidAmount: totalAmount, // Quick sale is always fully paid
         isPaid: true,
-        isDelivery,
-        needsPickup: false,
-        needsDelivery: isDelivery,
+        isDelivery: needsDelivery,
+        needsPickup,
+        needsDelivery,
+        pickupService: needsPickup ? {
+          type: 'pickup',
+          status: 'pending',
+          address: pickupAddress,
+          scheduledSlot: pickupSlot || undefined,
+        } : undefined,
+        deliveryService: needsDelivery ? {
+          type: 'delivery',
+          status: 'pending',
+          address: deliveryAddress,
+          scheduledSlot: deliverySlot || undefined,
+        } : undefined,
+        deliverySlot: needsDelivery && deliverySlot ? deliverySlot : undefined,
         createdAt: new Date(),
         updatedAt: new Date(),
         notes: '',
@@ -572,8 +606,12 @@ export default function QuickSale() {
     setSelectedCustomer(null);
     setIsNewCustomer(true);
     setCustomerSearchQuery('');
-    setIsDelivery(false);
-    setCustomerAddress('');
+    setNeedsPickup(false);
+    setNeedsDelivery(false);
+    setPickupAddress('');
+    setDeliveryAddress('');
+    setPickupSlot('');
+    setDeliverySlot('');
     setCart([]);
     setSelectedExtras([]);
     setDiscountAmount(0);
@@ -863,25 +901,95 @@ export default function QuickSale() {
               </div>
             )}
             
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Truck className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium">Delivery</span>
+            {/* Pickup Option */}
+            <div className="space-y-2 p-3 bg-muted/30 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Package className="w-4 h-4 text-orange-500" />
+                  <span className="text-sm font-medium">Recoger a domicilio</span>
+                </div>
+                <Switch checked={needsPickup} onCheckedChange={setNeedsPickup} />
               </div>
-              <Switch checked={isDelivery} onCheckedChange={setIsDelivery} />
+              
+              {needsPickup && (
+                <div className="space-y-2 pl-6">
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Dirección de recogida"
+                      value={pickupAddress}
+                      onChange={(e) => setPickupAddress(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={pickupSlot === 'morning' ? 'default' : 'outline'}
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setPickupSlot('morning')}
+                    >
+                      🌅 Mañana (9-13h)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={pickupSlot === 'afternoon' ? 'default' : 'outline'}
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setPickupSlot('afternoon')}
+                    >
+                      🌆 Tarde (14-18h)
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
-
-            {isDelivery && (
-              <div className="relative">
-                <MapPin className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Dirección de entrega"
-                  value={customerAddress}
-                  onChange={(e) => setCustomerAddress(e.target.value)}
-                  className="pl-10"
-                />
+            
+            {/* Delivery Option */}
+            <div className="space-y-2 p-3 bg-muted/30 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Truck className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium">Entregar a domicilio</span>
+                </div>
+                <Switch checked={needsDelivery} onCheckedChange={setNeedsDelivery} />
               </div>
-            )}
+              
+              {needsDelivery && (
+                <div className="space-y-2 pl-6">
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Dirección de entrega"
+                      value={deliveryAddress}
+                      onChange={(e) => setDeliveryAddress(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={deliverySlot === 'morning' ? 'default' : 'outline'}
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setDeliverySlot('morning')}
+                    >
+                      🌅 Mañana (9-13h)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={deliverySlot === 'afternoon' ? 'default' : 'outline'}
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setDeliverySlot('afternoon')}
+                    >
+                      🌆 Tarde (14-18h)
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
