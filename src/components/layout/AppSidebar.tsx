@@ -19,11 +19,13 @@ import {
   UserCircle,
   ShoppingBag,
   FileText,
+  Edit,
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
+import { UserProfileModal } from '@/components/profile/UserProfileModal';
 
 
 interface NavItem {
@@ -55,6 +57,7 @@ export function AppSidebar() {
   const { newOrderCount, clearCount } = useNewOrders();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   if (!user) return null;
 
@@ -91,19 +94,29 @@ export function AppSidebar() {
         </Button>
       </div>
 
-      {/* User Info */}
+      {/* User Info - Clickable for profile */}
       <div className={cn('p-4 border-b border-sidebar-border', collapsed && 'px-2')}>
-        <div className={cn('flex items-center gap-3', collapsed && 'justify-center')}>
-          <div className={cn('w-10 h-10 rounded-full flex items-center justify-center text-primary-foreground font-semibold', roleConfig.color)}>
+        <button
+          onClick={() => setShowProfileModal(true)}
+          className={cn(
+            'flex items-center gap-3 w-full rounded-lg p-2 -m-2 transition-colors',
+            'hover:bg-sidebar-accent group',
+            collapsed && 'justify-center'
+          )}
+        >
+          <div className={cn('w-10 h-10 rounded-full flex items-center justify-center text-primary-foreground font-semibold relative', roleConfig.color)}>
             {user.name.charAt(0)}
+            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <Edit className="w-3 h-3 text-primary-foreground" />
+            </div>
           </div>
           {!collapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-sm truncate">{user.name}</p>
+            <div className="flex-1 min-w-0 text-left">
+              <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">{user.name}</p>
               <p className="text-xs text-sidebar-foreground/60">{roleConfig.labelEs}</p>
             </div>
           )}
-        </div>
+        </button>
       </div>
 
       {/* Navigation */}
@@ -170,6 +183,12 @@ export function AppSidebar() {
           {!collapsed && <span className="ml-3">Cerrar Sesión</span>}
         </Button>
       </div>
+
+      {/* Profile Modal */}
+      <UserProfileModal 
+        isOpen={showProfileModal} 
+        onClose={() => setShowProfileModal(false)} 
+      />
     </aside>
   );
 }
