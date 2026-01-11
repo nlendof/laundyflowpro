@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_discount_codes: {
+        Row: {
+          admin_id: string
+          code: string
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          uses_remaining: number | null
+        }
+        Insert: {
+          admin_id: string
+          code: string
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          uses_remaining?: number | null
+        }
+        Update: {
+          admin_id?: string
+          code?: string
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          uses_remaining?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_discount_codes_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attendance_records: {
         Row: {
           check_in: string | null
@@ -161,6 +199,42 @@ export type Database = {
           tables_to_backup?: Json
           time_of_day?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      branches: {
+        Row: {
+          address: string | null
+          code: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          is_main: boolean | null
+          name: string
+          phone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          code: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_main?: boolean | null
+          name: string
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          code?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_main?: boolean | null
+          name?: string
+          phone?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -399,6 +473,7 @@ export type Database = {
           amount: number
           created_at: string
           created_by: string | null
+          deduction_frequency: string | null
           employee_id: string
           id: string
           monthly_deduction: number | null
@@ -406,11 +481,13 @@ export type Database = {
           remaining_amount: number
           status: string
           updated_at: string
+          weekly_deduction: number | null
         }
         Insert: {
           amount: number
           created_at?: string
           created_by?: string | null
+          deduction_frequency?: string | null
           employee_id: string
           id?: string
           monthly_deduction?: number | null
@@ -418,11 +495,13 @@ export type Database = {
           remaining_amount: number
           status?: string
           updated_at?: string
+          weekly_deduction?: number | null
         }
         Update: {
           amount?: number
           created_at?: string
           created_by?: string | null
+          deduction_frequency?: string | null
           employee_id?: string
           id?: string
           monthly_deduction?: number | null
@@ -430,6 +509,7 @@ export type Database = {
           remaining_amount?: number
           status?: string
           updated_at?: string
+          weekly_deduction?: number | null
         }
         Relationships: [
           {
@@ -697,8 +777,66 @@ export type Database = {
           },
         ]
       }
+      order_returns: {
+        Row: {
+          created_at: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          processed_at: string | null
+          processed_by: string | null
+          reason: string
+          refund_amount: number
+          refund_method: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          order_id: string
+          processed_at?: string | null
+          processed_by?: string | null
+          reason: string
+          refund_amount?: number
+          refund_method?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          reason?: string
+          refund_amount?: number
+          refund_method?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_returns_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_returns_processed_by_fkey"
+            columns: ["processed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
+          branch_id: string | null
           created_at: string | null
           created_by: string | null
           customer_address: string | null
@@ -732,6 +870,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          branch_id?: string | null
           created_at?: string | null
           created_by?: string | null
           customer_address?: string | null
@@ -765,6 +904,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          branch_id?: string | null
           created_at?: string | null
           created_by?: string | null
           customer_address?: string | null
@@ -798,6 +938,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "orders_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orders_customer_id_fkey"
             columns: ["customer_id"]

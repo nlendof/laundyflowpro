@@ -66,6 +66,9 @@ import { BackupScheduleSettings } from '@/components/settings/BackupScheduleSett
 import { TicketSettingsTab } from '@/components/settings/TicketSettingsTab';
 import { DataExportSettings } from '@/components/settings/DataExportSettings';
 import { NotificationSettings } from '@/components/settings/NotificationSettings';
+import { BranchSettings } from '@/components/settings/BranchSettings';
+import { AdminDiscountCodes } from '@/components/settings/AdminDiscountCodes';
+import { AppearanceSettings } from '@/components/settings/AppearanceSettings';
 
 // ServiceItem is local to Settings (not in context yet)
 interface ServiceItem {
@@ -1218,75 +1221,9 @@ export default function SettingsPage() {
 
         {/* Appearance Settings */}
         <TabsContent value="appearance" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Tema y Apariencia</CardTitle>
-              <CardDescription>Personaliza la apariencia del sistema</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label>Tema</Label>
-                <Select 
-                  value={appearance.theme} 
-                  onValueChange={(v) => setAppearance(prev => ({ ...prev, theme: v }))}
-                >
-                  <SelectTrigger className="w-full sm:w-[200px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="light">☀️ Claro</SelectItem>
-                    <SelectItem value="dark">🌙 Oscuro</SelectItem>
-                    <SelectItem value="system">💻 Sistema</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Color Principal</Label>
-                <div className="flex gap-3">
-                  {['teal', 'blue', 'purple', 'green', 'orange'].map((color) => (
-                    <button
-                      key={color}
-                      onClick={() => setAppearance(prev => ({ ...prev, primaryColor: color }))}
-                      className={cn(
-                        'w-10 h-10 rounded-full transition-all',
-                        color === 'teal' && 'bg-teal-500',
-                        color === 'blue' && 'bg-blue-500',
-                        color === 'purple' && 'bg-purple-500',
-                        color === 'green' && 'bg-green-500',
-                        color === 'orange' && 'bg-orange-500',
-                        appearance.primaryColor === color && 'ring-2 ring-offset-2 ring-primary'
-                      )}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Mostrar logo en tickets</p>
-                  <p className="text-sm text-muted-foreground">Incluir logo en tickets impresos</p>
-                </div>
-                <Switch
-                  checked={appearance.showLogo}
-                  onCheckedChange={(checked) => setAppearance(prev => ({ ...prev, showLogo: checked }))}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Modo compacto</p>
-                  <p className="text-sm text-muted-foreground">Reduce el espaciado para ver más contenido</p>
-                </div>
-                <Switch
-                  checked={appearance.compactMode}
-                  onCheckedChange={(checked) => setAppearance(prev => ({ ...prev, compactMode: checked }))}
-                />
-              </div>
-            </CardContent>
-          </Card>
+          <AppearanceSettings />
+          <BranchSettings />
+          <AdminDiscountCodes />
         </TabsContent>
 
         {/* Backup Settings */}
