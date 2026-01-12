@@ -3,16 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -52,12 +43,11 @@ import {
   Loader2,
   RefreshCw,
   User,
-  FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { z } from 'zod';
+import { CustomerFormModal, CustomerFormData } from '@/components/customers/CustomerFormModal';
 
 interface Customer {
   id: string;
@@ -72,13 +62,14 @@ interface Customer {
   updated_at: string;
 }
 
-const customerSchema = z.object({
-  name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
-  phone: z.string().optional(),
-  email: z.string().email('Correo inválido').optional().or(z.literal('')),
-  address: z.string().optional(),
-  notes: z.string().optional(),
-});
+// Helper to extract nickname from name
+const parseNameWithNickname = (fullName: string): { name: string; nickname: string } => {
+  const match = fullName.match(/^(.+?)\s*\((.+?)\)$/);
+  if (match) {
+    return { name: match[1].trim(), nickname: match[2].trim() };
+  }
+  return { name: fullName, nickname: '' };
+};
 
 export default function Customers() {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -88,15 +79,6 @@ export default function Customers() {
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    email: '',
-    address: '',
-    notes: '',
-  });
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [isSaving, setIsSaving] = useState(false);
   
   // Delete confirmation
   const [deleteCustomer, setDeleteCustomer] = useState<Customer | null>(null);
@@ -143,81 +125,29 @@ export default function Customers() {
   }), [customers]);
 
   const handleOpenModal = (customer?: Customer) => {
-    if (customer) {
-      setEditingCustomer(customer);
-      setFormData({
-        name: customer.name,
-        phone: customer.phone || '',
-        email: customer.email || '',
-        address: customer.address || '',
-        notes: customer.notes || '',
-      });
-    } else {
-      setEditingCustomer(null);
-      setFormData({
-        name: '',
-        phone: '',
-        email: '',
-        address: '',
-        notes: '',
-      });
-    }
-    setFormErrors({});
+    setEditingCustomer(customer || null);
     setIsModalOpen(true);
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormErrors({});
+  const handleCustomerSaved = () => {
+    setIsModalOpen(false);
+    setEditingCustomer(null);
+    fetchCustomers();
+  };
 
-    const result = customerSchema.safeParse(formData);
-    if (!result.success) {
-      const errors: Record<string, string> = {};
-      result.error.errors.forEach((err) => {
-        if (err.path[0]) {
-          errors[err.path[0] as string] = err.message;
-        }
-      });
-      setFormErrors(errors);
-      return;
-    }
-
-    setIsSaving(true);
-
-    try {
-      const customerData = {
-        name: formData.name,
-        phone: formData.phone || null,
-        email: formData.email || null,
-        address: formData.address || null,
-        notes: formData.notes || null,
-      };
-
-      if (editingCustomer) {
-        const { error } = await supabase
-          .from('customers')
-          .update(customerData)
-          .eq('id', editingCustomer.id);
-
-        if (error) throw error;
-        toast.success('Cliente actualizado');
-      } else {
-        const { error } = await supabase
-          .from('customers')
-          .insert(customerData);
-
-        if (error) throw error;
-        toast.success('Cliente creado');
-      }
-
-      setIsModalOpen(false);
-      fetchCustomers();
-    } catch (error) {
-      console.error('Error saving customer:', error);
-      toast.error('Error al guardar cliente');
-    } finally {
-      setIsSaving(false);
-    }
+  const getInitialFormData = (): Partial<CustomerFormData> | undefined => {
+    if (!editingCustomer) return undefined;
+    
+    const { name, nickname } = parseNameWithNickname(editingCustomer.name);
+    return {
+      id: editingCustomer.id,
+      name,
+      nickname,
+      phone: editingCustomer.phone || '',
+      email: editingCustomer.email || '',
+      address: editingCustomer.address || '',
+      notes: editingCustomer.notes || '',
+    };
   };
 
   const handleDelete = async () => {
@@ -460,97 +390,16 @@ export default function Customers() {
       </Card>
 
       {/* Create/Edit Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <User className="w-5 h-5" />
-              {editingCustomer ? 'Editar Cliente' : 'Nuevo Cliente'}
-            </DialogTitle>
-          </DialogHeader>
-
-          <form onSubmit={handleSave} className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nombre *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Nombre del cliente"
-                disabled={isSaving}
-              />
-              {formErrors.name && <p className="text-sm text-destructive">{formErrors.name}</p>}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="phone">Teléfono</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                  placeholder="Opcional"
-                  disabled={isSaving}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="Opcional"
-                  disabled={isSaving}
-                />
-                {formErrors.email && <p className="text-sm text-destructive">{formErrors.email}</p>}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="address">Dirección</Label>
-              <Input
-                id="address"
-                value={formData.address}
-                onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                placeholder="Dirección para entregas"
-                disabled={isSaving}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notas</Label>
-              <Textarea
-                id="notes"
-                value={formData.notes}
-                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Notas adicionales sobre el cliente..."
-                rows={3}
-                disabled={isSaving}
-              />
-            </div>
-
-            <DialogFooter className="gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSaving}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSaving}>
-                {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Guardando...
-                  </>
-                ) : editingCustomer ? (
-                  'Guardar Cambios'
-                ) : (
-                  'Crear Cliente'
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <CustomerFormModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingCustomer(null);
+        }}
+        onSave={handleCustomerSaved}
+        initialData={getInitialFormData()}
+        mode={editingCustomer ? 'edit' : 'create'}
+      />
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteCustomer} onOpenChange={() => setDeleteCustomer(null)}>

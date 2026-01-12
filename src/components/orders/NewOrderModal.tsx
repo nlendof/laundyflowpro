@@ -4,6 +4,7 @@ import { useConfig } from '@/contexts/ConfigContext';
 import { QUICK_SERVICES } from '@/lib/constants';
 import { supabase } from '@/integrations/supabase/client';
 import { DiscountInput } from '@/components/DiscountInput';
+import { CustomerFormModal } from '@/components/customers/CustomerFormModal';
 import {
   Dialog,
   DialogContent,
@@ -125,6 +126,7 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [isNewCustomer, setIsNewCustomer] = useState(false);
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
   
   // Customer info
   const [customerName, setCustomerName] = useState('');
@@ -190,14 +192,27 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
     setCustomerSearchOpen(false);
   };
 
-  // Switch to new customer mode
+  // Switch to new customer mode - opens modal
   const handleNewCustomer = () => {
-    setSelectedCustomer(null);
-    setCustomerName('');
-    setCustomerPhone('');
-    setCustomerAddress('');
-    setIsNewCustomer(true);
     setCustomerSearchOpen(false);
+    setShowCustomerModal(true);
+  };
+
+  // Handle customer saved from modal
+  const handleCustomerSaved = (customer: { id: string; name: string; nickname: string | null; phone: string | null; address: string | null }) => {
+    setSelectedCustomer({
+      id: customer.id,
+      name: customer.name,
+      phone: customer.phone,
+      email: null,
+      address: customer.address,
+    });
+    setCustomerName(customer.name);
+    setCustomerPhone(customer.phone || '');
+    setCustomerAddress(customer.address || '');
+    setIsNewCustomer(false);
+    setShowCustomerModal(false);
+    fetchCustomers();
   };
 
   // Create new customer in database
@@ -431,6 +446,7 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
   const canCreate = customerName && customerPhone && items.length > 0;
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); } }}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -1024,5 +1040,15 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Customer Form Modal */}
+    <CustomerFormModal
+      isOpen={showCustomerModal}
+      onClose={() => setShowCustomerModal(false)}
+      onSave={handleCustomerSaved}
+      mode="create"
+      title="Nuevo Cliente"
+    />
+    </>
   );
 }
