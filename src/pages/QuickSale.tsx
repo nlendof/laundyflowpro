@@ -62,6 +62,7 @@ import { useConfig } from '@/contexts/ConfigContext';
 import { Order, OrderItem } from '@/types';
 import { useOrders } from '@/hooks/useOrders';
 import { supabase } from '@/integrations/supabase/client';
+import { CustomerFormModal } from '@/components/customers/CustomerFormModal';
 
 // Payment methods
 const PAYMENT_METHODS = [
@@ -132,6 +133,7 @@ export default function QuickSale() {
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<{id: string; name: string; phone: string | null; address: string | null} | null>(null);
   const [isNewCustomer, setIsNewCustomer] = useState(true);
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
   
   // Pickup and Delivery options
   const [needsPickup, setNeedsPickup] = useState(false);
@@ -196,15 +198,27 @@ export default function QuickSale() {
     setCustomerSearchOpen(false);
   };
 
-  // Switch to new customer mode
+  // Switch to new customer mode - now opens the modal
   const handleNewCustomer = () => {
-    setSelectedCustomer(null);
-    setCustomerName('');
-    setCustomerPhone('');
-    setPickupAddress('');
-    setDeliveryAddress('');
-    setIsNewCustomer(true);
     setCustomerSearchOpen(false);
+    setShowCustomerModal(true);
+  };
+
+  // Handle customer saved from modal
+  const handleCustomerSaved = (customer: { id: string; name: string; nickname: string | null; phone: string | null; address: string | null }) => {
+    setSelectedCustomer({
+      id: customer.id,
+      name: customer.name,
+      phone: customer.phone,
+      address: customer.address,
+    });
+    setCustomerName(customer.name);
+    setCustomerPhone(customer.phone || '');
+    setPickupAddress(customer.address || '');
+    setDeliveryAddress(customer.address || '');
+    setIsNewCustomer(false);
+    setShowCustomerModal(false);
+    fetchCustomers(); // Refresh customer list
   };
 
   // Create new customer in database
@@ -1321,6 +1335,15 @@ export default function QuickSale() {
           onClose={resetSale}
         />
       )}
+
+      {/* Customer Form Modal */}
+      <CustomerFormModal
+        isOpen={showCustomerModal}
+        onClose={() => setShowCustomerModal(false)}
+        onSave={handleCustomerSaved}
+        mode="create"
+        title="Nuevo Cliente"
+      />
     </div>
   );
 }
