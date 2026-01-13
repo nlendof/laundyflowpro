@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Order, OrderItem, ItemType, OrderStatus } from '@/types';
 import { useConfig } from '@/contexts/ConfigContext';
-import { QUICK_SERVICES } from '@/lib/constants';
+import { useCatalog, CatalogItem } from '@/contexts/CatalogContext';
 import { supabase } from '@/integrations/supabase/client';
 import { DiscountInput } from '@/components/DiscountInput';
 import { CustomerFormModal } from '@/components/customers/CustomerFormModal';
+import { TimeSlotPicker, QuickTimeButtons } from '@/components/TimeSlotPicker';
 import {
   Dialog,
   DialogContent,
@@ -78,16 +79,6 @@ const iconMap: Record<string, React.ElementType> = {
   Waves, Flame, Sparkles, Eraser, Droplet, Zap,
 };
 
-// Categorías de prendas
-const GARMENT_CATEGORIES = [
-  { id: 'shirts', name: 'Camisas', icon: Shirt, pricePerPiece: 3.00, pricePerKg: 8.00 },
-  { id: 'pants', name: 'Pantalones', icon: Package, pricePerPiece: 4.00, pricePerKg: 9.00 },
-  { id: 'dresses', name: 'Vestidos', icon: Package, pricePerPiece: 6.00, pricePerKg: 12.00 },
-  { id: 'jackets', name: 'Chaquetas', icon: Package, pricePerPiece: 8.00, pricePerKg: 15.00 },
-  { id: 'blankets', name: 'Cobijas', icon: Package, pricePerPiece: 12.00, pricePerKg: 10.00 },
-  { id: 'mixed', name: 'Ropa Mixta', icon: Package, pricePerPiece: 2.50, pricePerKg: 6.00 },
-];
-
 // Verificación de artículos
 const ITEM_CHECKS = [
   { id: 'has_laces', label: 'Tiene cordones', defaultChecked: true },
@@ -120,7 +111,10 @@ interface OrderItemDraft {
 
 export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalProps) {
   const { activeDeliveryZones, activeExtraServices } = useConfig();
+  const { activeServices, activeArticles } = useCatalog();
   
+  // Combine services and articles for selection
+  const catalogItems = useMemo(() => [...activeServices, ...activeArticles], [activeServices, activeArticles]);
   // Customer search and selection
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -137,7 +131,7 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
   const [receptionType, setReceptionType] = useState<ReceptionType>('in_store');
   const [deliveryType, setDeliveryType] = useState<DeliveryType>('in_store');
   const [selectedZone, setSelectedZone] = useState<string>('');
-  const [deliverySlot, setDeliverySlot] = useState<'morning' | 'afternoon'>('morning');
+  const [deliverySlot, setDeliverySlot] = useState<string>('');
   const [pickupCost, setPickupCost] = useState<number>(100);
   const [deliveryCostValue, setDeliveryCostValue] = useState<number>(100);
   
@@ -157,8 +151,7 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
   const [notes, setNotes] = useState('');
   
   // Quick add state
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedType, setSelectedType] = useState<ItemType>('piece');
+  const [selectedCatalogItem, setSelectedCatalogItem] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
 
   // Fetch customers from database
@@ -272,27 +265,27 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
     return `${prefix}-${dateStr}-${random}`;
   };
 
-  // Add item
+  // Add item from catalog
   const handleAddItem = () => {
-    if (!selectedCategory || quantity <= 0) return;
+    if (!selectedCatalogItem || quantity <= 0) return;
     
-    const category = GARMENT_CATEGORIES.find(c => c.id === selectedCategory);
-    if (!category) return;
+    const item = catalogItems.find(c => c.id === selectedCatalogItem);
+    if (!item) return;
 
-    const unitPrice = selectedType === 'piece' ? category.pricePerPiece : category.pricePerKg;
+    const itemType: ItemType = item.pricingType === 'weight' ? 'weight' : 'piece';
 
     const newItem: OrderItemDraft = {
       id: crypto.randomUUID(),
-      categoryId: category.id,
-      name: category.name,
-      type: selectedType,
+      categoryId: item.id,
+      name: item.name,
+      type: itemType,
       quantity,
-      unitPrice,
+      unitPrice: item.price,
       extras: [],
     };
 
     setItems(prev => [...prev, newItem]);
-    setSelectedCategory('');
+    setSelectedCatalogItem('');
     setQuantity(1);
   };
 
@@ -355,7 +348,7 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
     setDiscountAmount(0);
     setItemChecks(Object.fromEntries(ITEM_CHECKS.map(c => [c.id, c.defaultChecked])));
     setNotes('');
-    setSelectedCategory('');
+    setSelectedCatalogItem('');
     setQuantity(1);
   };
 
@@ -758,25 +751,13 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
               )}
 
               <div className="space-y-2">
-                <Label>Franja Horaria</Label>
-                <div className="flex gap-3">
-                  <Button
-                    type="button"
-                    variant={deliverySlot === 'morning' ? 'default' : 'outline'}
-                    className="flex-1"
-                    onClick={() => setDeliverySlot('morning')}
-                  >
-                    🌅 Mañana (9-13h)
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={deliverySlot === 'afternoon' ? 'default' : 'outline'}
-                    className="flex-1"
-                    onClick={() => setDeliverySlot('afternoon')}
-                  >
-                    🌆 Tarde (14-19h)
-                  </Button>
-                </div>
+                <TimeSlotPicker
+                  value={deliverySlot}
+                  onChange={setDeliverySlot}
+                  label="Hora de recogida/entrega"
+                  placeholder="Seleccionar hora..."
+                />
+                <QuickTimeButtons onSelect={setDeliverySlot} selectedTime={deliverySlot} />
               </div>
             </div>
           )}
@@ -786,43 +767,40 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
           {/* Add Items Section */}
           <div className="space-y-4">
             <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-              Agregar Prendas
+              Agregar Servicios / Artículos
             </h3>
-            
-            {/* Type Selection */}
-            <div className="flex gap-3">
-              <Button
-                type="button"
-                variant={selectedType === 'piece' ? 'default' : 'outline'}
-                className="flex-1 gap-2"
-                onClick={() => setSelectedType('piece')}
-              >
-                <Shirt className="w-4 h-4" />
-                Por Pieza
-              </Button>
-              <Button
-                type="button"
-                variant={selectedType === 'weight' ? 'default' : 'outline'}
-                className="flex-1 gap-2"
-                onClick={() => setSelectedType('weight')}
-              >
-                <Scale className="w-4 h-4" />
-                Por Peso (kg)
-              </Button>
-            </div>
 
-            {/* Category and Quantity */}
+            {/* Catalog Item Selection and Quantity */}
             <div className="flex gap-3">
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <Select value={selectedCatalogItem} onValueChange={setSelectedCatalogItem}>
                 <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Seleccionar prenda..." />
+                  <SelectValue placeholder="Seleccionar servicio o artículo..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {GARMENT_CATEGORIES.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name} - ${selectedType === 'piece' ? cat.pricePerPiece : cat.pricePerKg}/{selectedType === 'piece' ? 'pieza' : 'kg'}
-                    </SelectItem>
-                  ))}
+                  {activeServices.length > 0 && (
+                    <>
+                      <SelectItem value="__services_header__" disabled className="font-semibold text-primary">
+                        ── Servicios ──
+                      </SelectItem>
+                      {activeServices.map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.name} - ${item.price.toFixed(2)}/{item.pricingType === 'weight' ? 'kg' : 'pza'}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  {activeArticles.length > 0 && (
+                    <>
+                      <SelectItem value="__articles_header__" disabled className="font-semibold text-primary">
+                        ── Artículos ──
+                      </SelectItem>
+                      {activeArticles.map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.name} - ${item.price.toFixed(2)}/pza
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
                 </SelectContent>
               </Select>
 
@@ -832,7 +810,11 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
-                  onClick={() => setQuantity(Math.max(0.5, quantity - (selectedType === 'weight' ? 0.5 : 1)))}
+                  onClick={() => {
+                    const item = catalogItems.find(c => c.id === selectedCatalogItem);
+                    const decrement = item?.pricingType === 'weight' ? 0.5 : 1;
+                    setQuantity(Math.max(decrement, quantity - decrement));
+                  }}
                 >
                   <Minus className="w-4 h-4" />
                 </Button>
@@ -842,13 +824,17 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
-                  onClick={() => setQuantity(quantity + (selectedType === 'weight' ? 0.5 : 1))}
+                  onClick={() => {
+                    const item = catalogItems.find(c => c.id === selectedCatalogItem);
+                    const increment = item?.pricingType === 'weight' ? 0.5 : 1;
+                    setQuantity(quantity + increment);
+                  }}
                 >
                   <Plus className="w-4 h-4" />
                 </Button>
               </div>
 
-              <Button type="button" onClick={handleAddItem} disabled={!selectedCategory}>
+              <Button type="button" onClick={handleAddItem} disabled={!selectedCatalogItem}>
                 <Plus className="w-4 h-4 mr-2" />
                 Agregar
               </Button>
