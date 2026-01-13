@@ -58,7 +58,7 @@ import { TimeSlotPicker, QuickTimeButtons } from '@/components/TimeSlotPicker';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { DiscountInput } from '@/components/DiscountInput';
-import { useCatalog, CatalogItem, PricingType } from '@/contexts/CatalogContext';
+import { useCatalog, CatalogItem, PricingType } from '@/hooks/useCatalog';
 import { useConfig } from '@/contexts/ConfigContext';
 import { Order, OrderItem } from '@/types';
 import { useOrders } from '@/hooks/useOrders';

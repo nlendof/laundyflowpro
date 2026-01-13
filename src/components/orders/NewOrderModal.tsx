@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Order, OrderItem, ItemType, OrderStatus } from '@/types';
 import { useConfig } from '@/contexts/ConfigContext';
-import { useCatalog, CatalogItem } from '@/contexts/CatalogContext';
+import { useCatalog, CatalogItem } from '@/hooks/useCatalog';
 import { supabase } from '@/integrations/supabase/client';
 import { DiscountInput } from '@/components/DiscountInput';
 import { CustomerFormModal } from '@/components/customers/CustomerFormModal';
