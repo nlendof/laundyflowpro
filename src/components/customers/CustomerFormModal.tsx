@@ -164,45 +164,34 @@ export function CustomerFormModal({
       
       const customerData = {
         name: formData.name.trim(),
+        nickname: formData.nickname.trim() || null,
         phone: fullPhone,
         email: formData.email.trim() || null,
         address: formData.address.trim() || null,
         notes: formData.notes.trim() || null,
       };
 
-      // Add nickname to notes if present (since we don't have a nickname column)
-      // We'll store it as a prefix in the name or in notes
-      const displayName = formData.nickname.trim() 
-        ? `${formData.name.trim()} (${formData.nickname.trim()})`
-        : formData.name.trim();
-
       if (mode === 'edit' && formData.id) {
         const { error } = await supabase
           .from('customers')
-          .update({
-            ...customerData,
-            name: displayName,
-          })
+          .update(customerData)
           .eq('id', formData.id);
 
         if (error) throw error;
         
         onSave({
           id: formData.id,
-          name: displayName,
-          nickname: formData.nickname.trim() || null,
+          name: customerData.name,
+          nickname: customerData.nickname,
           phone: fullPhone,
-          email: formData.email.trim() || null,
-          address: formData.address.trim() || null,
+          email: customerData.email,
+          address: customerData.address,
         });
         toast.success('Cliente actualizado');
       } else {
         const { data, error } = await supabase
           .from('customers')
-          .insert({
-            ...customerData,
-            name: displayName,
-          })
+          .insert(customerData)
           .select('id')
           .single();
 
@@ -210,11 +199,11 @@ export function CustomerFormModal({
         
         onSave({
           id: data.id,
-          name: displayName,
-          nickname: formData.nickname.trim() || null,
+          name: customerData.name,
+          nickname: customerData.nickname,
           phone: fullPhone,
-          email: formData.email.trim() || null,
-          address: formData.address.trim() || null,
+          email: customerData.email,
+          address: customerData.address,
         });
         toast.success('Cliente creado');
       }

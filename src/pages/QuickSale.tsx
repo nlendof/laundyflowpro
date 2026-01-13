@@ -54,6 +54,7 @@ import {
   Check,
   Package,
 } from 'lucide-react';
+import { TimeSlotPicker, QuickTimeButtons } from '@/components/TimeSlotPicker';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { DiscountInput } from '@/components/DiscountInput';
@@ -140,8 +141,8 @@ export default function QuickSale() {
   const [needsDelivery, setNeedsDelivery] = useState(false);
   const [pickupAddress, setPickupAddress] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
-  const [pickupSlot, setPickupSlot] = useState<'morning' | 'afternoon' | ''>('');
-  const [deliverySlot, setDeliverySlot] = useState<'morning' | 'afternoon' | ''>('');
+  const [pickupSlot, setPickupSlot] = useState<string>('');
+  const [deliverySlot, setDeliverySlot] = useState<string>('');
   
   // Cart
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -936,25 +937,14 @@ export default function QuickSale() {
                       className="pl-10"
                     />
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant={pickupSlot === 'morning' ? 'default' : 'outline'}
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => setPickupSlot('morning')}
-                    >
-                      🌅 Mañana (9-13h)
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={pickupSlot === 'afternoon' ? 'default' : 'outline'}
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => setPickupSlot('afternoon')}
-                    >
-                      🌆 Tarde (14-18h)
-                    </Button>
+                  <div className="space-y-2">
+                    <TimeSlotPicker
+                      value={pickupSlot}
+                      onChange={setPickupSlot}
+                      label="Hora de recogida"
+                      placeholder="Seleccionar hora..."
+                    />
+                    <QuickTimeButtons onSelect={setPickupSlot} selectedTime={pickupSlot} />
                   </div>
                 </div>
               )}
@@ -981,25 +971,14 @@ export default function QuickSale() {
                       className="pl-10"
                     />
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant={deliverySlot === 'morning' ? 'default' : 'outline'}
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => setDeliverySlot('morning')}
-                    >
-                      🌅 Mañana (9-13h)
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={deliverySlot === 'afternoon' ? 'default' : 'outline'}
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => setDeliverySlot('afternoon')}
-                    >
-                      🌆 Tarde (14-18h)
-                    </Button>
+                  <div className="space-y-2">
+                    <TimeSlotPicker
+                      value={deliverySlot}
+                      onChange={setDeliverySlot}
+                      label="Hora de entrega"
+                      placeholder="Seleccionar hora..."
+                    />
+                    <QuickTimeButtons onSelect={setDeliverySlot} selectedTime={deliverySlot} />
                   </div>
                 </div>
               )}

@@ -49,7 +49,7 @@ export interface DeliveryService {
   type: DeliveryServiceType;
   status: DeliveryServiceStatus;
   driverId?: string;
-  scheduledSlot?: 'morning' | 'afternoon';
+  scheduledSlot?: string; // Time slot like "09:00", "14:30", or legacy "morning"/"afternoon"
   scheduledDate?: Date;
   completedAt?: Date;
   address: string;
@@ -73,7 +73,7 @@ export interface Order {
   isPaid: boolean;
   // Legacy field for backward compatibility
   isDelivery: boolean;
-  deliverySlot?: 'morning' | 'afternoon';
+  deliverySlot?: string; // Time slot like "09:00", "14:30", or legacy "morning"/"afternoon"
   deliveryDriverId?: string;
   // New delivery service fields
   needsPickup: boolean;           // Customer wants pickup from home

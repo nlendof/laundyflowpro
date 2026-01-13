@@ -51,7 +51,7 @@ interface DeliveryTask {
   type: 'pickup' | 'delivery';
   status: DeliveryServiceStatus;
   address: string;
-  slot?: 'morning' | 'afternoon';
+  slot?: string; // Time slot like "09:00" or legacy "morning"/"afternoon"
   driverId?: string;
   notes?: string;
 }
