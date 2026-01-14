@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Order, OrderStatus } from '@/types';
-import { ORDER_STATUS_FLOW } from '@/lib/constants';
 import { OrderStatusTabs } from '@/components/orders/OrderStatusTabs';
 import { OrderCard } from '@/components/orders/OrderCard';
 import { OrderDetailsModal } from '@/components/orders/OrderDetailsModal';
@@ -27,6 +26,7 @@ import {
 import { toast } from 'sonner';
 import { useOrders } from '@/hooks/useOrders';
 import { useNewOrders } from '@/contexts/NewOrdersContext';
+import { useOperationsFlow } from '@/hooks/useOperationsFlow';
 
 type SortOption = 'newest' | 'oldest' | 'amount_high' | 'amount_low';
 
@@ -35,6 +35,7 @@ export default function Orders() {
   const { orders, loading, newOrderIds, fetchOrders, createOrder, updateOrderStatus, updateOrderPayment } = useOrders({
     onNewOrder: incrementCount
   });
+  const { statusFlow, getStatusConfig, getNextStatus, getPreviousStatus } = useOperationsFlow();
   const [activeStatus, setActiveStatus] = useState<OrderStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
@@ -117,9 +118,8 @@ export default function Orders() {
   };
 
   const handleAdvanceStatus = async (order: Order) => {
-    const currentIndex = ORDER_STATUS_FLOW.indexOf(order.status);
-    if (currentIndex < ORDER_STATUS_FLOW.length - 1) {
-      const nextStatus = ORDER_STATUS_FLOW[currentIndex + 1] as OrderStatus;
+    const nextStatus = getNextStatus(order.status);
+    if (nextStatus) {
       const success = await updateOrderStatus(order.id, nextStatus);
       
       if (success) {
@@ -128,15 +128,15 @@ export default function Orders() {
             prev ? { ...prev, status: nextStatus, updatedAt: new Date() } : null
           );
         }
-        toast.success(`Pedido ${order.ticketCode} avanzado a: ${nextStatus}`);
+        const config = getStatusConfig(nextStatus);
+        toast.success(`Pedido ${order.ticketCode} avanzado a: ${config?.labelEs || nextStatus}`);
       }
     }
   };
 
   const handleRegressStatus = async (order: Order) => {
-    const currentIndex = ORDER_STATUS_FLOW.indexOf(order.status);
-    if (currentIndex > 0) {
-      const prevStatus = ORDER_STATUS_FLOW[currentIndex - 1] as OrderStatus;
+    const prevStatus = getPreviousStatus(order.status);
+    if (prevStatus) {
       const success = await updateOrderStatus(order.id, prevStatus);
       
       if (success) {
@@ -145,7 +145,8 @@ export default function Orders() {
             prev ? { ...prev, status: prevStatus, updatedAt: new Date() } : null
           );
         }
-        toast.success(`Pedido ${order.ticketCode} retrocedido a: ${prevStatus}`);
+        const config = getStatusConfig(prevStatus);
+        toast.success(`Pedido ${order.ticketCode} retrocedido a: ${config?.labelEs || prevStatus}`);
       }
     }
   };

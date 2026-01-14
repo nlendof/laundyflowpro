@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
 import { Order, OrderStatus } from '@/types';
-import { ORDER_STATUS_CONFIG, ORDER_STATUS_FLOW } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,6 +38,7 @@ import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useOrders } from '@/hooks/useOrders';
+import { useOperationsFlow } from '@/hooks/useOperationsFlow';
 
 // Icon mapping
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -60,10 +60,12 @@ interface OperationOrderCardProps {
 }
 
 function OperationOrderCard({ order, onAdvance, onViewDetails }: OperationOrderCardProps) {
-  const currentIndex = ORDER_STATUS_FLOW.indexOf(order.status);
-  const canAdvance = currentIndex < ORDER_STATUS_FLOW.indexOf('ready_delivery');
-  const nextStatus = canAdvance ? ORDER_STATUS_FLOW[currentIndex + 1] as OrderStatus : null;
-  const nextStatusConfig = nextStatus ? ORDER_STATUS_CONFIG[nextStatus] : null;
+  const { statusFlow, getStatusConfig, getNextStatus } = useOperationsFlow();
+  const readyDeliveryIndex = statusFlow.indexOf('ready_delivery');
+  const currentIndex = statusFlow.indexOf(order.status);
+  const canAdvance = currentIndex >= 0 && currentIndex < readyDeliveryIndex;
+  const nextStatus = getNextStatus(order.status);
+  const nextStatusConfig = nextStatus ? getStatusConfig(nextStatus) : null;
 
   const timeInStatus = formatDistanceToNow(order.updatedAt, { locale: es, addSuffix: false });
 
@@ -146,12 +148,15 @@ interface OrderDetailsDialogProps {
 }
 
 function OrderDetailsDialog({ order, isOpen, onClose, onAdvance }: OrderDetailsDialogProps) {
+  const { statusFlow, getStatusConfig, getNextStatus } = useOperationsFlow();
+  
   if (!order) return null;
 
-  const currentIndex = ORDER_STATUS_FLOW.indexOf(order.status);
-  const canAdvance = currentIndex < ORDER_STATUS_FLOW.indexOf('ready_delivery');
-  const nextStatus = canAdvance ? ORDER_STATUS_FLOW[currentIndex + 1] as OrderStatus : null;
-  const nextStatusConfig = nextStatus ? ORDER_STATUS_CONFIG[nextStatus] : null;
+  const readyDeliveryIndex = statusFlow.indexOf('ready_delivery');
+  const currentIndex = statusFlow.indexOf(order.status);
+  const canAdvance = currentIndex >= 0 && currentIndex < readyDeliveryIndex;
+  const nextStatus = getNextStatus(order.status);
+  const nextStatusConfig = nextStatus ? getStatusConfig(nextStatus) : null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -259,6 +264,7 @@ function OrderDetailsDialog({ order, isOpen, onClose, onAdvance }: OrderDetailsD
 export default function Operations() {
   const { activeOperations, getOperationByKey } = useConfig();
   const { orders, loading, fetchOrders, updateOrderStatus } = useOrders();
+  const { statusFlow, getStatusConfig, getNextStatus } = useOperationsFlow();
   
   // Filter operation statuses that are active and between in_store and ready_delivery
   const operationKeys = useMemo(() => {
@@ -311,15 +317,13 @@ export default function Operations() {
   const totalReady = ordersByStatus.ready_delivery.length;
 
   const handleAdvanceStatus = async (order: Order) => {
-    const currentIndex = ORDER_STATUS_FLOW.indexOf(order.status);
-    if (currentIndex < ORDER_STATUS_FLOW.length - 1) {
-      const nextStatus = ORDER_STATUS_FLOW[currentIndex + 1] as OrderStatus;
-      
+    const nextStatus = getNextStatus(order.status);
+    if (nextStatus) {
       const success = await updateOrderStatus(order.id, nextStatus);
       
       if (success) {
-        const statusConfig = ORDER_STATUS_CONFIG[nextStatus];
-        toast.success(`${order.ticketCode} → ${statusConfig.labelEs}`);
+        const config = getStatusConfig(nextStatus);
+        toast.success(`${order.ticketCode} → ${config?.labelEs || nextStatus}`);
       }
     }
   };
@@ -384,7 +388,7 @@ export default function Operations() {
       <div className="flex-1 overflow-x-auto">
         <div className="flex gap-4 min-w-max h-full pb-4">
           {operationKeys.map((status) => {
-            const config = ORDER_STATUS_CONFIG[status];
+            const config = getStatusConfig(status);
             const operation = getOperationByKey(status);
             const Icon = operation ? (ICON_MAP[operation.icon] || Package) : Package;
             const statusOrders = ordersByStatus[status];

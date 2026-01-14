@@ -1,28 +1,8 @@
 import { OrderStatus } from '@/types';
-import { ORDER_STATUS_CONFIG, ORDER_STATUS_FLOW } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import {
-  Clock,
-  Store,
-  Waves,
-  Wind,
-  Flame,
-  Package,
-  Truck,
-  CheckCircle,
-} from 'lucide-react';
-
-const iconMap: Record<string, React.ElementType> = {
-  Clock,
-  Store,
-  Waves,
-  Wind,
-  Flame,
-  Package,
-  Truck,
-  CheckCircle,
-};
+import * as Icons from 'lucide-react';
+import { useOperationsFlow } from '@/hooks/useOperationsFlow';
 
 interface OrderStatusTabsProps {
   activeStatus: OrderStatus | 'all';
@@ -31,6 +11,7 @@ interface OrderStatusTabsProps {
 }
 
 export function OrderStatusTabs({ activeStatus, onStatusChange, counts }: OrderStatusTabsProps) {
+  const { statusFlow, statusConfig } = useOperationsFlow();
   const totalCount = Object.values(counts).reduce((a, b) => a + b, 0);
 
   return (
@@ -55,9 +36,11 @@ export function OrderStatusTabs({ activeStatus, onStatusChange, counts }: OrderS
       </button>
 
       {/* Status Tabs */}
-      {ORDER_STATUS_FLOW.map((statusKey) => {
-        const status = ORDER_STATUS_CONFIG[statusKey];
-        const Icon = iconMap[status.icon];
+      {statusFlow.map((statusKey) => {
+        const config = statusConfig[statusKey];
+        if (!config) return null;
+        
+        const IconComponent = Icons[config.icon as keyof typeof Icons] as React.ComponentType<{ className?: string }>;
         const count = counts[statusKey as OrderStatus] || 0;
         const isActive = activeStatus === statusKey;
 
@@ -68,12 +51,12 @@ export function OrderStatusTabs({ activeStatus, onStatusChange, counts }: OrderS
             className={cn(
               'flex items-center gap-2 px-3 py-2 rounded-lg border transition-all duration-200',
               isActive
-                ? `${status.bgColor} ${status.color} border-current shadow-md`
+                ? `${config.bgColor} ${config.color} border-current shadow-md`
                 : 'bg-card border-border hover:bg-muted'
             )}
           >
-            <Icon className="w-4 h-4" />
-            <span className="font-medium hidden sm:inline">{status.labelEs}</span>
+            {IconComponent && <IconComponent className="w-4 h-4" />}
+            <span className="font-medium hidden sm:inline">{config.labelEs}</span>
             <Badge 
               variant="secondary" 
               className={cn(

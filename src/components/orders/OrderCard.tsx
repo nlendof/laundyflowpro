@@ -1,10 +1,10 @@
 import { Order } from '@/types';
-import { ORDER_STATUS_CONFIG } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/StatusBadge';
+import { useOperationsFlow } from '@/hooks/useOperationsFlow';
 import {
   Phone,
   MapPin,
@@ -25,14 +25,16 @@ interface OrderCardProps {
 }
 
 export function OrderCard({ order, onViewDetails, isNew = false }: OrderCardProps) {
-  const statusConfig = ORDER_STATUS_CONFIG[order.status];
+  const { getStatusConfig } = useOperationsFlow();
+  const statusConfig = getStatusConfig(order.status);
+  const borderColor = statusConfig?.color?.replace('text-', 'border-l-') || 'border-l-muted';
 
   return (
     <Card 
       className={cn(
         'group cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-primary/30',
         'border-l-4',
-        statusConfig.color.replace('text-', 'border-l-'),
+        borderColor,
         isNew && 'ring-2 ring-primary ring-offset-2 animate-pulse bg-primary/5'
       )}
       onClick={() => onViewDetails(order)}
