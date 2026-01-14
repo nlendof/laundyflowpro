@@ -4,9 +4,9 @@ import { useDashboardStats, DatePeriod } from '@/hooks/useDashboardStats';
 import { StatCard } from '@/components/StatCard';
 import { OrderStatusFlow } from '@/components/OrderStatusFlow';
 import { StatusBadge } from '@/components/StatusBadge';
-import { ORDER_STATUS_CONFIG } from '@/lib/constants';
 import { formatCurrency } from '@/lib/currency';
 import { useConfig } from '@/contexts/ConfigContext';
+import { useOperationsFlow } from '@/hooks/useOperationsFlow';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
@@ -52,6 +52,7 @@ export default function Dashboard() {
   const [period, setPeriod] = useState<DatePeriod>('today');
   const { stats, loading } = useDashboardStats(period);
   const { business } = useConfig();
+  const { statusFlow, statusConfig } = useOperationsFlow();
   const navigate = useNavigate();
   const currency = business.currency;
 
@@ -153,20 +154,24 @@ export default function Dashboard() {
       <div className="bg-card rounded-xl border shadow-sm p-6">
         <h2 className="text-lg font-semibold mb-6">Estado de Pedidos</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-          {Object.entries(ORDER_STATUS_CONFIG).map(([key, config]) => (
-            <div
-              key={key}
-              className={`${config.bgColor} rounded-xl p-4 text-center transition-all hover:scale-105 cursor-pointer`}
-              onClick={() => navigate('/orders')}
-            >
-              <p className={`text-2xl font-bold ${config.color}`}>
-                {stats.statusCounts[key as keyof typeof stats.statusCounts] || 0}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1 truncate">
-                {config.labelEs}
-              </p>
-            </div>
-          ))}
+          {statusFlow.map((key) => {
+            const config = statusConfig[key];
+            if (!config) return null;
+            return (
+              <div
+                key={key}
+                className={`${config.bgColor} rounded-xl p-4 text-center transition-all hover:scale-105 cursor-pointer`}
+                onClick={() => navigate('/orders')}
+              >
+                <p className={`text-2xl font-bold ${config.color}`}>
+                  {stats.statusCounts[key as keyof typeof stats.statusCounts] || 0}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1 truncate">
+                  {config.labelEs}
+                </p>
+              </div>
+            );
+          })}
         </div>
       </div>
 

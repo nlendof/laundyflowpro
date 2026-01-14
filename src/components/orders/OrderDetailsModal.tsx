@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Order, OrderStatus } from '@/types';
-import { ORDER_STATUS_CONFIG, ORDER_STATUS_FLOW } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -17,6 +16,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { OrderStatusFlow } from '@/components/OrderStatusFlow';
 import { OrderQRCode } from '@/components/orders/OrderQRCode';
 import { PrintTicketButton } from '@/components/orders/PrintTicketButton';
+import { useOperationsFlow } from '@/hooks/useOperationsFlow';
 import {
   Phone,
   MapPin,
@@ -62,6 +62,8 @@ export function OrderDetailsModal({
   onRegressStatus,
   onUpdatePayment,
 }: OrderDetailsModalProps) {
+  const { getNextStatus, getPreviousStatus, canAdvance: checkCanAdvance, canRegress: checkCanRegress, getStatusConfig } = useOperationsFlow();
+  
   const [showQR, setShowQR] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [paymentType, setPaymentType] = useState<'full' | 'partial' | 'on_pickup'>('full');
@@ -71,14 +73,13 @@ export function OrderDetailsModal({
 
   if (!order) return null;
 
-  const statusConfig = ORDER_STATUS_CONFIG[order.status];
-  const currentStatusIndex = ORDER_STATUS_FLOW.indexOf(order.status);
-  const canAdvance = currentStatusIndex < ORDER_STATUS_FLOW.length - 1;
-  const canRegress = currentStatusIndex > 0;
-  const nextStatus = canAdvance ? ORDER_STATUS_FLOW[currentStatusIndex + 1] : null;
-  const prevStatus = canRegress ? ORDER_STATUS_FLOW[currentStatusIndex - 1] : null;
-  const nextStatusConfig = nextStatus ? ORDER_STATUS_CONFIG[nextStatus] : null;
-  const prevStatusConfig = prevStatus ? ORDER_STATUS_CONFIG[prevStatus] : null;
+  const statusConfig = getStatusConfig(order.status);
+  const canAdvance = checkCanAdvance(order.status);
+  const canRegress = checkCanRegress(order.status);
+  const nextStatus = getNextStatus(order.status);
+  const prevStatus = getPreviousStatus(order.status);
+  const nextStatusConfig = nextStatus ? getStatusConfig(nextStatus) : null;
+  const prevStatusConfig = prevStatus ? getStatusConfig(prevStatus) : null;
 
   const pendingAmount = order.totalAmount - order.paidAmount;
 

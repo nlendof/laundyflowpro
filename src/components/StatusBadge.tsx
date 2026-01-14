@@ -1,7 +1,7 @@
-import { ORDER_STATUS_CONFIG } from '@/lib/constants';
 import { OrderStatus } from '@/types';
 import { cn } from '@/lib/utils';
 import * as Icons from 'lucide-react';
+import { useOperationsFlow } from '@/hooks/useOperationsFlow';
 
 interface StatusBadgeProps {
   status: OrderStatus;
@@ -10,7 +10,16 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, showIcon = true, size = 'md' }: StatusBadgeProps) {
-  const config = ORDER_STATUS_CONFIG[status];
+  const { getStatusConfig } = useOperationsFlow();
+  const config = getStatusConfig(status);
+  
+  if (!config) {
+    return (
+      <span className="inline-flex items-center gap-1.5 font-medium rounded-full bg-muted text-muted-foreground px-3 py-1 text-sm">
+        {status}
+      </span>
+    );
+  }
   
   const IconComponent = Icons[config.icon as keyof typeof Icons] as React.ComponentType<{ className?: string }>;
   
