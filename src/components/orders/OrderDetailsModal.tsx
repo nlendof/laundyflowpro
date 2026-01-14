@@ -135,7 +135,7 @@ export function OrderDetailsModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-3">
@@ -428,20 +428,24 @@ export function OrderDetailsModal({
           </div>
 
           {/* Actions */}
-          <div className="flex flex-col sm:flex-row gap-3 pt-4">
-            <PrintTicketButton order={order} variant="outline" className="flex-1" />
+          <div className="flex flex-col gap-3 pt-4 pb-2">
+            {/* First row: Print and WhatsApp */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <PrintTicketButton order={order} variant="outline" className="flex-1" />
+              
+              {/* WhatsApp Notify Button - Only show when ready_delivery */}
+              {order.status === 'ready_delivery' && (
+                <WhatsAppNotifyButton 
+                  order={order} 
+                  notificationType="ready" 
+                  variant="default"
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                />
+              )}
+            </div>
             
-            {/* WhatsApp Notify Button - Only show when ready_delivery */}
-            {order.status === 'ready_delivery' && (
-              <WhatsAppNotifyButton 
-                order={order} 
-                notificationType="ready" 
-                variant="default"
-                className="flex-1 bg-green-600 hover:bg-green-700"
-              />
-            )}
-            
-            <div className="flex gap-2 flex-1">
+            {/* Second row: Status navigation */}
+            <div className="flex gap-2">
               {/* Regress Status Button */}
               {canRegress && prevStatusConfig && onRegressStatus && (
                 <Button 
@@ -450,7 +454,7 @@ export function OrderDetailsModal({
                   onClick={handleRegress}
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  <span className="hidden sm:inline">{prevStatusConfig.labelEs}</span>
+                  <span className="truncate">{prevStatusConfig.labelEs}</span>
                 </Button>
               )}
               
@@ -460,7 +464,7 @@ export function OrderDetailsModal({
                   className="flex-1 gap-2"
                   onClick={() => onAdvanceStatus(order)}
                 >
-                  <span className="hidden sm:inline">{nextStatusConfig.labelEs}</span>
+                  <span className="truncate">{nextStatusConfig.labelEs}</span>
                   <ArrowRight className="w-4 h-4" />
                 </Button>
               )}
