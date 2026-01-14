@@ -37,6 +37,7 @@ interface DiscountCode {
   created_at: string;
   discount_type: 'percentage' | 'fixed';
   discount_value: number;
+  admin_name?: string;
 }
 
 export function AdminDiscountCodes() {
@@ -58,8 +59,10 @@ export function AdminDiscountCodes() {
       setLoading(true);
       const { data, error } = await supabase
         .from('admin_discount_codes')
-        .select('*')
-        .eq('admin_id', user?.id)
+        .select(`
+          *,
+          profiles:admin_id (name)
+        `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -67,6 +70,7 @@ export function AdminDiscountCodes() {
         ...code,
         discount_type: code.discount_type || 'percentage',
         discount_value: code.discount_value || 0,
+        admin_name: (code.profiles as any)?.name || 'Desconocido',
       })) as DiscountCode[]);
     } catch (error) {
       console.error('Error fetching codes:', error);
@@ -209,6 +213,7 @@ export function AdminDiscountCodes() {
                 <TableRow>
                   <TableHead>Código</TableHead>
                   <TableHead>Descuento</TableHead>
+                  <TableHead>Creado por</TableHead>
                   <TableHead>Usos</TableHead>
                   <TableHead>Expira</TableHead>
                   <TableHead>Estado</TableHead>
@@ -252,6 +257,9 @@ export function AdminDiscountCodes() {
                             </>
                           )}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm font-medium">{discountCode.admin_name}</span>
                       </TableCell>
                       <TableCell>
                         <Badge variant={exhausted ? 'secondary' : 'default'}>
