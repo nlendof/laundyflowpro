@@ -79,38 +79,3 @@ export function TimeSlotPicker({
     </div>
   );
 }
-
-// Quick time buttons for common selections
-interface QuickTimeButtonsProps {
-  onSelect: (time: string) => void;
-  selectedTime?: string;
-}
-
-export function QuickTimeButtons({ onSelect, selectedTime }: QuickTimeButtonsProps) {
-  const quickTimes = [
-    { label: '9:00 AM', value: '09:00' },
-    { label: '12:00 PM', value: '12:00' },
-    { label: '3:00 PM', value: '15:00' },
-    { label: '6:00 PM', value: '18:00' },
-  ];
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {quickTimes.map((time) => (
-        <button
-          key={time.value}
-          type="button"
-          onClick={() => onSelect(time.value)}
-          className={cn(
-            'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-            selectedTime === time.value
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted hover:bg-muted/80'
-          )}
-        >
-          {time.label}
-        </button>
-      ))}
-    </div>
-  );
-}

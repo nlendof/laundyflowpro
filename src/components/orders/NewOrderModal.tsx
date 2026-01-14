@@ -5,7 +5,7 @@ import { useCatalog, CatalogItem } from '@/hooks/useCatalog';
 import { supabase } from '@/integrations/supabase/client';
 import { DiscountInput } from '@/components/DiscountInput';
 import { CustomerFormModal } from '@/components/customers/CustomerFormModal';
-import { TimeSlotPicker, QuickTimeButtons } from '@/components/TimeSlotPicker';
+import { TimeSlotPicker } from '@/components/TimeSlotPicker';
 import {
   Dialog,
   DialogContent,
@@ -18,8 +18,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -60,7 +58,6 @@ import {
   Package,
   Home,
   Store,
-  AlertTriangle,
   Search,
   UserPlus,
   Check,
@@ -78,16 +75,6 @@ interface Customer {
 const iconMap: Record<string, React.ElementType> = {
   Waves, Flame, Sparkles, Eraser, Droplet, Zap,
 };
-
-// Verificación de artículos
-const ITEM_CHECKS = [
-  { id: 'has_laces', label: 'Tiene cordones', defaultChecked: true },
-  { id: 'has_insoles', label: 'Tiene plantilla', defaultChecked: true },
-  { id: 'is_torn', label: 'Está roto', defaultChecked: false },
-  { id: 'is_detached', label: 'Está despegado', defaultChecked: false },
-  { id: 'has_stains', label: 'Tiene manchas', defaultChecked: false },
-  { id: 'missing_buttons', label: 'Faltan botones', defaultChecked: false },
-];
 
 // Tipo de recepción/entrega
 type ReceptionType = 'in_store' | 'pickup';
@@ -110,7 +97,7 @@ interface OrderItemDraft {
 }
 
 export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalProps) {
-  const { activeDeliveryZones, activeExtraServices } = useConfig();
+  const { activeDeliveryZones } = useConfig();
   const { activeServices, activeArticles } = useCatalog();
   
   // Combine services and articles for selection
@@ -131,21 +118,16 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
   const [receptionType, setReceptionType] = useState<ReceptionType>('in_store');
   const [deliveryType, setDeliveryType] = useState<DeliveryType>('in_store');
   const [selectedZone, setSelectedZone] = useState<string>('');
+  const [pickupSlot, setPickupSlot] = useState<string>('');
   const [deliverySlot, setDeliverySlot] = useState<string>('');
   const [pickupCost, setPickupCost] = useState<number>(100);
   const [deliveryCostValue, setDeliveryCostValue] = useState<number>(100);
   
   // Items
   const [items, setItems] = useState<OrderItemDraft[]>([]);
-  const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
   
   // Discount
   const [discountAmount, setDiscountAmount] = useState(0);
-  
-  // Item checks
-  const [itemChecks, setItemChecks] = useState<Record<string, boolean>>(
-    Object.fromEntries(ITEM_CHECKS.map(c => [c.id, c.defaultChecked]))
-  );
   
   // Notes
   const [notes, setNotes] = useState('');
@@ -234,13 +216,6 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
     return items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
   }, [items]);
 
-  const extrasTotal = useMemo(() => {
-    return selectedExtras.reduce((sum, extraId) => {
-      const extra = activeExtraServices.find(e => e.id === extraId);
-      return sum + (extra?.price || 0);
-    }, 0);
-  }, [selectedExtras, activeExtraServices]);
-
   // Calculate delivery costs
   const totalDeliveryCost = useMemo(() => {
     let cost = 0;
@@ -253,7 +228,7 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
     return cost;
   }, [receptionType, deliveryType, pickupCost, deliveryCostValue]);
 
-  const subtotal = itemsTotal + extrasTotal + totalDeliveryCost;
+  const subtotal = itemsTotal + totalDeliveryCost;
   const totalAmount = Math.max(0, subtotal - discountAmount);
 
   // Generate ticket code
@@ -305,31 +280,6 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
     }));
   };
 
-  // Toggle extra service
-  const toggleExtra = (extraId: string) => {
-    setSelectedExtras(prev => 
-      prev.includes(extraId) 
-        ? prev.filter(id => id !== extraId)
-        : [...prev, extraId]
-    );
-  };
-
-  // Toggle item check
-  const toggleItemCheck = (checkId: string) => {
-    setItemChecks(prev => ({ ...prev, [checkId]: !prev[checkId] }));
-  };
-
-  // Build notes with checks
-  const buildOrderNotes = () => {
-    const checkNotes = ITEM_CHECKS
-      .map(c => `${c.label}: ${itemChecks[c.id] ? 'Sí' : 'No'}`)
-      .join(' | ');
-    
-    return notes.trim() 
-      ? `[Verificación: ${checkNotes}]\n\n${notes.trim()}`
-      : `[Verificación: ${checkNotes}]`;
-  };
-
   // Reset form
   const resetForm = () => {
     setSelectedCustomer(null);
@@ -340,13 +290,12 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
     setReceptionType('in_store');
     setDeliveryType('in_store');
     setSelectedZone('');
-    setDeliverySlot('morning');
+    setPickupSlot('');
+    setDeliverySlot('');
     setPickupCost(100);
     setDeliveryCostValue(100);
     setItems([]);
-    setSelectedExtras([]);
     setDiscountAmount(0);
-    setItemChecks(Object.fromEntries(ITEM_CHECKS.map(c => [c.id, c.defaultChecked])));
     setNotes('');
     setSelectedCatalogItem('');
     setQuantity(1);
@@ -400,7 +349,7 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
         type: item.type,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
-        extras: selectedExtras.map(id => activeExtraServices.find(e => e.id === id)?.name || ''),
+        extras: [],
       })),
       status: needsPickup ? 'pending_pickup' : 'in_store',
       totalAmount,
@@ -414,7 +363,7 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
       pickupService: needsPickup ? {
         type: 'pickup',
         status: 'pending',
-        scheduledSlot: deliverySlot,
+        scheduledSlot: pickupSlot,
         address: customerAddress,
         notes: zone?.name,
       } : undefined,
@@ -428,7 +377,7 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
       createdAt: new Date(),
       updatedAt: new Date(),
       estimatedReadyAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      notes: buildOrderNotes(),
+      notes: notes.trim(),
     };
 
     onCreateOrder(order);
@@ -750,14 +699,24 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
                 </p>
               )}
 
-              <div className="space-y-2">
-                <TimeSlotPicker
-                  value={deliverySlot}
-                  onChange={setDeliverySlot}
-                  label="Hora de recogida/entrega"
-                  placeholder="Seleccionar hora..."
-                />
-                <QuickTimeButtons onSelect={setDeliverySlot} selectedTime={deliverySlot} />
+              {/* Time slots for pickup and delivery */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                {receptionType === 'pickup' && (
+                  <TimeSlotPicker
+                    value={pickupSlot}
+                    onChange={setPickupSlot}
+                    label="Hora de recogida"
+                    placeholder="Seleccionar hora..."
+                  />
+                )}
+                {deliveryType === 'delivery' && (
+                  <TimeSlotPicker
+                    value={deliverySlot}
+                    onChange={setDeliverySlot}
+                    label="Hora de entrega"
+                    placeholder="Seleccionar hora..."
+                  />
+                )}
               </div>
             </div>
           )}
@@ -903,58 +862,6 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
             </div>
           )}
 
-          <Separator />
-
-          {/* Extra Services */}
-          <div className="space-y-3">
-            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
-              Servicios Extra
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {activeExtraServices.map((extra) => (
-                <button
-                  key={extra.id}
-                  type="button"
-                  onClick={() => toggleExtra(extra.id)}
-                  className={`p-3 rounded-xl border text-left transition-all ${
-                    selectedExtras.includes(extra.id)
-                      ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
-                      : 'border-border hover:border-primary/30 hover:bg-muted/50'
-                  }`}
-                >
-                  <p className="font-medium text-sm">{extra.name}</p>
-                  <p className="text-primary font-semibold">+${extra.price.toFixed(2)}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Item Checks */}
-          <div className="space-y-3">
-            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4" />
-              Verificación del Pedido
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 bg-muted/50 rounded-xl">
-              {ITEM_CHECKS.map((check) => (
-                <div key={check.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={check.id}
-                    checked={itemChecks[check.id]}
-                    onCheckedChange={() => toggleItemCheck(check.id)}
-                  />
-                  <Label
-                    htmlFor={check.id}
-                    className="text-sm font-normal cursor-pointer"
-                  >
-                    {check.label}
-                  </Label>
-                </div>
-              ))}
-            </div>
-          </div>
 
           {/* Notes */}
           <div className="space-y-2">
@@ -985,12 +892,6 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
                 <p className="text-sm text-muted-foreground">Artículos</p>
                 <p className="font-medium">${itemsTotal.toFixed(2)}</p>
               </div>
-              {extrasTotal > 0 && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Extras</p>
-                  <p className="font-medium">+${extrasTotal.toFixed(2)}</p>
-                </div>
-              )}
               {totalDeliveryCost > 0 && (
                 <div>
                   <p className="text-sm text-muted-foreground">Envío</p>

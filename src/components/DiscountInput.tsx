@@ -192,26 +192,6 @@ export function DiscountInput({
         </div>
       </div>
       
-      {/* Quick percentage buttons */}
-      {discountType === 'percentage' && (
-        <div className="flex gap-1.5">
-          {[5, 10, 15, 20].map((percent) => (
-            <Button
-              key={percent}
-              type="button"
-              variant="outline"
-              size="sm"
-              className="flex-1 h-7 text-xs"
-              onClick={() => {
-                setDiscountValue(percent.toString());
-                setIsApproved(false);
-              }}
-            >
-              {percent}%
-            </Button>
-          ))}
-        </div>
-      )}
 
       {/* Approval Required Warning */}
       {needsApproval && (

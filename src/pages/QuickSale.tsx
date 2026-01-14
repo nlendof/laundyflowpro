@@ -54,7 +54,7 @@ import {
   Check,
   Package,
 } from 'lucide-react';
-import { TimeSlotPicker, QuickTimeButtons } from '@/components/TimeSlotPicker';
+import { TimeSlotPicker } from '@/components/TimeSlotPicker';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { DiscountInput } from '@/components/DiscountInput';
@@ -115,7 +115,7 @@ const ARTICLE_COLORS = [
 
 export default function QuickSale() {
   const { activeServices, activeArticles } = useCatalog();
-  const { activeExtraServices, activePaymentMethods } = useConfig();
+  const { activePaymentMethods } = useConfig();
   const { createOrder } = useOrders();
   
   // Tab selection - default to articles
@@ -146,7 +146,6 @@ export default function QuickSale() {
   
   // Cart
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
   
   // Discount
   const [discountAmount, setDiscountAmount] = useState(0);
@@ -245,17 +244,10 @@ export default function QuickSale() {
 
   // Calculate totals
   const cartTotal = useMemo(() => {
-    return cart.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    return (cart || []).reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
   }, [cart]);
 
-  const extrasTotal = useMemo(() => {
-    return selectedExtras.reduce((sum, extraId) => {
-      const extra = activeExtraServices.find(e => e.id === extraId);
-      return sum + (extra?.price || 0);
-    }, 0);
-  }, [selectedExtras, activeExtraServices]);
-
-  const subtotal = cartTotal + extrasTotal;
+  const subtotal = cartTotal;
   const totalAmount = Math.max(0, subtotal - discountAmount);
   const change = parseFloat(amountReceived || '0') - totalAmount;
 
@@ -317,27 +309,19 @@ export default function QuickSale() {
     setCart(prev => prev.filter(item => item.id !== itemId));
   };
 
-  // Toggle extra
-  const toggleExtra = (extraId: string) => {
-    setSelectedExtras(prev => 
-      prev.includes(extraId) 
-        ? prev.filter(id => id !== extraId)
-        : [...prev, extraId]
-    );
-  };
 
   // Quick amount buttons
   const quickAmounts = [50, 100, 200, 500];
 
   // Build Order object from cart
   const buildOrder = (ticketCode: string): Order => {
-    const orderItems: OrderItem[] = cart.map((item) => ({
+    const orderItems: OrderItem[] = (cart || []).map((item) => ({
       id: item.id,
       name: item.name,
       type: item.pricingType === 'weight' ? 'weight' : 'piece',
       quantity: item.quantity,
       unitPrice: item.unitPrice,
-      extras: selectedExtras,
+      extras: [],
     }));
 
     const now = new Date();
@@ -386,8 +370,8 @@ export default function QuickSale() {
   }, [cart]);
 
   // Get items by type
-  const articleItems = useMemo(() => cart.filter(item => item.type === 'article'), [cart]);
-  const serviceItems = useMemo(() => cart.filter(item => item.type === 'service'), [cart]);
+  const articleItems = useMemo(() => (cart || []).filter(item => item.type === 'article'), [cart]);
+  const serviceItems = useMemo(() => (cart || []).filter(item => item.type === 'service'), [cart]);
 
   // Process direct article sale (no order created)
   const processDirectArticleSale = async (customerId: string): Promise<DirectSaleResult> => {
@@ -505,13 +489,13 @@ export default function QuickSale() {
       }
 
       // If has services, create order (with or without articles)
-      const orderItems: OrderItem[] = cart.map((item) => ({
+      const orderItems: OrderItem[] = (cart || []).map((item) => ({
         id: item.id,
         name: item.name,
         type: item.pricingType === 'weight' ? 'weight' : 'piece',
         quantity: item.quantity,
         unitPrice: item.unitPrice,
-        extras: item.type === 'service' ? selectedExtras : [],
+        extras: [],
       }));
 
       // Create order object
@@ -628,7 +612,6 @@ export default function QuickSale() {
     setPickupSlot('');
     setDeliverySlot('');
     setCart([]);
-    setSelectedExtras([]);
     setDiscountAmount(0);
     setPaymentMethod('cash');
     setAmountReceived('');
@@ -766,38 +749,6 @@ export default function QuickSale() {
             </div>
           )}
 
-          {/* Extra Services */}
-          {activeExtraServices.length > 0 && (
-            <div className="mt-6">
-              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide mb-3">
-                Servicios Extra
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {activeExtraServices.map((extra) => {
-                  const isSelected = selectedExtras.includes(extra.id);
-                  
-                  return (
-                    <button
-                      key={extra.id}
-                      onClick={() => toggleExtra(extra.id)}
-                      className={cn(
-                        'flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all',
-                        isSelected
-                          ? 'border-primary bg-primary/10 text-primary'
-                          : 'border-border hover:border-primary/50 bg-card'
-                      )}
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      <span className="font-medium">{extra.name}</span>
-                      <Badge variant={isSelected ? 'default' : 'secondary'}>
-                        +${extra.price.toFixed(2)}
-                      </Badge>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -937,15 +888,12 @@ export default function QuickSale() {
                       className="pl-10"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <TimeSlotPicker
-                      value={pickupSlot}
-                      onChange={setPickupSlot}
-                      label="Hora de recogida"
-                      placeholder="Seleccionar hora..."
-                    />
-                    <QuickTimeButtons onSelect={setPickupSlot} selectedTime={pickupSlot} />
-                  </div>
+                  <TimeSlotPicker
+                    value={pickupSlot}
+                    onChange={setPickupSlot}
+                    label="Hora de recogida"
+                    placeholder="Seleccionar hora..."
+                  />
                 </div>
               )}
             </div>
@@ -971,15 +919,12 @@ export default function QuickSale() {
                       className="pl-10"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <TimeSlotPicker
-                      value={deliverySlot}
-                      onChange={setDeliverySlot}
-                      label="Hora de entrega"
-                      placeholder="Seleccionar hora..."
-                    />
-                    <QuickTimeButtons onSelect={setDeliverySlot} selectedTime={deliverySlot} />
-                  </div>
+                  <TimeSlotPicker
+                    value={deliverySlot}
+                    onChange={setDeliverySlot}
+                    label="Hora de entrega"
+                    placeholder="Seleccionar hora..."
+                  />
                 </div>
               )}
             </div>
@@ -1070,23 +1015,6 @@ export default function QuickSale() {
                   </div>
                 </div>
               ))}
-
-              {/* Extras in cart */}
-              {selectedExtras.length > 0 && (
-                <>
-                  <Separator />
-                  {selectedExtras.map((extraId) => {
-                    const extra = activeExtraServices.find(e => e.id === extraId);
-                    if (!extra) return null;
-                    return (
-                      <div key={extraId} className="flex items-center justify-between px-3 py-2 text-sm">
-                        <span className="text-muted-foreground">+ {extra.name}</span>
-                        <span className="font-medium">${extra.price.toFixed(2)}</span>
-                      </div>
-                    );
-                  })}
-                </>
-              )}
             </div>
           )}
         </div>
