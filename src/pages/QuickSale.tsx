@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { OrderQRCode } from '@/components/orders/OrderQRCode';
 import { TicketPrint } from '@/components/orders/TicketPrint';
 import {
@@ -82,7 +82,6 @@ interface CartItem {
   type: 'service' | 'article';
 }
 
-type SaleTab = 'services' | 'articles';
 type SaleType = 'articles_only' | 'with_services';
 
 interface DirectSaleResult {
@@ -118,8 +117,7 @@ export default function QuickSale() {
   const { activePaymentMethods } = useConfig();
   const { createOrder } = useOrders();
   
-  // Tab selection - default to articles
-  const [activeTab, setActiveTab] = useState<SaleTab>('articles');
+  // Search
   
   // Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -311,7 +309,7 @@ export default function QuickSale() {
 
 
   // Quick amount buttons
-  const quickAmounts = [50, 100, 200, 500];
+  const quickAmounts = [50, 100, 200, 500, 1000, 2000];
 
   // Build Order object from cart
   const buildOrder = (ticketCode: string): Order => {
@@ -620,20 +618,19 @@ export default function QuickSale() {
     setCompletedDirectSale(null);
   };
 
-  // Get items for current tab with search filter
+  // Get articles with search filter (only articles in quick sale)
   const currentItems = useMemo(() => {
-    const items = activeTab === 'services' ? activeServices : activeArticles;
-    if (!searchQuery.trim()) return items;
+    if (!searchQuery.trim()) return activeArticles;
     
     const query = searchQuery.toLowerCase();
-    return items.filter(item => 
+    return activeArticles.filter(item => 
       item.name.toLowerCase().includes(query) ||
       item.category.toLowerCase().includes(query) ||
       item.description?.toLowerCase().includes(query)
     );
-  }, [activeTab, activeServices, activeArticles, searchQuery]);
+  }, [activeArticles, searchQuery]);
   
-  const currentColors = activeTab === 'services' ? SERVICE_COLORS : ARTICLE_COLORS;
+  const currentColors = ARTICLE_COLORS;
 
   return (
     <div className="h-[calc(100vh-2rem)] flex flex-col lg:flex-row gap-4 p-4 lg:p-6 overflow-hidden">
@@ -667,19 +664,11 @@ export default function QuickSale() {
           </div>
         </div>
 
-        {/* Tab Selection */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as SaleTab)} className="mb-4">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="articles" className="gap-2">
-              <Shirt className="w-4 h-4" />
-              Artículos ({activeArticles.length})
-            </TabsTrigger>
-            <TabsTrigger value="services" className="gap-2">
-              <Sparkles className="w-4 h-4" />
-              Servicios ({activeServices.length})
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {/* Articles Header */}
+        <div className="flex items-center gap-2 mb-4">
+          <Shirt className="w-5 h-5 text-primary" />
+          <h3 className="font-semibold">Artículos ({activeArticles.length})</h3>
+        </div>
 
         {/* Items Grid */}
         <div className="flex-1 overflow-y-auto">
@@ -692,8 +681,8 @@ export default function QuickSale() {
                   <p className="text-sm">Intenta con otro término de búsqueda</p>
                 </>
               ) : (
-                <>
-                  <p>No hay {activeTab === 'services' ? 'servicios' : 'artículos'} activos</p>
+              <>
+                  <p>No hay artículos activos</p>
                   <p className="text-sm">Agrega desde el módulo de Catálogo</p>
                 </>
               )}
@@ -725,11 +714,7 @@ export default function QuickSale() {
                       </Badge>
                     )}
                     <div className={cn('w-10 h-10 lg:w-12 lg:h-12 rounded-lg flex items-center justify-center text-white', colorClass)}>
-                      {activeTab === 'services' ? (
-                        <Sparkles className="w-5 h-5 lg:w-6 lg:h-6" />
-                      ) : (
-                        <Shirt className="w-5 h-5 lg:w-6 lg:h-6" />
-                      )}
+                      <Shirt className="w-5 h-5 lg:w-6 lg:h-6" />
                     </div>
                     <span className="font-semibold text-xs lg:text-sm line-clamp-2">{item.name}</span>
                     <div className="flex items-center gap-1 text-primary font-bold text-base lg:text-lg">
