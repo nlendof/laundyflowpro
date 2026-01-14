@@ -19,6 +19,8 @@ export type Database = {
           admin_id: string
           code: string
           created_at: string | null
+          discount_type: string | null
+          discount_value: number | null
           expires_at: string | null
           id: string
           is_active: boolean | null
@@ -28,6 +30,8 @@ export type Database = {
           admin_id: string
           code: string
           created_at?: string | null
+          discount_type?: string | null
+          discount_value?: number | null
           expires_at?: string | null
           id?: string
           is_active?: boolean | null
@@ -37,6 +41,8 @@ export type Database = {
           admin_id?: string
           code?: string
           created_at?: string | null
+          discount_type?: string | null
+          discount_value?: number | null
           expires_at?: string | null
           id?: string
           is_active?: boolean | null

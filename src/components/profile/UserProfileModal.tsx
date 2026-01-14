@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, Phone, Mail, Camera, Lock, Eye, EyeOff, Loader2, Save } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { User, Phone, Camera, Lock, Eye, EyeOff, Loader2, Save, Tag } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { AdminDiscountCodes } from "@/components/settings/AdminDiscountCodes";
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -23,16 +25,17 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
   const [phone, setPhone] = useState("");
-  const [countryCode, setCountryCode] = useState("+52");
+  const [countryCode, setCountryCode] = useState("+1");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   // Password change
   const [showPasswordSection, setShowPasswordSection] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPasswords, setShowPasswords] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     if (isOpen && user) {
@@ -51,13 +54,11 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
 
       if (data) {
         setName(data.name || "");
-        // Extract nickname if name contains it (format: "Name (nickname)")
         const nicknameMatch = data.name?.match(/\((.+)\)$/);
         if (nicknameMatch) {
           setNickname(nicknameMatch[1]);
           setName(data.name.replace(/\s*\(.+\)$/, ""));
         }
-        // Handle phone with country code
         if (data.phone) {
           if (data.phone.startsWith("+")) {
             const codeMatch = data.phone.match(/^(\+\d{1,3})/);
@@ -86,7 +87,6 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
 
     setIsSaving(true);
     try {
-      // Combine name with nickname if provided
       const fullName = nickname ? `${name} (${nickname})` : name;
       const fullPhone = phone ? `${countryCode}${phone}` : null;
 
@@ -135,7 +135,6 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
       if (error) throw error;
 
       toast.success("Contraseña actualizada correctamente");
-      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
       setShowPasswordSection(false);
@@ -175,7 +174,7 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className={isAdmin ? "max-w-2xl" : "max-w-md"}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="w-5 h-5" />
@@ -187,165 +186,294 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
           <div className="flex items-center justify-center py-8">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
+        ) : isAdmin ? (
+          <Tabs defaultValue="profile" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="profile" className="gap-2">
+                <User className="w-4 h-4" />
+                Perfil
+              </TabsTrigger>
+              <TabsTrigger value="promotions" className="gap-2">
+                <Tag className="w-4 h-4" />
+                Promociones
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="profile" className="mt-4">
+              <ProfileForm
+                name={name}
+                setName={setName}
+                nickname={nickname}
+                setNickname={setNickname}
+                phone={phone}
+                setPhone={setPhone}
+                countryCode={countryCode}
+                setCountryCode={setCountryCode}
+                avatarUrl={avatarUrl}
+                email={user.email}
+                onAvatarUpload={handleAvatarUpload}
+                showPasswordSection={showPasswordSection}
+                setShowPasswordSection={setShowPasswordSection}
+                newPassword={newPassword}
+                setNewPassword={setNewPassword}
+                confirmPassword={confirmPassword}
+                setConfirmPassword={setConfirmPassword}
+                showPasswords={showPasswords}
+                setShowPasswords={setShowPasswords}
+                isChangingPassword={isChangingPassword}
+                onChangePassword={handleChangePassword}
+                isSaving={isSaving}
+                onSave={handleSaveProfile}
+                onCancel={onClose}
+              />
+            </TabsContent>
+            
+            <TabsContent value="promotions" className="mt-4">
+              <AdminDiscountCodes />
+            </TabsContent>
+          </Tabs>
         ) : (
-          <div className="space-y-6">
-            {/* Avatar */}
-            <div className="flex flex-col items-center gap-3">
-              <div className="relative">
-                <Avatar className="w-24 h-24">
-                  <AvatarImage src={avatarUrl || undefined} />
-                  <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
-                    {name.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
-                <label className="absolute bottom-0 right-0 p-2 bg-primary rounded-full cursor-pointer hover:bg-primary/90 transition-colors">
-                  <Camera className="w-4 h-4 text-primary-foreground" />
-                  <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
-                </label>
-              </div>
-              <p className="text-sm text-muted-foreground">{user.email}</p>
-            </div>
-
-            {/* Profile Fields */}
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nombre completo</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Tu nombre"
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="nickname">Apodo (opcional)</Label>
-                  <Input
-                    id="nickname"
-                    value={nickname}
-                    onChange={(e) => setNickname(e.target.value)}
-                    placeholder="Ej: Juanito"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phone">Teléfono</Label>
-                <div className="flex gap-2">
-                  <select
-                    value={countryCode}
-                    onChange={(e) => setCountryCode(e.target.value)}
-                    className="flex h-10 w-24 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    <option value="+1">+1 RD</option>
-                    <option value="+1">+1 US</option>
-                    <option value="+34">+34 ES</option>
-                    <option value="+57">+57 CO</option>
-                    <option value="+54">+54 AR</option>
-                  </select>
-                  <div className="relative flex-1">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="phone"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-                      placeholder="10 dígitos"
-                      className="pl-10"
-                      maxLength={10}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Password Section */}
-            <div className="border-t pt-4">
-              <Button
-                variant="outline"
-                className="w-full gap-2"
-                onClick={() => setShowPasswordSection(!showPasswordSection)}
-              >
-                <Lock className="w-4 h-4" />
-                Cambiar Contraseña
-              </Button>
-
-              {showPasswordSection && (
-                <div className="mt-4 space-y-4 p-4 bg-muted/50 rounded-lg">
-                  <div className="space-y-2">
-                    <Label>Nueva Contraseña</Label>
-                    <div className="relative">
-                      <Input
-                        type={showPasswords ? "text" : "password"}
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="Mínimo 6 caracteres"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full"
-                        onClick={() => setShowPasswords(!showPasswords)}
-                      >
-                        {showPasswords ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Confirmar Contraseña</Label>
-                    <Input
-                      type={showPasswords ? "text" : "password"}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Repite la contraseña"
-                    />
-                  </div>
-
-                  <Button
-                    className="w-full"
-                    onClick={handleChangePassword}
-                    disabled={!newPassword || !confirmPassword || isChangingPassword}
-                  >
-                    {isChangingPassword ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                        Cambiando...
-                      </>
-                    ) : (
-                      "Actualizar Contraseña"
-                    )}
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {/* Save Button */}
-            <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={onClose}>
-                Cancelar
-              </Button>
-              <Button className="flex-1 gap-2" onClick={handleSaveProfile} disabled={isSaving}>
-                {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Guardando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4" />
-                    Guardar
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
+          <ProfileForm
+            name={name}
+            setName={setName}
+            nickname={nickname}
+            setNickname={setNickname}
+            phone={phone}
+            setPhone={setPhone}
+            countryCode={countryCode}
+            setCountryCode={setCountryCode}
+            avatarUrl={avatarUrl}
+            email={user.email}
+            onAvatarUpload={handleAvatarUpload}
+            showPasswordSection={showPasswordSection}
+            setShowPasswordSection={setShowPasswordSection}
+            newPassword={newPassword}
+            setNewPassword={setNewPassword}
+            confirmPassword={confirmPassword}
+            setConfirmPassword={setConfirmPassword}
+            showPasswords={showPasswords}
+            setShowPasswords={setShowPasswords}
+            isChangingPassword={isChangingPassword}
+            onChangePassword={handleChangePassword}
+            isSaving={isSaving}
+            onSave={handleSaveProfile}
+            onCancel={onClose}
+          />
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+interface ProfileFormProps {
+  name: string;
+  setName: (v: string) => void;
+  nickname: string;
+  setNickname: (v: string) => void;
+  phone: string;
+  setPhone: (v: string) => void;
+  countryCode: string;
+  setCountryCode: (v: string) => void;
+  avatarUrl: string | null;
+  email?: string;
+  onAvatarUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  showPasswordSection: boolean;
+  setShowPasswordSection: (v: boolean) => void;
+  newPassword: string;
+  setNewPassword: (v: string) => void;
+  confirmPassword: string;
+  setConfirmPassword: (v: string) => void;
+  showPasswords: boolean;
+  setShowPasswords: (v: boolean) => void;
+  isChangingPassword: boolean;
+  onChangePassword: () => void;
+  isSaving: boolean;
+  onSave: () => void;
+  onCancel: () => void;
+}
+
+function ProfileForm({
+  name,
+  setName,
+  nickname,
+  setNickname,
+  phone,
+  setPhone,
+  countryCode,
+  setCountryCode,
+  avatarUrl,
+  email,
+  onAvatarUpload,
+  showPasswordSection,
+  setShowPasswordSection,
+  newPassword,
+  setNewPassword,
+  confirmPassword,
+  setConfirmPassword,
+  showPasswords,
+  setShowPasswords,
+  isChangingPassword,
+  onChangePassword,
+  isSaving,
+  onSave,
+  onCancel,
+}: ProfileFormProps) {
+  return (
+    <div className="space-y-6">
+      {/* Avatar */}
+      <div className="flex flex-col items-center gap-3">
+        <div className="relative">
+          <Avatar className="w-24 h-24">
+            <AvatarImage src={avatarUrl || undefined} />
+            <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
+              {name.charAt(0)}
+            </AvatarFallback>
+          </Avatar>
+          <label className="absolute bottom-0 right-0 p-2 bg-primary rounded-full cursor-pointer hover:bg-primary/90 transition-colors">
+            <Camera className="w-4 h-4 text-primary-foreground" />
+            <input type="file" accept="image/*" onChange={onAvatarUpload} className="hidden" />
+          </label>
+        </div>
+        <p className="text-sm text-muted-foreground">{email}</p>
+      </div>
+
+      {/* Profile Fields */}
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Nombre completo</Label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Tu nombre"
+                className="pl-10"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="nickname">Apodo (opcional)</Label>
+            <Input
+              id="nickname"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              placeholder="Ej: Juanito"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="phone">Teléfono</Label>
+          <div className="flex gap-2">
+            <select
+              value={countryCode}
+              onChange={(e) => setCountryCode(e.target.value)}
+              className="flex h-10 w-24 rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="+1">+1 RD</option>
+              <option value="+1">+1 US</option>
+              <option value="+34">+34 ES</option>
+              <option value="+57">+57 CO</option>
+              <option value="+54">+54 AR</option>
+            </select>
+            <div className="relative flex-1">
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                id="phone"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                placeholder="10 dígitos"
+                className="pl-10"
+                maxLength={10}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Password Section */}
+      <div className="border-t pt-4">
+        <Button
+          variant="outline"
+          className="w-full gap-2"
+          onClick={() => setShowPasswordSection(!showPasswordSection)}
+        >
+          <Lock className="w-4 h-4" />
+          Cambiar Contraseña
+        </Button>
+
+        {showPasswordSection && (
+          <div className="mt-4 space-y-4 p-4 bg-muted/50 rounded-lg">
+            <div className="space-y-2">
+              <Label>Nueva Contraseña</Label>
+              <div className="relative">
+                <Input
+                  type={showPasswords ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full"
+                  onClick={() => setShowPasswords(!showPasswords)}
+                >
+                  {showPasswords ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Confirmar Contraseña</Label>
+              <Input
+                type={showPasswords ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Repite la contraseña"
+              />
+            </div>
+
+            <Button
+              className="w-full"
+              onClick={onChangePassword}
+              disabled={!newPassword || !confirmPassword || isChangingPassword}
+            >
+              {isChangingPassword ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Cambiando...
+                </>
+              ) : (
+                "Actualizar Contraseña"
+              )}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Save Button */}
+      <div className="flex gap-3">
+        <Button variant="outline" className="flex-1" onClick={onCancel}>
+          Cancelar
+        </Button>
+        <Button className="flex-1 gap-2" onClick={onSave} disabled={isSaving}>
+          {isSaving ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Guardando...
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4" />
+              Guardar
+            </>
+          )}
+        </Button>
+      </div>
+    </div>
   );
 }
