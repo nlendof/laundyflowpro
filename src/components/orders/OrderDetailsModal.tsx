@@ -16,6 +16,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { OrderStatusFlow } from '@/components/OrderStatusFlow';
 import { OrderQRCode } from '@/components/orders/OrderQRCode';
 import { PrintTicketButton } from '@/components/orders/PrintTicketButton';
+import { WhatsAppNotifyButton } from '@/components/orders/WhatsAppNotifyButton';
 import { useOperationsFlow } from '@/hooks/useOperationsFlow';
 import {
   Phone,
@@ -429,6 +430,16 @@ export function OrderDetailsModal({
           {/* Actions */}
           <div className="flex flex-col sm:flex-row gap-3 pt-4">
             <PrintTicketButton order={order} variant="outline" className="flex-1" />
+            
+            {/* WhatsApp Notify Button - Only show when ready_delivery */}
+            {order.status === 'ready_delivery' && (
+              <WhatsAppNotifyButton 
+                order={order} 
+                notificationType="ready" 
+                variant="default"
+                className="flex-1 bg-green-600 hover:bg-green-700"
+              />
+            )}
             
             <div className="flex gap-2 flex-1">
               {/* Regress Status Button */}

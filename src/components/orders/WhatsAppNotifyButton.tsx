@@ -3,6 +3,7 @@ import { MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useConfig } from '@/contexts/ConfigContext';
 import { Order } from '@/types';
+import { formatCurrency } from '@/lib/currency';
 
 interface WhatsAppNotifyButtonProps {
   order: Order;
@@ -23,18 +24,31 @@ export function WhatsAppNotifyButton({
 }: WhatsAppNotifyButtonProps) {
   const { business } = useConfig();
 
+  const pendingAmount = order.totalAmount - order.paidAmount;
+
+  const getItemsSummary = (): string => {
+    return order.items
+      .map((item) => `• ${item.quantity} ${item.type === 'weight' ? 'kg' : 'pz'} - ${item.name}`)
+      .join('\n');
+  };
+
   const getNotificationMessage = (): string => {
     const greeting = `¡Hola ${order.customerName}! 👋`;
     const signature = `\n\n${business.name}\n📞 ${business.phone}`;
+    const itemsList = getItemsSummary();
+    
+    const pendingPaymentMessage = !order.isPaid && pendingAmount > 0
+      ? `\n\n💳 *Monto pendiente por pagar: ${formatCurrency(pendingAmount)}*`
+      : '';
     
     switch (notificationType) {
       case 'ready':
-        return `${greeting}\n\n✨ *¡Tu pedido está listo!*\n\n📋 Ticket: *${order.ticketCode}*\n💰 Total: *$${order.totalAmount.toFixed(2)}*${order.isPaid ? ' ✅ Pagado' : ''}\n\n${order.needsDelivery 
+        return `${greeting}\n\n✨ *¡Tu pedido está listo!*\n\n📋 Ticket: *${order.ticketCode}*\n\n📦 *Detalle del pedido:*\n${itemsList}\n\n💰 Total: *${formatCurrency(order.totalAmount)}*${order.isPaid ? ' ✅ Pagado' : ''}${pendingPaymentMessage}\n\n${order.needsDelivery 
           ? '🚗 Pronto enviaremos tu pedido a domicilio.' 
           : '📍 Puedes pasar a recogerlo en nuestro local.'}\n\n¡Gracias por tu preferencia!${signature}`;
       
       case 'in_transit':
-        return `${greeting}\n\n🚗 *¡Tu pedido va en camino!*\n\n📋 Ticket: *${order.ticketCode}*\n📍 Dirección: ${order.deliveryService?.address || order.customerAddress || 'Por confirmar'}\n\n⏰ Llegará en breve. ¡Mantente atento!\n\n¡Gracias por tu preferencia!${signature}`;
+        return `${greeting}\n\n🚗 *¡Tu pedido va en camino!*\n\n📋 Ticket: *${order.ticketCode}*\n📍 Dirección: ${order.deliveryService?.address || order.customerAddress || 'Por confirmar'}${pendingPaymentMessage}\n\n⏰ Llegará en breve. ¡Mantente atento!\n\n¡Gracias por tu preferencia!${signature}`;
       
       case 'delivered':
         return `${greeting}\n\n✅ *¡Tu pedido ha sido entregado!*\n\n📋 Ticket: *${order.ticketCode}*\n\nEsperamos que todo esté perfecto. ¡Gracias por confiar en nosotros! 🙏\n\n¿Te gustó nuestro servicio? Tu recomendación nos ayuda a crecer. ⭐${signature}`;
