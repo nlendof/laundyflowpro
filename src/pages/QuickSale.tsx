@@ -867,67 +867,60 @@ export default function QuickSale() {
               </div>
             )}
             
-            {/* Pickup Option */}
-            <div className="space-y-2 p-3 bg-muted/30 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Package className="w-4 h-4 text-orange-500" />
-                  <span className="text-sm font-medium">Recoger a domicilio</span>
-                </div>
-                <Switch checked={needsPickup} onCheckedChange={setNeedsPickup} />
-              </div>
-              
-              {needsPickup && (
-                <div className="space-y-2 pl-6">
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Dirección de recogida"
-                      value={pickupAddress}
-                      onChange={(e) => setPickupAddress(e.target.value)}
-                      className="pl-10"
-                    />
+            {/* Pickup & Delivery Options - Two columns */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Pickup Option */}
+              <div className="p-3 bg-muted/30 rounded-lg space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Package className="w-4 h-4 text-orange-500" />
+                    <span className="text-sm font-medium">Recoger</span>
                   </div>
+                  <Switch checked={needsPickup} onCheckedChange={setNeedsPickup} />
+                </div>
+                {needsPickup && (
                   <TimeSlotPicker
                     value={pickupSlot}
                     onChange={setPickupSlot}
-                    label="Hora de recogida"
-                    placeholder="Seleccionar hora..."
+                    placeholder="Hora recogida..."
                   />
-                </div>
-              )}
-            </div>
-            
-            {/* Delivery Option */}
-            <div className="space-y-2 p-3 bg-muted/30 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-medium">Entregar a domicilio</span>
-                </div>
-                <Switch checked={needsDelivery} onCheckedChange={setNeedsDelivery} />
+                )}
               </div>
               
-              {needsDelivery && (
-                <div className="space-y-2 pl-6">
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Dirección de entrega"
-                      value={deliveryAddress}
-                      onChange={(e) => setDeliveryAddress(e.target.value)}
-                      className="pl-10"
-                    />
+              {/* Delivery Option */}
+              <div className="p-3 bg-muted/30 rounded-lg space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Truck className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium">Entregar</span>
                   </div>
+                  <Switch checked={needsDelivery} onCheckedChange={setNeedsDelivery} />
+                </div>
+                {needsDelivery && (
                   <TimeSlotPicker
                     value={deliverySlot}
                     onChange={setDeliverySlot}
-                    label="Hora de entrega"
-                    placeholder="Seleccionar hora..."
+                    placeholder="Hora entrega..."
                   />
-                </div>
-              )}
+                )}
+              </div>
             </div>
+            
+            {/* Single Address Field - shown when pickup or delivery is enabled */}
+            {(needsPickup || needsDelivery) && (
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Dirección del cliente"
+                  value={pickupAddress}
+                  onChange={(e) => {
+                    setPickupAddress(e.target.value);
+                    setDeliveryAddress(e.target.value);
+                  }}
+                  className="pl-10"
+                />
+              </div>
+            )}
           </div>
         </div>
 
