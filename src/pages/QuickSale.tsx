@@ -53,6 +53,7 @@ import {
   UserPlus,
   Check,
   Package,
+  MessageCircle,
 } from 'lucide-react';
 import { TimeSlotPicker } from '@/components/TimeSlotPicker';
 import { toast } from 'sonner';
@@ -87,8 +88,12 @@ type SaleType = 'articles_only' | 'with_services';
 interface DirectSaleResult {
   success: boolean;
   saleType: SaleType;
+  saleCode: string;
   totalAmount: number;
   itemsSold: string[];
+  customerName: string;
+  customerPhone: string;
+  createdAt: Date;
 }
 
 // Colors for service buttons
@@ -371,23 +376,35 @@ export default function QuickSale() {
   const articleItems = useMemo(() => (cart || []).filter(item => item.type === 'article'), [cart]);
   const serviceItems = useMemo(() => (cart || []).filter(item => item.type === 'service'), [cart]);
 
+  // Generate sale code for direct sales
+  const generateSaleCode = () => {
+    const date = new Date();
+    const prefix = 'VR'; // Venta Rápida
+    const dateStr = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+    const timeStr = `${String(date.getHours()).padStart(2, '0')}${String(date.getMinutes()).padStart(2, '0')}`;
+    const random = Math.random().toString(36).substring(2, 5).toUpperCase();
+    return `${prefix}-${dateStr}-${timeStr}-${random}`;
+  };
+
   // Process direct article sale (no order created)
   const processDirectArticleSale = async (customerId: string): Promise<DirectSaleResult> => {
     const itemsSold: string[] = [];
+    const saleCode = generateSaleCode();
+    const saleDate = new Date();
     
     // Build description for cash register
     const itemsDescription = articleItems.map(item => 
       `${item.name} x${item.quantity}`
     ).join(', ');
 
-    // Register in cash register
+    // Register in cash register with sale code in description
     const { error: cashError } = await supabase
       .from('cash_register')
       .insert({
         entry_type: 'income',
         category: 'sales',
         amount: totalAmount,
-        description: `Venta de artículos: ${itemsDescription}${customerName ? ` - Cliente: ${customerName}` : ''}`,
+        description: `[${saleCode}] Venta de artículos: ${itemsDescription}${customerName ? ` - Cliente: ${customerName}` : ''}`,
       });
 
     if (cashError) throw cashError;
@@ -398,7 +415,7 @@ export default function QuickSale() {
         .from('catalog_articles')
         .select('id, track_inventory, stock')
         .eq('id', item.catalogItemId)
-        .single();
+        .maybeSingle();
       
       if (article?.track_inventory) {
         const newStock = Math.max(0, (article.stock || 0) - item.quantity);
@@ -417,7 +434,7 @@ export default function QuickSale() {
         .from('customers')
         .select('total_orders, total_spent')
         .eq('id', customerId)
-        .single();
+        .maybeSingle();
       
       if (customer) {
         await supabase
@@ -433,8 +450,12 @@ export default function QuickSale() {
     return {
       success: true,
       saleType: 'articles_only',
+      saleCode,
       totalAmount,
       itemsSold,
+      customerName,
+      customerPhone,
+      createdAt: saleDate,
     };
   };
 
@@ -594,6 +615,143 @@ export default function QuickSale() {
       printWindow.print();
       setTimeout(() => printWindow.close(), 500);
     };
+  };
+
+  // Print sale ticket (for direct sales)
+  const handlePrintSaleTicket = () => {
+    if (!completedDirectSale) return;
+
+    const printWindow = window.open('', '_blank', 'width=350,height=600');
+    if (!printWindow) {
+      alert('Por favor habilite las ventanas emergentes para imprimir');
+      return;
+    }
+
+    const formatDate = (date: Date) => {
+      return date.toLocaleDateString('es-MX', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    };
+
+    const ticketContent = `
+      <div style="text-align: center; margin-bottom: 8px;">
+        <div style="font-weight: bold; font-size: 14px;">TICKET DE VENTA</div>
+        <div style="font-size: 16px; font-weight: bold; margin: 8px 0;">${completedDirectSale.saleCode}</div>
+        <div>${formatDate(completedDirectSale.createdAt)}</div>
+      </div>
+      <div style="border-top: 1px dashed #000; margin: 8px 0;"></div>
+      ${completedDirectSale.customerName ? `<div><strong>Cliente:</strong> ${completedDirectSale.customerName}</div>` : ''}
+      ${completedDirectSale.customerPhone ? `<div><strong>Tel:</strong> ${completedDirectSale.customerPhone}</div>` : ''}
+      <div style="border-top: 1px dashed #000; margin: 8px 0;"></div>
+      <div style="font-weight: bold; margin-bottom: 4px;">ARTÍCULOS:</div>
+      ${completedDirectSale.itemsSold.map(item => `<div>• ${item}</div>`).join('')}
+      <div style="border-top: 1px dashed #000; margin: 8px 0;"></div>
+      <div style="text-align: right; font-size: 16px; font-weight: bold;">
+        TOTAL: $${completedDirectSale.totalAmount.toFixed(2)}
+      </div>
+      <div style="border-top: 1px dashed #000; margin: 8px 0;"></div>
+      <div style="text-align: center; font-size: 10px;">¡Gracias por su compra!</div>
+    `;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Ticket ${completedDirectSale.saleCode}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+              font-family: monospace, 'Courier New', Courier;
+              font-size: 12px;
+              line-height: 1.3;
+              width: 80mm;
+              padding: 2mm;
+              background: white;
+              color: black;
+            }
+            @media print {
+              @page { size: 80mm auto; margin: 0; }
+              body { width: 80mm; padding: 2mm; }
+            }
+          </style>
+        </head>
+        <body>${ticketContent}</body>
+      </html>
+    `);
+
+    printWindow.document.close();
+
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+      setTimeout(() => printWindow.close(), 500);
+    };
+  };
+
+  // Send WhatsApp for order
+  const handleSendOrderWhatsApp = () => {
+    if (!completedOrder?.customerPhone) {
+      toast.error('El cliente no tiene número de teléfono registrado');
+      return;
+    }
+
+    let phone = completedOrder.customerPhone.replace(/[\s\-\(\)]/g, '');
+    if (!phone.startsWith('+')) {
+      if (phone.startsWith('0')) phone = phone.substring(1);
+      phone = `+52${phone}`;
+    }
+
+    const message = `🧺 *Ticket: ${completedOrder.ticketCode}*
+
+👤 Cliente: ${completedOrder.customerName}
+💰 Total: $${completedOrder.totalAmount.toFixed(2)}
+
+📦 Artículos:
+${completedOrder.items.map(item => `• ${item.name} x${item.quantity}`).join('\n')}
+
+✅ *PAGADO*
+
+¡Gracias por su compra!`;
+
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/${phone.replace('+', '')}?text=${encodedMessage}`;
+    window.open(whatsappUrl, '_blank');
+    toast.success('Abriendo WhatsApp...');
+  };
+
+  // Send WhatsApp for direct sale
+  const handleSendSaleWhatsApp = () => {
+    if (!completedDirectSale?.customerPhone) {
+      toast.error('El cliente no tiene número de teléfono registrado');
+      return;
+    }
+
+    let phone = completedDirectSale.customerPhone.replace(/[\s\-\(\)]/g, '');
+    if (!phone.startsWith('+')) {
+      if (phone.startsWith('0')) phone = phone.substring(1);
+      phone = `+52${phone}`;
+    }
+
+    const message = `🧺 *Venta: ${completedDirectSale.saleCode}*
+
+${completedDirectSale.customerName ? `👤 Cliente: ${completedDirectSale.customerName}` : ''}
+💰 Total: $${completedDirectSale.totalAmount.toFixed(2)}
+
+📦 Artículos:
+${completedDirectSale.itemsSold.map(item => `• ${item}`).join('\n')}
+
+✅ *PAGADO*
+
+¡Gracias por su compra!`;
+
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/${phone.replace('+', '')}?text=${encodedMessage}`;
+    window.open(whatsappUrl, '_blank');
+    toast.success('Abriendo WhatsApp...');
   };
 
   // Reset form
@@ -1139,10 +1297,10 @@ export default function QuickSale() {
           </DialogHeader>
           
           <div className="space-y-4 py-4">
-            {/* Sale type indicator */}
+            {/* Sale code for direct sales */}
             {completedDirectSale && (
-              <Badge variant="secondary" className="text-sm">
-                Venta directa de artículos
+              <Badge variant="default" className="text-sm">
+                Venta: {completedDirectSale.saleCode}
               </Badge>
             )}
             {completedOrder && (
@@ -1181,21 +1339,33 @@ export default function QuickSale() {
               </div>
             )}
 
+            {/* Actions row 1: Nueva Venta + Imprimir */}
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={resetSale}>
+                <RefreshCw className="w-4 h-4 mr-2" />
                 Nueva Venta
               </Button>
-              {completedOrder && (
-                <Button 
-                  variant="outline"
-                  className="flex-1 gap-2"
-                  onClick={handlePrintTicket}
-                >
-                  <Printer className="w-4 h-4" />
-                  Imprimir
-                </Button>
-              )}
+              <Button 
+                variant="outline"
+                className="flex-1 gap-2"
+                onClick={completedDirectSale ? handlePrintSaleTicket : handlePrintTicket}
+              >
+                <Printer className="w-4 h-4" />
+                Imprimir
+              </Button>
             </div>
+            
+            {/* Actions row 2: WhatsApp */}
+            {((completedDirectSale?.customerPhone) || (completedOrder?.customerPhone)) && (
+              <Button 
+                variant="secondary"
+                className="w-full gap-2"
+                onClick={completedDirectSale ? handleSendSaleWhatsApp : handleSendOrderWhatsApp}
+              >
+                <MessageCircle className="w-4 h-4" />
+                Enviar por WhatsApp
+              </Button>
+            )}
             
             {completedOrder && (
               <Button 
