@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Dialog,
   DialogContent,
@@ -21,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Shield, Plus, Trash2, Loader2, Copy, RefreshCw, Key } from 'lucide-react';
+import { Shield, Plus, Trash2, Loader2, Copy, RefreshCw, Key, Percent, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -34,6 +35,8 @@ interface DiscountCode {
   uses_remaining: number;
   expires_at: string | null;
   created_at: string;
+  discount_type: 'percentage' | 'fixed';
+  discount_value: number;
 }
 
 export function AdminDiscountCodes() {
@@ -44,6 +47,8 @@ export function AdminDiscountCodes() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   
   const [formData, setFormData] = useState({
+    discountType: 'percentage' as 'percentage' | 'fixed',
+    discountValue: 10,
     uses: 1,
     expiresInHours: 24,
   });
@@ -58,7 +63,11 @@ export function AdminDiscountCodes() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setCodes(data || []);
+      setCodes((data || []).map(code => ({
+        ...code,
+        discount_type: code.discount_type || 'percentage',
+        discount_value: code.discount_value || 0,
+      })) as DiscountCode[]);
     } catch (error) {
       console.error('Error fetching codes:', error);
       toast.error('Error al cargar códigos');
@@ -83,6 +92,16 @@ export function AdminDiscountCodes() {
   };
 
   const handleGenerateCode = async () => {
+    if (formData.discountValue <= 0) {
+      toast.error('El valor del descuento debe ser mayor a 0');
+      return;
+    }
+    
+    if (formData.discountType === 'percentage' && formData.discountValue > 100) {
+      toast.error('El porcentaje no puede ser mayor a 100%');
+      return;
+    }
+
     setGenerating(true);
     try {
       const code = generateCode();
@@ -96,11 +115,23 @@ export function AdminDiscountCodes() {
           code,
           uses_remaining: formData.uses,
           expires_at: expiresAt.toISOString(),
+          discount_type: formData.discountType,
+          discount_value: formData.discountValue,
         });
 
       if (error) throw error;
 
-      toast.success(`Código generado: ${code}`);
+      const discountLabel = formData.discountType === 'percentage' 
+        ? `${formData.discountValue}%` 
+        : `RD$ ${formData.discountValue}`;
+      
+      toast.success(`Código generado: ${code}`, {
+        description: `Descuento: ${discountLabel}`,
+      });
+      
+      // Copy to clipboard
+      navigator.clipboard.writeText(code);
+      
       setIsDialogOpen(false);
       fetchCodes();
     } catch (error) {
@@ -157,7 +188,7 @@ export function AdminDiscountCodes() {
               Códigos de Descuento
             </CardTitle>
             <CardDescription>
-              Genera códigos para aprobar descuentos mayores. Los cajeros pueden usarlos para aplicar descuentos especiales.
+              Genera códigos con descuentos específicos. Los cajeros los usarán para aplicar descuentos.
             </CardDescription>
           </div>
           <Button onClick={() => setIsDialogOpen(true)} className="gap-2">
@@ -170,14 +201,15 @@ export function AdminDiscountCodes() {
             <div className="text-center py-8 text-muted-foreground">
               <Key className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p>No hay códigos activos</p>
-              <p className="text-sm">Genera un código para aprobar descuentos</p>
+              <p className="text-sm">Genera un código cuando un cajero solicite un descuento</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Código</TableHead>
-                  <TableHead>Usos Restantes</TableHead>
+                  <TableHead>Descuento</TableHead>
+                  <TableHead>Usos</TableHead>
                   <TableHead>Expira</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
@@ -207,6 +239,21 @@ export function AdminDiscountCodes() {
                         </div>
                       </TableCell>
                       <TableCell>
+                        <Badge variant="secondary" className="gap-1">
+                          {discountCode.discount_type === 'percentage' ? (
+                            <>
+                              <Percent className="w-3 h-3" />
+                              {discountCode.discount_value}%
+                            </>
+                          ) : (
+                            <>
+                              <DollarSign className="w-3 h-3" />
+                              RD$ {discountCode.discount_value}
+                            </>
+                          )}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
                         <Badge variant={exhausted ? 'secondary' : 'default'}>
                           {discountCode.uses_remaining}
                         </Badge>
@@ -224,7 +271,7 @@ export function AdminDiscountCodes() {
                         {expired ? (
                           <Badge variant="destructive">Expirado</Badge>
                         ) : exhausted ? (
-                          <Badge variant="secondary">Agotado</Badge>
+                          <Badge variant="secondary">Usado</Badge>
                         ) : inactive ? (
                           <Badge variant="outline">Inactivo</Badge>
                         ) : (
@@ -260,6 +307,47 @@ export function AdminDiscountCodes() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Discount Type */}
+            <div className="space-y-2">
+              <Label>Tipo de Descuento</Label>
+              <RadioGroup
+                value={formData.discountType}
+                onValueChange={(value: 'percentage' | 'fixed') => 
+                  setFormData({ ...formData, discountType: value })
+                }
+                className="flex gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="percentage" id="percentage" />
+                  <Label htmlFor="percentage" className="flex items-center gap-1 cursor-pointer">
+                    <Percent className="w-4 h-4" />
+                    Porcentaje
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="fixed" id="fixed" />
+                  <Label htmlFor="fixed" className="flex items-center gap-1 cursor-pointer">
+                    <DollarSign className="w-4 h-4" />
+                    Monto Fijo
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* Discount Value */}
+            <div className="space-y-2">
+              <Label>
+                {formData.discountType === 'percentage' ? 'Porcentaje (%)' : 'Monto (RD$)'}
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                max={formData.discountType === 'percentage' ? 100 : undefined}
+                value={formData.discountValue}
+                onChange={(e) => setFormData({ ...formData, discountValue: parseFloat(e.target.value) || 0 })}
+              />
+            </div>
+            
             <div className="space-y-2">
               <Label>Número de Usos</Label>
               <Input
@@ -283,9 +371,6 @@ export function AdminDiscountCodes() {
                 value={formData.expiresInHours}
                 onChange={(e) => setFormData({ ...formData, expiresInHours: parseInt(e.target.value) || 24 })}
               />
-              <p className="text-xs text-muted-foreground">
-                El código expirará después de este tiempo
-              </p>
             </div>
 
             <div className="flex gap-2">
