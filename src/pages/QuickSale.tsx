@@ -1355,17 +1355,15 @@ ${completedDirectSale.itemsSold.map(item => `• ${item}`).join('\n')}
               </Button>
             </div>
             
-            {/* Actions row 2: WhatsApp */}
-            {((completedDirectSale?.customerPhone) || (completedOrder?.customerPhone)) && (
-              <Button 
-                variant="secondary"
-                className="w-full gap-2"
-                onClick={completedDirectSale ? handleSendSaleWhatsApp : handleSendOrderWhatsApp}
-              >
-                <MessageCircle className="w-4 h-4" />
-                Enviar por WhatsApp
-              </Button>
-            )}
+            {/* Actions row 2: WhatsApp - always show */}
+            <Button 
+              variant="secondary"
+              className="w-full gap-2"
+              onClick={completedDirectSale ? handleSendSaleWhatsApp : handleSendOrderWhatsApp}
+            >
+              <MessageCircle className="w-4 h-4" />
+              Enviar por WhatsApp
+            </Button>
             
             {completedOrder && (
               <Button 
