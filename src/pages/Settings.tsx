@@ -429,6 +429,10 @@ export default function SettingsPage() {
             <Palette className="w-4 h-4" />
             Apariencia
           </TabsTrigger>
+          <TabsTrigger value="promotions" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Percent className="w-4 h-4" />
+            Promociones
+          </TabsTrigger>
           <TabsTrigger value="backup" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Database className="w-4 h-4" />
             Backup
@@ -1223,6 +1227,11 @@ export default function SettingsPage() {
         <TabsContent value="appearance" className="space-y-6">
           <AppearanceSettings />
           <BranchSettings />
+          <AdminDiscountCodes />
+        </TabsContent>
+
+        {/* Promotions Settings */}
+        <TabsContent value="promotions" className="space-y-6">
           <AdminDiscountCodes />
         </TabsContent>
 
