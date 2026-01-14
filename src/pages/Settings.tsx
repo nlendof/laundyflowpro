@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/hooks/useAuth';
 import {
   Select,
   SelectContent,
@@ -118,6 +119,10 @@ const AVAILABLE_COLORS = [
 const WORK_DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
 export default function SettingsPage() {
+  // Get auth info
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  
   // Get shared config from context
   const {
     categories,
@@ -429,10 +434,12 @@ export default function SettingsPage() {
             <Palette className="w-4 h-4" />
             Apariencia
           </TabsTrigger>
-          <TabsTrigger value="promotions" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <Percent className="w-4 h-4" />
-            Promociones
-          </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="promotions" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Percent className="w-4 h-4" />
+              Promociones
+            </TabsTrigger>
+          )}
           <TabsTrigger value="backup" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Database className="w-4 h-4" />
             Backup
