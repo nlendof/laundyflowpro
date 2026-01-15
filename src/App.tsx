@@ -33,6 +33,8 @@ import Returns from "./pages/Returns";
 import ErrorPage from "./pages/ErrorPage";
 import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
+import CustomerPortal from "./pages/CustomerPortal";
+import DriverPortal from "./pages/DriverPortal";
 
 const queryClient = new QueryClient();
 
@@ -102,6 +104,8 @@ function AppRoutes() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/install" element={<Install />} />
+      <Route path="/customer" element={<CustomerPortal />} />
+      <Route path="/driver" element={<DriverPortal />} />
       <Route
         path="/login"
         element={
