@@ -59,7 +59,7 @@ interface OperationOrderCardProps {
   onViewDetails: (order: Order) => void;
 }
 
-function OperationOrderCard({ order, onAdvance, onViewDetails }: OperationOrderCardProps) {
+function OperationOrderCard({ order, onAdvance, onViewDetails, onMarkDelivered }: OperationOrderCardProps & { onMarkDelivered: (order: Order) => void }) {
   const { statusFlow, getStatusConfig, getNextStatus } = useOperationsFlow();
   const readyDeliveryIndex = statusFlow.indexOf('ready_delivery');
   const currentIndex = statusFlow.indexOf(order.status);
@@ -68,6 +68,9 @@ function OperationOrderCard({ order, onAdvance, onViewDetails }: OperationOrderC
   const nextStatusConfig = nextStatus ? getStatusConfig(nextStatus) : null;
 
   const timeInStatus = formatDistanceToNow(order.updatedAt, { locale: es, addSuffix: false });
+
+  // Check if order can be marked as delivered (ready_delivery + no delivery service needed)
+  const canMarkDelivered = order.status === 'ready_delivery' && !order.needsDelivery;
 
   return (
     <Card 
@@ -93,11 +96,18 @@ function OperationOrderCard({ order, onAdvance, onViewDetails }: OperationOrderC
             <User className="w-3.5 h-3.5 text-muted-foreground" />
             {order.customerName}
           </p>
-          {order.isDelivery && (
-            <Badge variant="outline" className="text-xs">
-              🚚 Delivery
-            </Badge>
-          )}
+          <div className="flex gap-1">
+            {order.needsDelivery && (
+              <Badge variant="outline" className="text-xs">
+                🚚 Delivery
+              </Badge>
+            )}
+            {!order.needsDelivery && order.status === 'ready_delivery' && (
+              <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+                🏪 Retiro en local
+              </Badge>
+            )}
+          </div>
         </div>
 
         {/* Items summary */}
@@ -114,7 +124,7 @@ function OperationOrderCard({ order, onAdvance, onViewDetails }: OperationOrderC
           </div>
         )}
 
-        {/* Action button */}
+        {/* Action button - Advance to next status */}
         {canAdvance && nextStatusConfig && (
           <Button
             size="sm"
@@ -129,10 +139,33 @@ function OperationOrderCard({ order, onAdvance, onViewDetails }: OperationOrderC
           </Button>
         )}
 
-        {order.status === 'ready_delivery' && (
-          <div className="flex items-center justify-center gap-2 p-2 bg-green-500/10 rounded-lg text-green-600 dark:text-green-400">
-            <CheckCircle className="w-4 h-4" />
-            <span className="text-sm font-medium">Listo</span>
+        {/* Ready for pickup in store - show delivered button */}
+        {canMarkDelivered && (
+          <div className="space-y-2 mt-2">
+            <div className="flex items-center justify-center gap-2 p-2 bg-green-500/10 rounded-lg text-green-600 dark:text-green-400">
+              <CheckCircle className="w-4 h-4" />
+              <span className="text-sm font-medium">Listo para entregar</span>
+            </div>
+            <Button
+              size="sm"
+              variant="default"
+              className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700"
+              onClick={(e) => {
+                e.stopPropagation();
+                onMarkDelivered(order);
+              }}
+            >
+              <CheckCircle className="w-3.5 h-3.5" />
+              Marcar como Entregado
+            </Button>
+          </div>
+        )}
+
+        {/* Ready for delivery - waiting for driver */}
+        {order.status === 'ready_delivery' && order.needsDelivery && (
+          <div className="flex items-center justify-center gap-2 p-2 bg-blue-500/10 rounded-lg text-blue-600 dark:text-blue-400">
+            <Truck className="w-4 h-4" />
+            <span className="text-sm font-medium">Esperando repartidor</span>
           </div>
         )}
       </CardContent>
@@ -145,9 +178,10 @@ interface OrderDetailsDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onAdvance: (order: Order) => void;
+  onMarkDelivered: (order: Order) => void;
 }
 
-function OrderDetailsDialog({ order, isOpen, onClose, onAdvance }: OrderDetailsDialogProps) {
+function OrderDetailsDialog({ order, isOpen, onClose, onAdvance, onMarkDelivered }: OrderDetailsDialogProps) {
   const { statusFlow, getStatusConfig, getNextStatus } = useOperationsFlow();
   
   if (!order) return null;
@@ -157,6 +191,9 @@ function OrderDetailsDialog({ order, isOpen, onClose, onAdvance }: OrderDetailsD
   const canAdvance = currentIndex >= 0 && currentIndex < readyDeliveryIndex;
   const nextStatus = getNextStatus(order.status);
   const nextStatusConfig = nextStatus ? getStatusConfig(nextStatus) : null;
+  
+  // Check if order can be marked as delivered (ready_delivery + no delivery service needed)
+  const canMarkDelivered = order.status === 'ready_delivery' && !order.needsDelivery;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -179,9 +216,16 @@ function OrderDetailsDialog({ order, isOpen, onClose, onAdvance }: OrderDetailsD
               <Phone className="w-4 h-4" />
               {order.customerPhone}
             </p>
-            {order.isDelivery && (
-              <Badge>🚚 Entrega a Domicilio</Badge>
-            )}
+            <div className="flex gap-2">
+              {order.needsDelivery && (
+                <Badge>🚚 Entrega a Domicilio</Badge>
+              )}
+              {!order.needsDelivery && (
+                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                  🏪 Retiro en local
+                </Badge>
+              )}
+            </div>
           </div>
 
           {/* Items */}
@@ -247,11 +291,35 @@ function OrderDetailsDialog({ order, isOpen, onClose, onAdvance }: OrderDetailsD
             </Button>
           )}
 
-          {order.status === 'ready_delivery' && (
-            <div className="p-4 bg-green-500/10 rounded-xl text-center">
-              <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
-              <p className="font-semibold text-green-600 dark:text-green-400">
-                Pedido listo para entrega
+          {/* Ready for pickup in store - show delivered button */}
+          {canMarkDelivered && (
+            <div className="space-y-3">
+              <div className="p-4 bg-green-500/10 rounded-xl text-center">
+                <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
+                <p className="font-semibold text-green-600 dark:text-green-400">
+                  Listo para entregar al cliente
+                </p>
+              </div>
+              <Button
+                className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700"
+                size="lg"
+                onClick={() => {
+                  onMarkDelivered(order);
+                  onClose();
+                }}
+              >
+                <CheckCircle className="w-4 h-4" />
+                Marcar como Entregado
+              </Button>
+            </div>
+          )}
+
+          {/* Ready for delivery - waiting for driver */}
+          {order.status === 'ready_delivery' && order.needsDelivery && (
+            <div className="p-4 bg-blue-500/10 rounded-xl text-center">
+              <Truck className="w-8 h-8 text-blue-500 mx-auto mb-2" />
+              <p className="font-semibold text-blue-600 dark:text-blue-400">
+                Esperando asignación de repartidor
               </p>
             </div>
           )}
@@ -325,6 +393,16 @@ export default function Operations() {
         const config = getStatusConfig(nextStatus);
         toast.success(`${order.ticketCode} → ${config?.labelEs || nextStatus}`);
       }
+    }
+  };
+
+  const handleMarkDelivered = async (order: Order) => {
+    const success = await updateOrderStatus(order.id, 'delivered');
+    
+    if (success) {
+      toast.success(`${order.ticketCode} → Entregado`, {
+        description: 'El pedido ha sido entregado al cliente en el local',
+      });
     }
   };
 
@@ -428,6 +506,7 @@ export default function Operations() {
                         order={order}
                         onAdvance={handleAdvanceStatus}
                         onViewDetails={handleViewDetails}
+                        onMarkDelivered={handleMarkDelivered}
                       />
                     ))
                   )}
@@ -444,6 +523,7 @@ export default function Operations() {
         isOpen={isDetailsOpen}
         onClose={() => setIsDetailsOpen(false)}
         onAdvance={handleAdvanceStatus}
+        onMarkDelivered={handleMarkDelivered}
       />
     </div>
   );
