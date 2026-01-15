@@ -435,6 +435,78 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_addresses: {
+        Row: {
+          address: string
+          created_at: string | null
+          customer_id: string
+          delivery_instructions: string | null
+          id: string
+          is_default: boolean | null
+          label: string
+          latitude: number | null
+          longitude: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          address: string
+          created_at?: string | null
+          customer_id: string
+          delivery_instructions?: string | null
+          id?: string
+          is_default?: boolean | null
+          label?: string
+          latitude?: number | null
+          longitude?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string
+          created_at?: string | null
+          customer_id?: string
+          delivery_instructions?: string | null
+          id?: string
+          is_default?: boolean | null
+          label?: string
+          latitude?: number | null
+          longitude?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      customer_profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          delivery_notes: string | null
+          id: string
+          phone: string | null
+          preferred_delivery_time: string | null
+          preferred_pickup_time: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          delivery_notes?: string | null
+          id: string
+          phone?: string | null
+          preferred_delivery_time?: string | null
+          preferred_pickup_time?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          delivery_notes?: string | null
+          id?: string
+          phone?: string | null
+          preferred_delivery_time?: string | null
+          preferred_pickup_time?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           address: string | null
@@ -449,6 +521,7 @@ export type Database = {
           total_orders: number | null
           total_spent: number | null
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           address?: string | null
@@ -463,6 +536,7 @@ export type Database = {
           total_orders?: number | null
           total_spent?: number | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           address?: string | null
@@ -477,6 +551,7 @@ export type Database = {
           total_orders?: number | null
           total_spent?: number | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -860,6 +935,8 @@ export type Database = {
           delivery_completed_at: string | null
           delivery_cost: number | null
           delivery_driver_id: string | null
+          delivery_latitude: number | null
+          delivery_longitude: number | null
           delivery_slot: string | null
           discount_amount: number | null
           estimated_ready_at: string | null
@@ -874,6 +951,8 @@ export type Database = {
           pickup_completed_at: string | null
           pickup_cost: number | null
           pickup_driver_id: string | null
+          pickup_latitude: number | null
+          pickup_longitude: number | null
           pickup_slot: string | null
           qr_code: string | null
           status: Database["public"]["Enums"]["order_status"] | null
@@ -894,6 +973,8 @@ export type Database = {
           delivery_completed_at?: string | null
           delivery_cost?: number | null
           delivery_driver_id?: string | null
+          delivery_latitude?: number | null
+          delivery_longitude?: number | null
           delivery_slot?: string | null
           discount_amount?: number | null
           estimated_ready_at?: string | null
@@ -908,6 +989,8 @@ export type Database = {
           pickup_completed_at?: string | null
           pickup_cost?: number | null
           pickup_driver_id?: string | null
+          pickup_latitude?: number | null
+          pickup_longitude?: number | null
           pickup_slot?: string | null
           qr_code?: string | null
           status?: Database["public"]["Enums"]["order_status"] | null
@@ -928,6 +1011,8 @@ export type Database = {
           delivery_completed_at?: string | null
           delivery_cost?: number | null
           delivery_driver_id?: string | null
+          delivery_latitude?: number | null
+          delivery_longitude?: number | null
           delivery_slot?: string | null
           discount_amount?: number | null
           estimated_ready_at?: string | null
@@ -942,6 +1027,8 @@ export type Database = {
           pickup_completed_at?: string | null
           pickup_cost?: number | null
           pickup_driver_id?: string | null
+          pickup_latitude?: number | null
+          pickup_longitude?: number | null
           pickup_slot?: string | null
           qr_code?: string | null
           status?: Database["public"]["Enums"]["order_status"] | null
@@ -1367,9 +1454,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_customer: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "cajero" | "operador" | "delivery"
+      app_role: "admin" | "cajero" | "operador" | "delivery" | "cliente"
       expense_category: "rent" | "utilities" | "payroll" | "supplies" | "other"
       inventory_category: "detergent" | "softener" | "stain_remover" | "other"
       item_type: "weight" | "piece"
@@ -1509,7 +1597,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "cajero", "operador", "delivery"],
+      app_role: ["admin", "cajero", "operador", "delivery", "cliente"],
       expense_category: ["rent", "utilities", "payroll", "supplies", "other"],
       inventory_category: ["detergent", "softener", "stain_remover", "other"],
       item_type: ["weight", "piece"],
