@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import CustomerProfile from './CustomerProfile';
 import CustomerOrders from './CustomerOrders';
 import NewPickupRequest from './NewPickupRequest';
+import CustomerNotificationToggle from './CustomerNotificationToggle';
 
 interface CustomerDashboardProps {
   session: Session;
@@ -85,7 +86,7 @@ export default function CustomerDashboard({ session }: CustomerDashboardProps) {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
         <div className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
               <Shirt className="w-5 h-5 text-primary" />
             </div>
@@ -96,9 +97,12 @@ export default function CustomerDashboard({ session }: CustomerDashboardProps) {
               </p>
             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={handleLogout}>
-            <LogOut className="w-5 h-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <CustomerNotificationToggle />
+            <Button variant="ghost" size="icon" onClick={handleLogout}>
+              <LogOut className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
       </header>
 
