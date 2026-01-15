@@ -51,6 +51,7 @@ import { CustomerFormModal, CustomerFormData } from '@/components/customers/Cust
 
 interface Customer {
   id: string;
+  code: string | null;
   name: string;
   phone: string | null;
   email: string | null;
@@ -112,6 +113,7 @@ export default function Customers() {
     const query = searchQuery.toLowerCase();
     return customers.filter(customer =>
       customer.name.toLowerCase().includes(query) ||
+      customer.code?.toLowerCase().includes(query) ||
       customer.phone?.toLowerCase().includes(query) ||
       customer.email?.toLowerCase().includes(query) ||
       customer.address?.toLowerCase().includes(query)
@@ -280,6 +282,7 @@ export default function Customers() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Código</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Contacto</TableHead>
                   <TableHead>Dirección</TableHead>
@@ -291,7 +294,7 @@ export default function Customers() {
               <TableBody>
                 {filteredCustomers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12">
+                    <TableCell colSpan={7} className="text-center py-12">
                       <div className="flex flex-col items-center gap-2 text-muted-foreground">
                         <Users className="w-12 h-12 opacity-50" />
                         <p>
@@ -308,6 +311,11 @@ export default function Customers() {
                 ) : (
                   filteredCustomers.map((customer) => (
                     <TableRow key={customer.id}>
+                      <TableCell>
+                        <Badge variant="outline" className="font-mono text-xs">
+                          {customer.code || '-'}
+                        </Badge>
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
