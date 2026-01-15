@@ -14,14 +14,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from '@/components/ui/label';
+
 import { formatCurrency } from '@/lib/currency';
 import {
   Store,
@@ -43,9 +36,6 @@ import {
   Zap,
   RefreshCw,
   Loader2,
-  CreditCard,
-  DollarSign,
-  Banknote,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -360,11 +350,9 @@ export default function Operations() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   
-  // Payment pending dialog state
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [orderToDeliver, setOrderToDeliver] = useState<Order | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer'>('cash');
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  // Payment warning dialog state
+  const [paymentWarningOpen, setPaymentWarningOpen] = useState(false);
+  const [orderWithPendingPayment, setOrderWithPendingPayment] = useState<Order | null>(null);
 
   // Filter orders for operations (only relevant statuses)
   const operationOrders = useMemo(() => {
@@ -419,9 +407,9 @@ export default function Operations() {
   const handleMarkDelivered = async (order: Order) => {
     // Check if order is paid
     if (!order.isPaid) {
-      // Show payment dialog
-      setOrderToDeliver(order);
-      setPaymentDialogOpen(true);
+      // Show warning dialog - cannot deliver without payment
+      setOrderWithPendingPayment(order);
+      setPaymentWarningOpen(true);
       return;
     }
     
@@ -436,64 +424,6 @@ export default function Operations() {
       toast.success(`${order.ticketCode} → Entregado`, {
         description: 'El pedido ha sido entregado al cliente en el local',
       });
-    }
-  };
-  
-  const handleProcessPaymentAndDeliver = async () => {
-    if (!orderToDeliver) return;
-    
-    setIsProcessingPayment(true);
-    
-    try {
-      const { supabase } = await import('@/integrations/supabase/client');
-      
-      // Calculate remaining amount
-      const remainingAmount = orderToDeliver.totalAmount - (orderToDeliver.paidAmount || 0);
-      
-      // Update order as paid
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({
-          is_paid: true,
-          paid_amount: orderToDeliver.totalAmount,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', orderToDeliver.id);
-      
-      if (updateError) throw updateError;
-      
-      // Register payment in cash register
-      const { error: cashError } = await supabase
-        .from('cash_register')
-        .insert({
-          entry_type: 'income',
-          amount: remainingAmount,
-          category: 'venta',
-          description: `Pago al entregar - ${orderToDeliver.ticketCode} (${paymentMethod})`,
-          order_id: orderToDeliver.id,
-        });
-      
-      if (cashError) {
-        console.error('Error registering cash:', cashError);
-      }
-      
-      // Now mark as delivered
-      const success = await updateOrderStatus(orderToDeliver.id, 'delivered');
-      
-      if (success) {
-        toast.success(`Pago registrado y pedido entregado`, {
-          description: `${orderToDeliver.ticketCode} - ${formatCurrency(remainingAmount)} (${paymentMethod === 'cash' ? 'Efectivo' : paymentMethod === 'card' ? 'Tarjeta' : 'Transferencia'})`,
-        });
-      }
-      
-      setPaymentDialogOpen(false);
-      setOrderToDeliver(null);
-      fetchOrders();
-    } catch (error) {
-      console.error('Error processing payment:', error);
-      toast.error('Error al procesar el pago');
-    } finally {
-      setIsProcessingPayment(false);
     }
   };
 
@@ -617,102 +547,64 @@ export default function Operations() {
         onMarkDelivered={handleMarkDelivered}
       />
 
-      {/* Payment Pending Dialog */}
-      <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+      {/* Payment Warning Dialog */}
+      <Dialog open={paymentWarningOpen} onOpenChange={setPaymentWarningOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-amber-600">
+            <DialogTitle className="flex items-center gap-2 text-destructive">
               <AlertCircle className="w-5 h-5" />
-              Pago Pendiente
+              No se puede entregar
             </DialogTitle>
             <DialogDescription>
-              Este pedido tiene un saldo pendiente. Debe cobrar antes de entregar.
+              Este pedido tiene un saldo pendiente y no puede ser entregado hasta que se complete el pago.
             </DialogDescription>
           </DialogHeader>
 
-          {orderToDeliver && (
+          {orderWithPendingPayment && (
             <div className="space-y-4">
               {/* Order Summary */}
-              <div className="p-4 bg-muted/50 rounded-xl space-y-3">
+              <div className="p-4 bg-destructive/10 rounded-xl border border-destructive/20 space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Pedido</span>
-                  <span className="font-mono font-bold">{orderToDeliver.ticketCode}</span>
+                  <span className="font-mono font-bold">{orderWithPendingPayment.ticketCode}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Cliente</span>
-                  <span className="font-medium">{orderToDeliver.customerName}</span>
+                  <span className="font-medium">{orderWithPendingPayment.customerName}</span>
                 </div>
-                <div className="border-t pt-3 space-y-2">
+                <div className="border-t border-destructive/20 pt-3 space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Total del pedido</span>
-                    <span className="font-medium">{formatCurrency(orderToDeliver.totalAmount)}</span>
+                    <span className="font-medium">{formatCurrency(orderWithPendingPayment.totalAmount)}</span>
                   </div>
                   <div className="flex justify-between items-center text-green-600">
                     <span className="text-sm">Pagado</span>
-                    <span className="font-medium">{formatCurrency(orderToDeliver.paidAmount || 0)}</span>
+                    <span className="font-medium">{formatCurrency(orderWithPendingPayment.paidAmount || 0)}</span>
                   </div>
-                  <div className="flex justify-between items-center text-lg font-bold text-amber-600">
+                  <div className="flex justify-between items-center text-lg font-bold text-destructive">
                     <span>Saldo Pendiente</span>
-                    <span>{formatCurrency(orderToDeliver.totalAmount - (orderToDeliver.paidAmount || 0))}</span>
+                    <span>{formatCurrency(orderWithPendingPayment.totalAmount - (orderWithPendingPayment.paidAmount || 0))}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Payment Method */}
-              <div className="space-y-2">
-                <Label>Método de Pago</Label>
-                <Select
-                  value={paymentMethod}
-                  onValueChange={(value: 'cash' | 'card' | 'transfer') => setPaymentMethod(value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">
-                      <div className="flex items-center gap-2">
-                        <Banknote className="w-4 h-4" />
-                        Efectivo
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="card">
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="w-4 h-4" />
-                        Tarjeta
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="transfer">
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="w-4 h-4" />
-                        Transferencia
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+              {/* Warning message */}
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  <strong>⚠️ Importante:</strong> Debe procesar el pago desde la sección de Caja o desde el detalle del pedido antes de poder marcar como entregado.
+                </p>
               </div>
 
-              <DialogFooter className="flex gap-2 sm:gap-0">
+              <DialogFooter>
                 <Button
-                  variant="outline"
+                  variant="default"
                   onClick={() => {
-                    setPaymentDialogOpen(false);
-                    setOrderToDeliver(null);
+                    setPaymentWarningOpen(false);
+                    setOrderWithPendingPayment(null);
                   }}
-                  disabled={isProcessingPayment}
+                  className="w-full"
                 >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleProcessPaymentAndDeliver}
-                  disabled={isProcessingPayment}
-                  className="gap-2 bg-emerald-600 hover:bg-emerald-700"
-                >
-                  {isProcessingPayment ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <CheckCircle className="w-4 h-4" />
-                  )}
-                  Cobrar y Entregar
+                  Entendido
                 </Button>
               </DialogFooter>
             </div>
