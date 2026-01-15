@@ -298,8 +298,7 @@ export default function Orders() {
       {/* QR Code Modal */}
       {qrOrder && (
         <OrderQRCode
-          ticketCode={qrOrder.ticketCode}
-          customerName={qrOrder.customerName}
+          order={qrOrder}
           isOpen={!!qrOrder}
           onClose={() => setQrOrder(null)}
         />

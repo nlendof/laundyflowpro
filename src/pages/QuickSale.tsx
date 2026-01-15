@@ -1378,8 +1378,7 @@ ${completedDirectSale.itemsSold.map(item => `• ${item}`).join('\n')}
       {/* QR Code Modal */}
       {completedOrder && !showSuccess && (
         <OrderQRCode
-          ticketCode={completedOrder.ticketCode}
-          customerName={completedOrder.customerName}
+          order={completedOrder}
           isOpen={!!completedOrder && !showSuccess}
           onClose={resetSale}
         />
