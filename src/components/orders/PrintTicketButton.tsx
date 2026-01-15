@@ -112,7 +112,7 @@ export function PrintTicketButton({
 
       {/* Preview Dialog */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-[400px] max-h-[90vh] flex flex-col">
+        <DialogContent className="w-[95vw] max-w-[420px] max-h-[90vh] flex flex-col p-4">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Eye className="w-5 h-5" />
@@ -122,16 +122,17 @@ export function PrintTicketButton({
 
           {/* Ticket Preview - scrollable area */}
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="flex justify-center bg-muted/50 p-4 rounded-lg">
+            <div className="flex justify-center bg-muted/50 p-3 rounded-lg">
               <TicketPrint ref={ticketRef} order={order} />
             </div>
           </div>
 
           {/* Actions - always visible at bottom */}
-          <div className="flex gap-2 pt-4 flex-shrink-0 border-t mt-2">
+          <div className="flex flex-wrap gap-2 pt-3 flex-shrink-0 border-t mt-2">
             <Button
               variant="outline"
-              className="flex-1"
+              size="sm"
+              className="flex-1 min-w-[80px]"
               onClick={() => setShowPreview(false)}
             >
               Cerrar
@@ -139,9 +140,10 @@ export function PrintTicketButton({
             <WhatsAppTicketButton 
               order={order} 
               variant="outline"
-              className="flex-1"
+              size="sm"
+              className="flex-1 min-w-[80px]"
             />
-            <Button className="flex-1 gap-2" onClick={handlePrint}>
+            <Button size="sm" className="flex-1 min-w-[80px] gap-1" onClick={handlePrint}>
               <Printer className="w-4 h-4" />
               Imprimir
             </Button>
