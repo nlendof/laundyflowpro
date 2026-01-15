@@ -47,6 +47,7 @@ interface OrderDetailsModalProps {
   onAdvanceStatus: (order: Order) => void;
   onRegressStatus?: (order: Order) => void;
   onUpdatePayment?: (orderId: string, paidAmount: number, isPaid: boolean) => Promise<boolean>;
+  onPaymentRequiredForDelivery?: (order: Order) => void;
 }
 
 const PAYMENT_METHODS = [
@@ -62,6 +63,7 @@ export function OrderDetailsModal({
   onAdvanceStatus,
   onRegressStatus,
   onUpdatePayment,
+  onPaymentRequiredForDelivery,
 }: OrderDetailsModalProps) {
   const { getNextStatus, getPreviousStatus, canAdvance: checkCanAdvance, canRegress: checkCanRegress, getStatusConfig } = useOperationsFlow();
   
@@ -131,6 +133,22 @@ export function OrderDetailsModal({
     if (onRegressStatus && canRegress) {
       onRegressStatus(order);
     }
+  };
+
+  // Check if advancing to delivered requires payment
+  const isAdvancingToDelivered = nextStatus === 'delivered';
+  const hasPendingPayment = !order.isPaid && pendingAmount > 0;
+
+  const handleAdvance = () => {
+    // If advancing to delivered and has pending payment, show payment dialog
+    if (isAdvancingToDelivered && hasPendingPayment) {
+      if (onPaymentRequiredForDelivery) {
+        onPaymentRequiredForDelivery(order);
+        onClose();
+      }
+      return;
+    }
+    onAdvanceStatus(order);
   };
 
   return (
@@ -461,11 +479,23 @@ export function OrderDetailsModal({
               {/* Advance Status Button */}
               {canAdvance && nextStatusConfig && (
                 <Button 
-                  className="flex-1 gap-2"
-                  onClick={() => onAdvanceStatus(order)}
+                  className={cn(
+                    "flex-1 gap-2",
+                    isAdvancingToDelivered && hasPendingPayment && "bg-amber-600 hover:bg-amber-700"
+                  )}
+                  onClick={handleAdvance}
                 >
-                  <span className="truncate">{nextStatusConfig.labelEs}</span>
-                  <ArrowRight className="w-4 h-4" />
+                  {isAdvancingToDelivered && hasPendingPayment ? (
+                    <>
+                      <AlertCircle className="w-4 h-4" />
+                      <span className="truncate">Cobrar para Entregar</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="truncate">{nextStatusConfig.labelEs}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
                 </Button>
               )}
             </div>
