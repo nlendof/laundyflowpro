@@ -121,13 +121,14 @@ export function useDrivers() {
     }
   }, []);
 
-  // Assign driver to pickup
+  // Assign driver to pickup - changes status to "on_way_to_store"
   const assignPickupDriver = useCallback(async (orderId: string, driverId: string) => {
     try {
       const { error } = await supabase
         .from('orders')
         .update({
           pickup_driver_id: driverId,
+          status: 'pending_pickup', // Keep in pending_pickup, but driver is on the way
           updated_at: new Date().toISOString(),
         })
         .eq('id', orderId);
@@ -143,13 +144,14 @@ export function useDrivers() {
     }
   }, [fetchDrivers]);
 
-  // Assign driver to delivery
+  // Assign driver to delivery - changes status to "in_transit"
   const assignDeliveryDriver = useCallback(async (orderId: string, driverId: string) => {
     try {
       const { error } = await supabase
         .from('orders')
         .update({
           delivery_driver_id: driverId,
+          status: 'in_transit',
           updated_at: new Date().toISOString(),
         })
         .eq('id', orderId);

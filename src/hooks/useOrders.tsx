@@ -42,16 +42,14 @@ const mapDbOrderToOrder = (dbOrder: DbOrder, dbItems: DbOrderItem[]): Order => {
     needsPickup: dbOrder.needs_pickup || false,
     needsDelivery: dbOrder.needs_delivery || false,
     pickupService: dbOrder.needs_pickup ? {
-      type: 'pickup',
-      status: dbOrder.pickup_completed_at ? 'completed' : 'pending',
+      status: dbOrder.pickup_completed_at ? 'received' : (dbOrder.pickup_driver_id && dbOrder.status === 'pending_pickup' ? 'on_way_to_store' : 'pending_pickup'),
       address: dbOrder.pickup_address || dbOrder.customer_address || '',
       scheduledSlot: dbOrder.pickup_slot as 'morning' | 'afternoon' | undefined,
       completedAt: dbOrder.pickup_completed_at ? new Date(dbOrder.pickup_completed_at) : undefined,
       driverId: dbOrder.pickup_driver_id || undefined,
     } : undefined,
     deliveryService: dbOrder.needs_delivery ? {
-      type: 'delivery',
-      status: dbOrder.delivery_completed_at ? 'completed' : 'pending',
+      status: dbOrder.delivery_completed_at ? 'delivered' : (dbOrder.status === 'in_transit' ? 'in_transit' : 'pending_delivery'),
       address: dbOrder.delivery_address || dbOrder.customer_address || '',
       scheduledSlot: dbOrder.delivery_slot as 'morning' | 'afternoon' | undefined,
       completedAt: dbOrder.delivery_completed_at ? new Date(dbOrder.delivery_completed_at) : undefined,

@@ -345,14 +345,12 @@ export default function QuickSale() {
       needsPickup,
       needsDelivery,
       pickupService: needsPickup ? {
-        type: 'pickup',
-        status: 'pending',
+        status: 'pending_pickup',
         address: pickupAddress,
         scheduledSlot: pickupSlot || undefined,
       } : undefined,
       deliveryService: needsDelivery ? {
-        type: 'delivery',
-        status: 'pending',
+        status: 'pending_delivery',
         address: deliveryAddress,
         scheduledSlot: deliverySlot || undefined,
       } : undefined,
@@ -536,14 +534,12 @@ export default function QuickSale() {
         needsPickup,
         needsDelivery,
         pickupService: needsPickup ? {
-          type: 'pickup',
-          status: 'pending',
+          status: 'pending_pickup',
           address: pickupAddress,
           scheduledSlot: pickupSlot || undefined,
         } : undefined,
         deliveryService: needsDelivery ? {
-          type: 'delivery',
-          status: 'pending',
+          status: 'pending_delivery',
           address: deliveryAddress,
           scheduledSlot: deliverySlot || undefined,
         } : undefined,

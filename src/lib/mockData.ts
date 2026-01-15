@@ -1,4 +1,4 @@
-import { Order, OrderStatus, DeliveryService } from '@/types';
+import { Order, OrderStatus, PickupService, DeliveryService } from '@/types';
 
 // Generate mock orders for demo
 export const MOCK_ORDERS: Order[] = [
@@ -24,8 +24,7 @@ export const MOCK_ORDERS: Order[] = [
     needsDelivery: true,
     pickupService: undefined,
     deliveryService: {
-      type: 'delivery',
-      status: 'pending',
+      status: 'pending_delivery',
       scheduledSlot: 'afternoon',
       address: 'Av. Reforma 123, Col. Centro',
     },
@@ -54,15 +53,13 @@ export const MOCK_ORDERS: Order[] = [
     needsPickup: true,
     needsDelivery: true,
     pickupService: {
-      type: 'pickup',
-      status: 'pending',
+      status: 'pending_pickup',
       scheduledSlot: 'morning',
       address: 'Calle Insurgentes 456, Zona Rosa',
       notes: 'Tocar timbre 2B',
     },
     deliveryService: {
-      type: 'delivery',
-      status: 'pending',
+      status: 'pending_delivery',
       scheduledSlot: 'afternoon',
       address: 'Calle Insurgentes 456, Zona Rosa',
     },
@@ -113,8 +110,7 @@ export const MOCK_ORDERS: Order[] = [
     needsPickup: false,
     needsDelivery: true,
     deliveryService: {
-      type: 'delivery',
-      status: 'in_progress',
+      status: 'in_transit',
       driverId: '4',
       scheduledSlot: 'afternoon',
       address: 'Calle Durango 45, Roma Norte',
@@ -165,16 +161,14 @@ export const MOCK_ORDERS: Order[] = [
     needsPickup: true,
     needsDelivery: true,
     pickupService: {
-      type: 'pickup',
-      status: 'completed',
+      status: 'received',
       driverId: '4',
       scheduledSlot: 'morning',
       address: 'Insurgentes Sur 800',
       completedAt: new Date('2024-01-06T11:30:00'),
     },
     deliveryService: {
-      type: 'delivery',
-      status: 'completed',
+      status: 'delivered',
       driverId: '4',
       scheduledSlot: 'morning',
       address: 'Insurgentes Sur 800',
@@ -227,8 +221,7 @@ export const MOCK_ORDERS: Order[] = [
     needsPickup: false,
     needsDelivery: true,
     deliveryService: {
-      type: 'delivery',
-      status: 'pending',
+      status: 'pending_delivery',
       scheduledSlot: 'afternoon',
       address: 'Polanco, Miguel Hidalgo 234',
     },
@@ -256,8 +249,7 @@ export const MOCK_ORDERS: Order[] = [
     needsPickup: true,
     needsDelivery: false,
     pickupService: {
-      type: 'pickup',
-      status: 'assigned',
+      status: 'on_way_to_store',
       driverId: '2',
       scheduledSlot: 'afternoon',
       address: 'Condesa, Av. Amsterdam 78',
