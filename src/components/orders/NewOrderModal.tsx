@@ -361,15 +361,13 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
       needsPickup,
       needsDelivery,
       pickupService: needsPickup ? {
-        type: 'pickup',
-        status: 'pending',
+        status: 'pending_pickup',
         scheduledSlot: pickupSlot,
         address: customerAddress,
         notes: zone?.name,
       } : undefined,
       deliveryService: needsDelivery ? {
-        type: 'delivery',
-        status: 'pending',
+        status: 'pending_delivery',
         scheduledSlot: deliverySlot,
         address: customerAddress,
         notes: zone?.name,

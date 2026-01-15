@@ -38,7 +38,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useOrders } from '@/hooks/useOrders';
 import { useDrivers, Driver } from '@/hooks/useDrivers';
-import { Order, DeliveryServiceStatus } from '@/types';
+import { Order, PickupServiceStatus, DeliveryServiceStatus } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/currency';
@@ -46,10 +46,13 @@ import { useConfig } from '@/contexts/ConfigContext';
 
 type ServiceTab = 'pickups' | 'deliveries' | 'all';
 
+// Task status that unifies both pickup and delivery statuses for UI
+type TaskStatus = PickupServiceStatus | DeliveryServiceStatus;
+
 interface DeliveryTask {
   order: Order;
   type: 'pickup' | 'delivery';
-  status: DeliveryServiceStatus;
+  status: TaskStatus;
   address: string;
   slot?: string; // Time slot like "09:00" or legacy "morning"/"afternoon"
   driverId?: string;
@@ -74,7 +77,7 @@ export default function Deliveries() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<ServiceTab>('all');
   const [selectedSlot, setSelectedSlot] = useState<'all' | 'morning' | 'afternoon'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | DeliveryServiceStatus>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | TaskStatus>('all');
   const [selectedTask, setSelectedTask] = useState<DeliveryTask | null>(null);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [taskToAssign, setTaskToAssign] = useState<DeliveryTask | null>(null);
@@ -88,22 +91,12 @@ export default function Deliveries() {
     orders.forEach(order => {
       // Add pickup task if order needs pickup
       if (order.needsPickup) {
-        const pickupCompleted = order.pickupService?.status === 'completed';
-        const hasDriver = !!order.pickupService?.driverId;
-        
-        let status: DeliveryServiceStatus = 'pending';
-        if (pickupCompleted) {
-          status = 'completed';
-        } else if (order.status === 'pending_pickup' && hasDriver) {
-          status = 'in_progress';
-        } else if (hasDriver) {
-          status = 'assigned';
-        }
+        const pickupStatus = order.pickupService?.status || 'pending_pickup';
         
         tasks.push({
           order,
           type: 'pickup',
-          status,
+          status: pickupStatus,
           address: order.pickupService?.address || order.customerAddress || '',
           slot: order.pickupService?.scheduledSlot,
           driverId: order.pickupService?.driverId,
@@ -115,23 +108,13 @@ export default function Deliveries() {
       if (order.needsDelivery) {
         // Only show delivery task when order is ready or later
         const readyStatuses = ['ready_delivery', 'in_transit', 'delivered'];
-        const deliveryCompleted = order.deliveryService?.status === 'completed';
-        const hasDriver = !!order.deliveryService?.driverId;
+        const deliveryStatus = order.deliveryService?.status || 'pending_delivery';
         
-        if (readyStatuses.includes(order.status) || deliveryCompleted || hasDriver) {
-          let status: DeliveryServiceStatus = 'pending';
-          if (deliveryCompleted || order.status === 'delivered') {
-            status = 'completed';
-          } else if (order.status === 'in_transit') {
-            status = 'in_progress';
-          } else if (hasDriver) {
-            status = 'assigned';
-          }
-          
+        if (readyStatuses.includes(order.status) || order.deliveryService?.driverId) {
           tasks.push({
             order,
             type: 'delivery',
-            status,
+            status: deliveryStatus,
             address: order.deliveryService?.address || order.customerAddress || '',
             slot: order.deliveryService?.scheduledSlot,
             driverId: order.deliveryService?.driverId,
@@ -178,12 +161,12 @@ export default function Deliveries() {
     const deliveryTasksOnly = deliveryTasks.filter(t => t.type === 'delivery');
     
     return {
-      pendingPickups: pickupTasks.filter(t => t.status === 'pending').length,
-      inProgressPickups: pickupTasks.filter(t => t.status === 'in_progress' || t.status === 'assigned').length,
-      completedPickups: pickupTasks.filter(t => t.status === 'completed').length,
-      pendingDeliveries: deliveryTasksOnly.filter(t => t.status === 'pending').length,
-      inProgressDeliveries: deliveryTasksOnly.filter(t => t.status === 'in_progress' || t.status === 'assigned').length,
-      completedDeliveries: deliveryTasksOnly.filter(t => t.status === 'completed').length,
+      pendingPickups: pickupTasks.filter(t => t.status === 'pending_pickup').length,
+      inProgressPickups: pickupTasks.filter(t => t.status === 'on_way_to_store').length,
+      completedPickups: pickupTasks.filter(t => t.status === 'received').length,
+      pendingDeliveries: deliveryTasksOnly.filter(t => t.status === 'pending_delivery').length,
+      inProgressDeliveries: deliveryTasksOnly.filter(t => t.status === 'in_transit').length,
+      completedDeliveries: deliveryTasksOnly.filter(t => t.status === 'delivered').length,
       availableDrivers: drivers.filter(d => d.status === 'available').length,
     };
   }, [deliveryTasks, drivers]);
@@ -245,30 +228,49 @@ export default function Deliveries() {
     }
   };
 
-  const getStatusConfig = (status: DeliveryServiceStatus, type: 'pickup' | 'delivery') => {
-    const configs: Record<DeliveryServiceStatus, { label: string; color: string; icon: typeof Truck }> = {
-      pending: { 
+  const getStatusConfig = (status: TaskStatus, type: 'pickup' | 'delivery') => {
+    // Pickup status configs
+    const pickupConfigs: Record<PickupServiceStatus, { label: string; color: string; icon: typeof Truck }> = {
+      pending_pickup: { 
         label: 'Pendiente', 
         color: 'bg-amber-500', 
         icon: Clock 
       },
-      assigned: { 
-        label: 'Asignado', 
-        color: 'bg-blue-500', 
-        icon: User 
-      },
-      in_progress: { 
-        label: type === 'pickup' ? 'Recogiendo' : 'En Camino', 
+      on_way_to_store: { 
+        label: 'Camino al Local', 
         color: 'bg-purple-500', 
-        icon: type === 'pickup' ? ArrowDownToLine : Truck 
+        icon: ArrowDownToLine 
       },
-      completed: { 
-        label: 'Completado', 
+      received: { 
+        label: 'Recibido', 
         color: 'bg-green-600', 
         icon: CheckCircle 
       },
     };
-    return configs[status];
+    
+    // Delivery status configs
+    const deliveryConfigs: Record<DeliveryServiceStatus, { label: string; color: string; icon: typeof Truck }> = {
+      pending_delivery: { 
+        label: 'Pendiente Envío', 
+        color: 'bg-amber-500', 
+        icon: Clock 
+      },
+      in_transit: { 
+        label: 'En Camino', 
+        color: 'bg-purple-500', 
+        icon: Truck 
+      },
+      delivered: { 
+        label: 'Entregado', 
+        color: 'bg-green-600', 
+        icon: CheckCircle 
+      },
+    };
+    
+    if (type === 'pickup') {
+      return pickupConfigs[status as PickupServiceStatus] || pickupConfigs.pending_pickup;
+    }
+    return deliveryConfigs[status as DeliveryServiceStatus] || deliveryConfigs.pending_delivery;
   };
 
   const getDriverById = (driverId?: string) => {
@@ -541,7 +543,8 @@ export default function Deliveries() {
                           </span>
                           
                           <div className="flex gap-2">
-                            {task.status === 'pending' && (
+                            {/* Pickup: pending_pickup -> can assign driver */}
+                            {task.type === 'pickup' && task.status === 'pending_pickup' && (
                               <Button 
                                 size="sm" 
                                 variant="outline"
@@ -553,17 +556,33 @@ export default function Deliveries() {
                                 Asignar
                               </Button>
                             )}
-                            {task.status === 'assigned' && (
+                            {/* Pickup: on_way_to_store -> can mark as received */}
+                            {task.type === 'pickup' && task.status === 'on_way_to_store' && (
                               <Button 
                                 size="sm" 
-                                onClick={(e) => { e.stopPropagation(); handleStartTask(task); }}
-                                className="gap-1"
+                                variant="default"
+                                onClick={(e) => { e.stopPropagation(); handleCompleteTask(task); }}
+                                className="gap-1 bg-green-600 hover:bg-green-700"
                               >
-                                <Play className="w-3 h-3" />
-                                Iniciar
+                                <CheckCircle className="w-3 h-3" />
+                                Marcar Recibido
                               </Button>
                             )}
-                            {task.status === 'in_progress' && (
+                            {/* Delivery: pending_delivery -> can assign driver */}
+                            {task.type === 'delivery' && task.status === 'pending_delivery' && (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={(e) => { e.stopPropagation(); handleAssignDriver(task); }}
+                                className="gap-1"
+                                disabled={drivers.length === 0}
+                              >
+                                <User className="w-3 h-3" />
+                                Asignar
+                              </Button>
+                            )}
+                            {/* Delivery: in_transit -> can mark as delivered */}
+                            {task.type === 'delivery' && task.status === 'in_transit' && (
                               <Button 
                                 size="sm" 
                                 variant="default"
@@ -705,7 +724,8 @@ export default function Deliveries() {
                 )}
                 
                 <div className="pt-4 border-t space-y-2">
-                  {selectedTask.status === 'pending' && (
+                  {/* Pickup: pending_pickup -> can assign */}
+                  {selectedTask.type === 'pickup' && selectedTask.status === 'pending_pickup' && (
                     <Button 
                       className="w-full gap-2" 
                       onClick={() => handleAssignDriver(selectedTask)}
@@ -715,22 +735,35 @@ export default function Deliveries() {
                       Asignar Repartidor
                     </Button>
                   )}
-                  {selectedTask.status === 'assigned' && (
-                    <Button 
-                      className="w-full gap-2" 
-                      onClick={() => handleStartTask(selectedTask)}
-                    >
-                      <Play className="w-4 h-4" />
-                      Iniciar {selectedTask.type === 'pickup' ? 'Recogida' : 'Entrega'}
-                    </Button>
-                  )}
-                  {selectedTask.status === 'in_progress' && (
+                  {/* Pickup: on_way_to_store -> can mark as received */}
+                  {selectedTask.type === 'pickup' && selectedTask.status === 'on_way_to_store' && (
                     <Button 
                       className="w-full gap-2 bg-green-600 hover:bg-green-700" 
                       onClick={() => handleCompleteTask(selectedTask)}
                     >
                       <CheckCircle className="w-4 h-4" />
-                      Marcar como Completado
+                      Marcar como Recibido
+                    </Button>
+                  )}
+                  {/* Delivery: pending_delivery -> can assign */}
+                  {selectedTask.type === 'delivery' && selectedTask.status === 'pending_delivery' && (
+                    <Button 
+                      className="w-full gap-2" 
+                      onClick={() => handleAssignDriver(selectedTask)}
+                      disabled={drivers.length === 0}
+                    >
+                      <User className="w-4 h-4" />
+                      Asignar Repartidor
+                    </Button>
+                  )}
+                  {/* Delivery: in_transit -> can complete */}
+                  {selectedTask.type === 'delivery' && selectedTask.status === 'in_transit' && (
+                    <Button 
+                      className="w-full gap-2 bg-green-600 hover:bg-green-700" 
+                      onClick={() => handleCompleteTask(selectedTask)}
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      Marcar como Entregado
                     </Button>
                   )}
                 </div>

@@ -43,13 +43,29 @@ export interface OrderItem {
 
 // Delivery Service Types
 export type DeliveryServiceType = 'pickup' | 'delivery';
-export type DeliveryServiceStatus = 'pending' | 'assigned' | 'in_progress' | 'completed';
+// Pickup status: pending_pickup → on_way_to_store → received (transitions to in_store in operations)
+export type PickupServiceStatus = 'pending_pickup' | 'on_way_to_store' | 'received';
+
+// Delivery status: pending_delivery → in_transit → delivered  
+export type DeliveryServiceStatus = 'pending_delivery' | 'in_transit' | 'delivered';
+
+// Legacy - keep for backward compatibility
+export type LegacyDeliveryServiceStatus = 'pending' | 'assigned' | 'in_progress' | 'completed';
+
+export interface PickupService {
+  status: PickupServiceStatus;
+  driverId?: string;
+  scheduledSlot?: string;
+  scheduledDate?: Date;
+  completedAt?: Date;
+  address: string;
+  notes?: string;
+}
 
 export interface DeliveryService {
-  type: DeliveryServiceType;
   status: DeliveryServiceStatus;
   driverId?: string;
-  scheduledSlot?: string; // Time slot like "09:00", "14:30", or legacy "morning"/"afternoon"
+  scheduledSlot?: string;
   scheduledDate?: Date;
   completedAt?: Date;
   address: string;
@@ -78,7 +94,7 @@ export interface Order {
   // New delivery service fields
   needsPickup: boolean;           // Customer wants pickup from home
   needsDelivery: boolean;         // Customer wants delivery to home
-  pickupService?: DeliveryService;
+  pickupService?: PickupService;
   deliveryService?: DeliveryService;
   createdAt: Date;
   updatedAt: Date;
