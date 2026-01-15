@@ -156,7 +156,7 @@ export function WhatsAppTicketButton({
       className={className}
     >
       <MessageCircle className="w-4 h-4" />
-      {showLabel && size !== 'icon' && <span className="ml-2">Enviar WhatsApp</span>}
+      {showLabel && size !== 'icon' && <span className="ml-2 truncate">WhatsApp</span>}
     </Button>
   );
 }
