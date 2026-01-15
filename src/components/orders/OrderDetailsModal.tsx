@@ -474,8 +474,7 @@ export function OrderDetailsModal({
 
         {/* QR Code Modal */}
         <OrderQRCode
-          ticketCode={order.ticketCode}
-          customerName={order.customerName}
+          order={order}
           isOpen={showQR}
           onClose={() => setShowQR(false)}
         />
