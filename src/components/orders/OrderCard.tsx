@@ -43,7 +43,7 @@ export function OrderCard({ order, onViewDetails, isNew = false }: OrderCardProp
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           {/* Main Info */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-center gap-3 mb-2 flex-wrap">
               <span className="font-mono font-bold text-lg text-primary">
                 {order.ticketCode}
               </span>
@@ -52,6 +52,12 @@ export function OrderCard({ order, onViewDetails, isNew = false }: OrderCardProp
                 <Badge variant="outline" className="gap-1">
                   <Truck className="w-3 h-3" />
                   Delivery
+                </Badge>
+              )}
+              {(order.status === 'ready_delivery' || order.status === 'in_transit') && !order.isPaid && (
+                <Badge variant="destructive" className="gap-1 animate-pulse">
+                  <DollarSign className="w-3 h-3" />
+                  Cobrar al entregar
                 </Badge>
               )}
             </div>
