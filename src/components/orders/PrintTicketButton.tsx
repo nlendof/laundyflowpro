@@ -128,22 +128,26 @@ export function PrintTicketButton({
           </div>
 
           {/* Actions - always visible at bottom */}
-          <div className="flex flex-wrap gap-2 pt-3 flex-shrink-0 border-t mt-2">
+          <div className="grid grid-cols-1 gap-2 pt-3 flex-shrink-0 border-t mt-2 sm:grid-cols-3">
             <Button
               variant="outline"
               size="sm"
-              className="flex-1 min-w-[80px]"
+              className="w-full min-w-0 whitespace-normal"
               onClick={() => setShowPreview(false)}
             >
               Cerrar
             </Button>
-            <WhatsAppTicketButton 
-              order={order} 
+            <WhatsAppTicketButton
+              order={order}
               variant="outline"
               size="sm"
-              className="flex-1 min-w-[80px]"
+              className="w-full min-w-0 whitespace-normal"
             />
-            <Button size="sm" className="flex-1 min-w-[80px] gap-1" onClick={handlePrint}>
+            <Button
+              size="sm"
+              className="w-full min-w-0 whitespace-normal gap-1"
+              onClick={handlePrint}
+            >
               <Printer className="w-4 h-4" />
               Imprimir
             </Button>
