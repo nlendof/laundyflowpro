@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/StatusBadge';
 import {
@@ -16,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 
 import { formatCurrency } from '@/lib/currency';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Store,
   Waves,
@@ -36,6 +38,10 @@ import {
   Zap,
   RefreshCw,
   Loader2,
+  Banknote,
+  CreditCard,
+  Smartphone,
+  DollarSign,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -43,6 +49,12 @@ import { toast } from 'sonner';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useOrders } from '@/hooks/useOrders';
 import { useOperationsFlow } from '@/hooks/useOperationsFlow';
+
+const PAYMENT_METHODS = [
+  { id: 'cash', name: 'Efectivo', icon: Banknote },
+  { id: 'card', name: 'Tarjeta', icon: CreditCard },
+  { id: 'transfer', name: 'Transferencia', icon: Smartphone },
+];
 
 // Icon mapping
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -353,6 +365,8 @@ export default function Operations() {
   // Payment warning dialog state
   const [paymentWarningOpen, setPaymentWarningOpen] = useState(false);
   const [orderWithPendingPayment, setOrderWithPendingPayment] = useState<Order | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   // Filter orders for operations (only relevant statuses)
   const operationOrders = useMemo(() => {
@@ -424,6 +438,58 @@ export default function Operations() {
       toast.success(`${order.ticketCode} → Entregado`, {
         description: 'El pedido ha sido entregado al cliente en el local',
       });
+    }
+  };
+
+  const handleProcessPaymentAndDeliver = async () => {
+    if (!orderWithPendingPayment) return;
+    
+    setIsProcessingPayment(true);
+    try {
+      const remainingAmount = orderWithPendingPayment.totalAmount - (orderWithPendingPayment.paidAmount || 0);
+      
+      // Update order as paid
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({
+          is_paid: true,
+          paid_amount: orderWithPendingPayment.totalAmount,
+        })
+        .eq('id', orderWithPendingPayment.id);
+      
+      if (updateError) throw updateError;
+      
+      // Register income in cash register
+      const { error: cashError } = await supabase
+        .from('cash_register')
+        .insert({
+          amount: remainingAmount,
+          category: 'venta',
+          entry_type: 'income',
+          description: `Pago completo de pedido ${orderWithPendingPayment.ticketCode} (${paymentMethod === 'cash' ? 'Efectivo' : paymentMethod === 'card' ? 'Tarjeta' : 'Transferencia'}) al entregar`,
+          order_id: orderWithPendingPayment.id,
+        });
+      
+      if (cashError) throw cashError;
+      
+      // Now complete delivery
+      const success = await updateOrderStatus(orderWithPendingPayment.id, 'delivered');
+      
+      if (success) {
+        toast.success(`${orderWithPendingPayment.ticketCode} → Entregado`, {
+          description: 'Pago procesado y pedido entregado correctamente',
+        });
+      }
+      
+      setPaymentWarningOpen(false);
+      setOrderWithPendingPayment(null);
+      setPaymentMethod('cash');
+      fetchOrders();
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      toast.error('Error al procesar el pago');
+    } finally {
+      setIsProcessingPayment(false);
     }
   };
 
@@ -547,23 +613,29 @@ export default function Operations() {
         onMarkDelivered={handleMarkDelivered}
       />
 
-      {/* Payment Warning Dialog */}
-      <Dialog open={paymentWarningOpen} onOpenChange={setPaymentWarningOpen}>
+      {/* Payment Warning Dialog with Payment Options */}
+      <Dialog open={paymentWarningOpen} onOpenChange={(open) => {
+        if (!open) {
+          setPaymentWarningOpen(false);
+          setOrderWithPendingPayment(null);
+          setPaymentMethod('cash');
+        }
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <AlertCircle className="w-5 h-5" />
-              No se puede entregar
+              Pago Pendiente
             </DialogTitle>
             <DialogDescription>
-              Este pedido tiene un saldo pendiente y no puede ser entregado hasta que se complete el pago.
+              Este pedido tiene un saldo pendiente. Complete el pago para poder entregar.
             </DialogDescription>
           </DialogHeader>
 
           {orderWithPendingPayment && (
             <div className="space-y-4">
               {/* Order Summary */}
-              <div className="p-4 bg-destructive/10 rounded-xl border border-destructive/20 space-y-3">
+              <div className="p-4 bg-muted/50 rounded-xl border space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Pedido</span>
                   <span className="font-mono font-bold">{orderWithPendingPayment.ticketCode}</span>
@@ -572,7 +644,7 @@ export default function Operations() {
                   <span className="text-sm text-muted-foreground">Cliente</span>
                   <span className="font-medium">{orderWithPendingPayment.customerName}</span>
                 </div>
-                <div className="border-t border-destructive/20 pt-3 space-y-2">
+                <div className="border-t pt-3 space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Total del pedido</span>
                     <span className="font-medium">{formatCurrency(orderWithPendingPayment.totalAmount)}</span>
@@ -582,29 +654,64 @@ export default function Operations() {
                     <span className="font-medium">{formatCurrency(orderWithPendingPayment.paidAmount || 0)}</span>
                   </div>
                   <div className="flex justify-between items-center text-lg font-bold text-destructive">
-                    <span>Saldo Pendiente</span>
+                    <span>A Cobrar</span>
                     <span>{formatCurrency(orderWithPendingPayment.totalAmount - (orderWithPendingPayment.paidAmount || 0))}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Warning message */}
-              <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
-                <p className="text-sm text-amber-700 dark:text-amber-300">
-                  <strong>⚠️ Importante:</strong> Debe procesar el pago desde la sección de Caja o desde el detalle del pedido antes de poder marcar como entregado.
-                </p>
+              {/* Payment Method Selection */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Método de Pago</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {PAYMENT_METHODS.map((method) => {
+                    const Icon = method.icon;
+                    return (
+                      <Button
+                        key={method.id}
+                        type="button"
+                        variant={paymentMethod === method.id ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setPaymentMethod(method.id)}
+                        className="gap-1.5"
+                      >
+                        <Icon className="w-4 h-4" />
+                        {method.name}
+                      </Button>
+                    );
+                  })}
+                </div>
               </div>
 
-              <DialogFooter>
+              <DialogFooter className="flex flex-col sm:flex-row gap-2">
                 <Button
-                  variant="default"
+                  variant="outline"
                   onClick={() => {
                     setPaymentWarningOpen(false);
                     setOrderWithPendingPayment(null);
+                    setPaymentMethod('cash');
                   }}
-                  className="w-full"
+                  className="flex-1"
+                  disabled={isProcessingPayment}
                 >
-                  Entendido
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleProcessPaymentAndDeliver}
+                  className="flex-1 gap-2 bg-emerald-600 hover:bg-emerald-700"
+                  disabled={isProcessingPayment}
+                >
+                  {isProcessingPayment ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      <DollarSign className="w-4 h-4" />
+                      Cobrar y Entregar
+                    </>
+                  )}
                 </Button>
               </DialogFooter>
             </div>
