@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useConfig } from '@/contexts/ConfigContext';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { sendLocalNotification, ORDER_STATUS_LABELS } from '@/lib/pushNotifications';
 
 interface CustomerOrdersProps {
   customerId?: string;
@@ -61,11 +62,13 @@ export default function CustomerOrders({ customerId }: CustomerOrdersProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const { activeOperations, loading: configLoading } = useConfig();
+  const previousOrdersRef = useRef<Map<string, string>>(new Map());
 
   useEffect(() => {
     if (customerId) {
       fetchOrders();
-      subscribeToOrders();
+      const cleanup = subscribeToOrders();
+      return cleanup;
     }
   }, [customerId]);
 
@@ -96,19 +99,57 @@ export default function CustomerOrders({ customerId }: CustomerOrdersProps) {
   };
 
   const subscribeToOrders = () => {
-    if (!customerId) return;
+    if (!customerId) return () => {};
 
     const channel = supabase
       .channel('customer-orders')
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
           table: 'orders',
           filter: `customer_id=eq.${customerId}`,
         },
-        () => {
+        (payload) => {
+          const updatedOrder = payload.new as any;
+          const previousStatus = previousOrdersRef.current.get(updatedOrder.id);
+          
+          // Check if status changed and send notification
+          if (previousStatus && previousStatus !== updatedOrder.status) {
+            const statusLabel = ORDER_STATUS_LABELS[updatedOrder.status] || updatedOrder.status;
+            const operation = activeOperations.find(op => op.key === updatedOrder.status);
+            
+            sendLocalNotification(
+              `📦 Pedido ${updatedOrder.ticket_code}`,
+              {
+                body: `Tu pedido ahora está: ${operation?.name || statusLabel}`,
+                tag: `order-status-${updatedOrder.ticket_code}`,
+                data: { 
+                  type: 'status_change', 
+                  ticketCode: updatedOrder.ticket_code, 
+                  status: updatedOrder.status 
+                },
+              }
+            );
+          }
+          
+          // Update the reference for next comparison
+          previousOrdersRef.current.set(updatedOrder.id, updatedOrder.status);
+          fetchOrders();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'orders',
+          filter: `customer_id=eq.${customerId}`,
+        },
+        (payload) => {
+          const newOrder = payload.new as any;
+          previousOrdersRef.current.set(newOrder.id, newOrder.status);
           fetchOrders();
         }
       )
@@ -118,6 +159,15 @@ export default function CustomerOrders({ customerId }: CustomerOrdersProps) {
       supabase.removeChannel(channel);
     };
   };
+
+  // Initialize previous orders ref when orders are first loaded
+  useEffect(() => {
+    orders.forEach(order => {
+      if (!previousOrdersRef.current.has(order.id)) {
+        previousOrdersRef.current.set(order.id, order.status);
+      }
+    });
+  }, [orders]);
 
   const getOperationConfig = (status: string) => {
     const operation = activeOperations.find(op => op.key === status);
