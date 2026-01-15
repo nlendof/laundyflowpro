@@ -52,7 +52,9 @@ interface Loan {
   remaining_amount: number;
   reason: string | null;
   status: 'active' | 'paid' | 'cancelled';
+  deduction_frequency: 'monthly' | 'weekly' | null;
   monthly_deduction: number | null;
+  weekly_deduction: number | null;
   created_at: string;
   created_by: string | null;
 }
@@ -96,6 +98,8 @@ export function LoanManagement({ employees }: LoanManagementProps) {
     amount: '',
     reason: '',
     monthly_deduction: '',
+    weekly_deduction: '',
+    deduction_frequency: 'monthly' as 'monthly' | 'weekly',
   });
 
   const formatCurrency = (amount: number) => {
@@ -152,6 +156,8 @@ export function LoanManagement({ employees }: LoanManagementProps) {
       amount: '',
       reason: '',
       monthly_deduction: '',
+      weekly_deduction: '',
+      deduction_frequency: 'monthly',
     });
     setIsDialogOpen(true);
   };
@@ -176,7 +182,13 @@ export function LoanManagement({ employees }: LoanManagementProps) {
         amount,
         remaining_amount: amount,
         reason: formData.reason || null,
-        monthly_deduction: formData.monthly_deduction ? parseFloat(formData.monthly_deduction) : null,
+        deduction_frequency: formData.deduction_frequency,
+        monthly_deduction: formData.deduction_frequency === 'monthly' && formData.monthly_deduction 
+          ? parseFloat(formData.monthly_deduction) 
+          : null,
+        weekly_deduction: formData.deduction_frequency === 'weekly' && formData.weekly_deduction 
+          ? parseFloat(formData.weekly_deduction) 
+          : null,
         created_by: user?.id,
       });
 
@@ -471,20 +483,54 @@ export function LoanManagement({ employees }: LoanManagementProps) {
             </div>
 
             <div className="space-y-2">
-              <Label>Descuento Mensual (opcional)</Label>
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="Monto a descontar por nómina"
-                  className="pl-9"
-                  value={formData.monthly_deduction}
-                  onChange={(e) => setFormData({ ...formData, monthly_deduction: e.target.value })}
-                />
-              </div>
+              <Label>Frecuencia de Descuento</Label>
+              <Select
+                value={formData.deduction_frequency}
+                onValueChange={(value: 'monthly' | 'weekly') => setFormData({ ...formData, deduction_frequency: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monthly">Mensual (por nómina)</SelectItem>
+                  <SelectItem value="weekly">Semanal</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            {formData.deduction_frequency === 'monthly' ? (
+              <div className="space-y-2">
+                <Label>Descuento Mensual</Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Monto a descontar por nómina"
+                    className="pl-9"
+                    value={formData.monthly_deduction}
+                    onChange={(e) => setFormData({ ...formData, monthly_deduction: e.target.value })}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Descuento Semanal</Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Monto a descontar semanalmente"
+                    className="pl-9"
+                    value={formData.weekly_deduction}
+                    onChange={(e) => setFormData({ ...formData, weekly_deduction: e.target.value })}
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Motivo</Label>
@@ -535,10 +581,14 @@ export function LoanManagement({ employees }: LoanManagementProps) {
                   <p className="text-sm text-muted-foreground">Saldo Pendiente</p>
                   <p className="font-bold text-lg">{formatCurrency(selectedLoan.remaining_amount)}</p>
                 </div>
-                {selectedLoan.monthly_deduction && (
+                {(selectedLoan.monthly_deduction || selectedLoan.weekly_deduction) && (
                   <div>
-                    <p className="text-sm text-muted-foreground">Descuento Mensual</p>
-                    <p className="font-medium">{formatCurrency(selectedLoan.monthly_deduction)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Descuento {selectedLoan.weekly_deduction ? 'Semanal' : 'Mensual'}
+                    </p>
+                    <p className="font-medium">
+                      {formatCurrency(selectedLoan.weekly_deduction || selectedLoan.monthly_deduction || 0)}
+                    </p>
                   </div>
                 )}
                 {selectedLoan.reason && (

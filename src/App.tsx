@@ -29,6 +29,7 @@ import ResetPassword from "./pages/ResetPassword";
 import TermsAndConditions from "./pages/TermsAndConditions";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import AuditLogs from "./pages/AuditLogs";
+import Returns from "./pages/Returns";
 import ErrorPage from "./pages/ErrorPage";
 import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
@@ -235,6 +236,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <AuditLogs />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/returns"
+          element={
+            <ProtectedRoute>
+              <Returns />
             </ProtectedRoute>
           }
         />

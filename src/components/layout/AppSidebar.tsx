@@ -20,6 +20,7 @@ import {
   ShoppingBag,
   FileText,
   User,
+  RotateCcw,
 } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,7 @@ const navItems: NavItem[] = [
   { icon: WashingMachine, label: 'Operaciones', path: '/operations', permissionKey: 'operations' },
   { icon: Truck, label: 'Entregas', path: '/deliveries', permissionKey: 'deliveries' },
   { icon: DollarSign, label: 'Caja', path: '/cash-register', permissionKey: 'cash_register' },
+  { icon: RotateCcw, label: 'Devoluciones', path: '/returns', permissionKey: 'cash_register' },
   { icon: UserCircle, label: 'Clientes', path: '/customers', permissionKey: 'customers' },
   { icon: Boxes, label: 'Inventario', path: '/inventory', permissionKey: 'inventory' },
   { icon: ShoppingBag, label: 'Compras', path: '/purchases', permissionKey: 'purchases' },
