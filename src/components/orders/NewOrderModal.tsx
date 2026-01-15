@@ -61,6 +61,11 @@ import {
   Search,
   UserPlus,
   Check,
+  CreditCard,
+  Banknote,
+  ArrowRightLeft,
+  Clock,
+  Wallet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -135,6 +140,13 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
   // Quick add state
   const [selectedCatalogItem, setSelectedCatalogItem] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
+
+  // Payment options
+  type PaymentOption = 'full' | 'advance' | 'on_pickup';
+  type PaymentMethod = 'cash' | 'card' | 'transfer';
+  const [paymentOption, setPaymentOption] = useState<PaymentOption>('full');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [advanceAmount, setAdvanceAmount] = useState<number>(0);
 
   // Fetch customers from database
   const fetchCustomers = useCallback(async () => {
@@ -299,6 +311,23 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
     setNotes('');
     setSelectedCatalogItem('');
     setQuantity(1);
+    setPaymentOption('full');
+    setPaymentMethod('cash');
+    setAdvanceAmount(0);
+  };
+
+  // Calculate paid amount based on payment option
+  const calculatePaidAmount = () => {
+    switch (paymentOption) {
+      case 'full':
+        return totalAmount;
+      case 'advance':
+        return Math.min(advanceAmount, totalAmount);
+      case 'on_pickup':
+        return 0;
+      default:
+        return 0;
+    }
   };
 
   // Create order
@@ -354,8 +383,9 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
       status: needsPickup ? 'pending_pickup' : 'in_store',
       totalAmount,
       discountAmount,
-      paidAmount: 0,
-      isPaid: false,
+      paidAmount: calculatePaidAmount(),
+      isPaid: paymentOption === 'full',
+      paymentMethod: paymentOption !== 'on_pickup' ? paymentMethod : undefined,
       isDelivery: needsDelivery,
       deliverySlot: needsDelivery ? deliverySlot : undefined,
       needsPickup,
@@ -883,6 +913,127 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
             />
           )}
 
+          {/* Payment Section */}
+          {items.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+                Pago
+              </h3>
+              
+              {/* Payment Option */}
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPaymentOption('full')}
+                  className={`p-3 rounded-xl border text-center transition-all ${
+                    paymentOption === 'full'
+                      ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
+                      : 'border-border hover:border-primary/30 hover:bg-muted/50'
+                  }`}
+                >
+                  <Wallet className="w-5 h-5 mx-auto mb-1 text-emerald-500" />
+                  <p className="font-medium text-sm">Pago Total</p>
+                  <p className="text-xs text-muted-foreground">${totalAmount.toFixed(2)}</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentOption('advance')}
+                  className={`p-3 rounded-xl border text-center transition-all ${
+                    paymentOption === 'advance'
+                      ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
+                      : 'border-border hover:border-primary/30 hover:bg-muted/50'
+                  }`}
+                >
+                  <ArrowRightLeft className="w-5 h-5 mx-auto mb-1 text-amber-500" />
+                  <p className="font-medium text-sm">Avance</p>
+                  <p className="text-xs text-muted-foreground">Pago parcial</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentOption('on_pickup')}
+                  className={`p-3 rounded-xl border text-center transition-all ${
+                    paymentOption === 'on_pickup'
+                      ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
+                      : 'border-border hover:border-primary/30 hover:bg-muted/50'
+                  }`}
+                >
+                  <Clock className="w-5 h-5 mx-auto mb-1 text-blue-500" />
+                  <p className="font-medium text-sm">Al Retirar</p>
+                  <p className="text-xs text-muted-foreground">Pagar después</p>
+                </button>
+              </div>
+
+              {/* Advance Amount */}
+              {paymentOption === 'advance' && (
+                <div className="space-y-2 p-4 border rounded-xl border-amber-200 bg-amber-50/50">
+                  <Label htmlFor="advanceAmount">Monto del Avance</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                    <Input
+                      id="advanceAmount"
+                      type="number"
+                      min="0"
+                      max={totalAmount}
+                      step="10"
+                      value={advanceAmount}
+                      onChange={(e) => setAdvanceAmount(Math.min(Number(e.target.value) || 0, totalAmount))}
+                      className="pl-8"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Restante: ${(totalAmount - advanceAmount).toFixed(2)}
+                  </p>
+                </div>
+              )}
+
+              {/* Payment Method (only if not paying on pickup) */}
+              {paymentOption !== 'on_pickup' && (
+                <div className="space-y-2">
+                  <Label>Forma de Pago</Label>
+                  <div className="grid grid-cols-3 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('cash')}
+                      className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center gap-1 ${
+                        paymentMethod === 'cash'
+                          ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
+                          : 'border-border hover:border-primary/30 hover:bg-muted/50'
+                      }`}
+                    >
+                      <Banknote className="w-5 h-5 text-emerald-600" />
+                      <span className="text-sm font-medium">Efectivo</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('card')}
+                      className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center gap-1 ${
+                        paymentMethod === 'card'
+                          ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
+                          : 'border-border hover:border-primary/30 hover:bg-muted/50'
+                      }`}
+                    >
+                      <CreditCard className="w-5 h-5 text-blue-600" />
+                      <span className="text-sm font-medium">Tarjeta</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentMethod('transfer')}
+                      className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center gap-1 ${
+                        paymentMethod === 'transfer'
+                          ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
+                          : 'border-border hover:border-primary/30 hover:bg-muted/50'
+                      }`}
+                    >
+                      <ArrowRightLeft className="w-5 h-5 text-purple-600" />
+                      <span className="text-sm font-medium">Transferencia</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Total and Actions */}
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-primary/5 rounded-xl">
@@ -907,6 +1058,32 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
                 <p className="text-3xl font-bold text-primary">${totalAmount.toFixed(2)}</p>
               </div>
             </div>
+            
+            {/* Payment Summary */}
+            {items.length > 0 && (
+              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  {paymentOption === 'full' && <Wallet className="w-4 h-4 text-emerald-500" />}
+                  {paymentOption === 'advance' && <ArrowRightLeft className="w-4 h-4 text-amber-500" />}
+                  {paymentOption === 'on_pickup' && <Clock className="w-4 h-4 text-blue-500" />}
+                  <span className="text-sm font-medium">
+                    {paymentOption === 'full' && 'Pago Total'}
+                    {paymentOption === 'advance' && `Avance: $${advanceAmount.toFixed(2)}`}
+                    {paymentOption === 'on_pickup' && 'Pagar al Retirar'}
+                  </span>
+                </div>
+                {paymentOption !== 'on_pickup' && (
+                  <span className="text-xs text-muted-foreground capitalize flex items-center gap-1">
+                    {paymentMethod === 'cash' && <Banknote className="w-3 h-3" />}
+                    {paymentMethod === 'card' && <CreditCard className="w-3 h-3" />}
+                    {paymentMethod === 'transfer' && <ArrowRightLeft className="w-3 h-3" />}
+                    {paymentMethod === 'cash' && 'Efectivo'}
+                    {paymentMethod === 'card' && 'Tarjeta'}
+                    {paymentMethod === 'transfer' && 'Transferencia'}
+                  </span>
+                )}
+              </div>
+            )}
 
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={onClose}>

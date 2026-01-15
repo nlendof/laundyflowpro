@@ -87,6 +87,7 @@ export interface Order {
   discountAmount?: number;        // Discount applied to the order
   paidAmount: number;
   isPaid: boolean;
+  paymentMethod?: 'cash' | 'card' | 'transfer'; // Método de pago
   // Legacy field for backward compatibility
   isDelivery: boolean;
   deliverySlot?: string; // Time slot like "09:00", "14:30", or legacy "morning"/"afternoon"
