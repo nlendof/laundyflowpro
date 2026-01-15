@@ -112,21 +112,23 @@ export function PrintTicketButton({
 
       {/* Preview Dialog */}
       <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-[400px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-[400px] max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Eye className="w-5 h-5" />
               Vista Previa del Ticket
             </DialogTitle>
           </DialogHeader>
 
-          {/* Ticket Preview */}
-          <div className="flex justify-center bg-muted/50 p-4 rounded-lg overflow-auto">
-            <TicketPrint ref={ticketRef} order={order} />
+          {/* Ticket Preview - scrollable area */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="flex justify-center bg-muted/50 p-4 rounded-lg">
+              <TicketPrint ref={ticketRef} order={order} />
+            </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-2 pt-4">
+          {/* Actions - always visible at bottom */}
+          <div className="flex gap-2 pt-4 flex-shrink-0 border-t mt-2">
             <Button
               variant="outline"
               className="flex-1"
