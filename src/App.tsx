@@ -23,6 +23,7 @@ import CashRegister from "./pages/CashRegister";
 import Employees from "./pages/Employees";
 import EmployeePortal from "./pages/EmployeePortal";
 import FirstLoginSetup from "./pages/FirstLoginSetup";
+import LaundryOnboarding from "./pages/LaundryOnboarding";
 import Reports from "./pages/Reports";
 import Purchases from "./pages/Purchases";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -107,6 +108,14 @@ function AppRoutes() {
       <Route path="/install" element={<Install />} />
       <Route path="/customer" element={<CustomerPortal />} />
       <Route path="/driver" element={<DriverPortal />} />
+      <Route
+        path="/onboarding"
+        element={
+          <ProtectedRoute>
+            <LaundryOnboarding />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/login"
         element={
