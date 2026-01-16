@@ -178,6 +178,44 @@ export default function OwnerPanel() {
     fetchLaundries();
   }, [isOwner, navigate]);
 
+  // Realtime subscription for laundry_users changes
+  useEffect(() => {
+    if (!selectedLaundry) return;
+
+    const channel = supabase
+      .channel(`laundry_users_${selectedLaundry.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'laundry_users',
+          filter: `laundry_id=eq.${selectedLaundry.id}`,
+        },
+        () => {
+          // Refresh the users list when any change occurs
+          fetchLaundryUsers(selectedLaundry.id);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profiles',
+        },
+        () => {
+          // Refresh when profiles change too (name updates, etc.)
+          fetchLaundryUsers(selectedLaundry.id);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedLaundry?.id]);
+
   const fetchLaundries = async () => {
     try {
       setLoading(true);
