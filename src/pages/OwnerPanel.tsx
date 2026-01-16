@@ -248,16 +248,23 @@ export default function OwnerPanel() {
       const rolesMap = new Map(rolesData?.map(r => [r.user_id, r.role]) || []);
       const branchesMap = new Map(branchesData?.map(b => [b.id, b]) || []);
 
-      setLaundryUsers(users.map(lu => {
-        const profile = profilesMap.get(lu.user_id) as { name: string; email: string; branch_id: string | null } | undefined;
+      const enriched = users.map((lu) => {
+        const profile = profilesMap.get(lu.user_id) as
+          | { name: string; email: string; branch_id: string | null }
+          | undefined;
+
         return {
           ...lu,
           profile,
           role: (rolesMap.get(lu.user_id) as string) || 'sin rol',
-          branch: profile?.branch_id ? (branchesMap.get(profile.branch_id) as { id: string; name: string; code: string }) || null : null,
+          branch: profile?.branch_id
+            ? (branchesMap.get(profile.branch_id) as { id: string; name: string; code: string }) || null
+            : null,
         };
-      }));
-    } catch (error) {
+      });
+
+      // Hide orphan rows (e.g. users already deleted but still linked in laundry_users)
+      setLaundryUsers(enriched.filter((u) => !!u.profile));
       console.error('Error fetching laundry users:', error);
     }
   };
@@ -609,7 +616,9 @@ export default function OwnerPanel() {
 
   const handleDeleteEmployee = async () => {
     if (!deletingEmployee) return;
-    
+
+    const deletedUserId = deletingEmployee.user_id;
+
     if (deletingEmployee.is_primary) {
       toast.error('No se puede eliminar al usuario principal de la lavandería');
       setDeletingEmployee(null);
@@ -619,13 +628,17 @@ export default function OwnerPanel() {
     setIsDeleting(true);
     try {
       const { data, error } = await supabase.functions.invoke('delete-employee', {
-        body: { user_id: deletingEmployee.user_id },
+        body: { user_id: deletedUserId },
       });
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
       toast.success('Empleado eliminado exitosamente');
+
+      // Remove immediately from UI, then re-sync from backend
+      setLaundryUsers((prev) => prev.filter((u) => u.user_id !== deletedUserId));
+
       if (selectedLaundry) {
         fetchLaundryUsers(selectedLaundry.id);
       }
