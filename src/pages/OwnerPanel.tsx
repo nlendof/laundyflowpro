@@ -76,7 +76,14 @@ interface LaundryUser {
   profile?: {
     name: string;
     email: string;
+    branch_id: string | null;
   };
+  role?: string;
+  branch?: {
+    id: string;
+    name: string;
+    code: string;
+  } | null;
 }
 
 export default function OwnerPanel() {
@@ -159,19 +166,43 @@ export default function OwnerPanel() {
 
   const fetchLaundryUsers = async (laundryId: string) => {
     try {
-      const { data, error } = await supabase
+      // Fetch laundry_users with profiles and branches
+      const { data: luData, error: luError } = await supabase
         .from('laundry_users')
         .select(`
           *,
-          profile:profiles(name, email)
+          profile:profiles(name, email, branch_id)
         `)
         .eq('laundry_id', laundryId);
 
-      if (error) throw error;
-      setLaundryUsers(data?.map(lu => ({
-        ...lu,
-        profile: lu.profile as unknown as { name: string; email: string } | undefined
-      })) || []);
+      if (luError) throw luError;
+
+      // Get user roles for these users
+      const userIds = luData?.map(lu => lu.user_id) || [];
+      const { data: rolesData } = await supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .in('user_id', userIds);
+
+      // Get branches for users that have branch_id
+      const branchIds = luData?.map(lu => (lu.profile as { branch_id?: string })?.branch_id).filter(Boolean) || [];
+      const { data: branchesData } = await supabase
+        .from('branches')
+        .select('id, name, code')
+        .in('id', branchIds);
+
+      const rolesMap = new Map(rolesData?.map(r => [r.user_id, r.role]) || []);
+      const branchesMap = new Map(branchesData?.map(b => [b.id, b]) || []);
+
+      setLaundryUsers(luData?.map(lu => {
+        const profile = lu.profile as unknown as { name: string; email: string; branch_id: string | null } | undefined;
+        return {
+          ...lu,
+          profile,
+          role: rolesMap.get(lu.user_id) || 'sin rol',
+          branch: profile?.branch_id ? branchesMap.get(profile.branch_id) || null : null,
+        };
+      }) || []);
     } catch (error) {
       console.error('Error fetching laundry users:', error);
     }
@@ -643,7 +674,7 @@ export default function OwnerPanel() {
                 <CardHeader>
                   <CardTitle>Usuarios Asignados</CardTitle>
                   <CardDescription>
-                    Usuarios con acceso a esta lavandería
+                    Usuarios con acceso a esta lavandería. Los admins de sucursal solo ven datos de su sucursal.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -658,7 +689,10 @@ export default function OwnerPanel() {
                         <TableRow>
                           <TableHead>Nombre</TableHead>
                           <TableHead>Email</TableHead>
-                          <TableHead>Principal</TableHead>
+                          <TableHead>Rol</TableHead>
+                          <TableHead>Sucursal Asignada</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -671,15 +705,78 @@ export default function OwnerPanel() {
                               {lu.profile?.email || '-'}
                             </TableCell>
                             <TableCell>
+                              <Badge variant={lu.role === 'admin' ? 'default' : 'secondary'}>
+                                {lu.role || 'sin rol'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {lu.branch ? (
+                                <Badge variant="outline" className="gap-1">
+                                  <Building2 className="w-3 h-3" />
+                                  {lu.branch.code} - {lu.branch.name}
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">
+                                  Todas las sucursales
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell>
                               {lu.is_primary && (
                                 <Badge variant="default">Principal</Badge>
                               )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <select
+                                className="text-sm border rounded px-2 py-1 bg-background"
+                                value={lu.profile?.branch_id || ''}
+                                onChange={async (e) => {
+                                  const branchId = e.target.value || null;
+                                  try {
+                                    const { error } = await supabase
+                                      .from('profiles')
+                                      .update({ branch_id: branchId })
+                                      .eq('id', lu.user_id);
+                                    if (error) throw error;
+                                    toast.success('Sucursal actualizada');
+                                    fetchLaundryUsers(selectedLaundry!.id);
+                                  } catch (error) {
+                                    console.error('Error updating branch:', error);
+                                    toast.error('Error al actualizar sucursal');
+                                  }
+                                }}
+                              >
+                                <option value="">Todas las sucursales</option>
+                                {branches.map(b => (
+                                  <option key={b.id} value={b.id}>
+                                    {b.code} - {b.name}
+                                  </option>
+                                ))}
+                              </select>
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
                   )}
+                </CardContent>
+              </Card>
+
+              {/* Info Card */}
+              <Card className="bg-muted/50">
+                <CardContent className="pt-6">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium mb-1">Permisos por Sucursal</p>
+                      <ul className="text-muted-foreground space-y-1">
+                        <li>• <strong>Owner:</strong> Ve todos los datos de todas las lavanderías</li>
+                        <li>• <strong>Admin (sin sucursal):</strong> Ve todos los datos de su lavandería</li>
+                        <li>• <strong>Admin (con sucursal):</strong> Solo ve datos de su sucursal asignada</li>
+                        <li>• <strong>Empleados:</strong> Solo trabajan en su sucursal asignada</li>
+                      </ul>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

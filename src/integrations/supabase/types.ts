@@ -1441,6 +1441,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          branch_id: string | null
           created_at: string | null
           email: string
           hire_date: string | null
@@ -1456,6 +1457,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          branch_id?: string | null
           created_at?: string | null
           email: string
           hire_date?: string | null
@@ -1471,6 +1473,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          branch_id?: string | null
           created_at?: string | null
           email?: string
           hire_date?: string | null
@@ -1485,6 +1488,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profiles_laundry_id_fkey"
             columns: ["laundry_id"]
@@ -1781,6 +1791,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_branch: {
+        Args: { _branch_id: string; _user_id: string }
+        Returns: boolean
+      }
+      get_user_branch_id: { Args: { _user_id: string }; Returns: string }
       get_user_laundry_id: { Args: never; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
@@ -1794,6 +1809,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_branch_admin: {
+        Args: { _branch_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_customer: { Args: { _user_id: string }; Returns: boolean }
       is_laundry_admin: {
         Args: { _laundry_id: string; _user_id: string }
