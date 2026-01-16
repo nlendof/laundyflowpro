@@ -104,16 +104,26 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Assign the creating user as owner
-    const { error: roleError } = await adminClient
+    // Check if user already has owner role
+    const { data: existingRole } = await adminClient
       .from("user_roles")
-      .upsert({
-        user_id: user.id,
-        role: "owner",
-      }, { onConflict: "user_id" });
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("role", "owner")
+      .single();
 
-    if (roleError) {
-      console.error("Error assigning owner role:", roleError);
+    if (!existingRole) {
+      // Assign owner role if not exists
+      const { error: roleError } = await adminClient
+        .from("user_roles")
+        .insert({
+          user_id: user.id,
+          role: "owner",
+        });
+
+      if (roleError) {
+        console.error("Error assigning owner role:", roleError);
+      }
     }
 
     // Link user to laundry
