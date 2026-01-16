@@ -79,6 +79,12 @@ export const ORDER_STATUS_FLOW: string[] = [
 ];
 
 export const ROLE_CONFIG: Record<UserRole, { label: string; labelEs: string; color: string; icon: string }> = {
+  owner: {
+    label: 'Owner',
+    labelEs: 'Propietario',
+    color: 'bg-role-admin',
+    icon: 'Crown',
+  },
   admin: {
     label: 'Administrator',
     labelEs: 'Administrador',
@@ -102,6 +108,12 @@ export const ROLE_CONFIG: Record<UserRole, { label: string; labelEs: string; col
     labelEs: 'Repartidor',
     color: 'bg-role-delivery',
     icon: 'Truck',
+  },
+  cliente: {
+    label: 'Customer',
+    labelEs: 'Cliente',
+    color: 'bg-muted',
+    icon: 'User',
   },
 };
 
