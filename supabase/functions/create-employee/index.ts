@@ -122,20 +122,48 @@ Deno.serve(async (req) => {
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // Update profile with additional data including laundry_id and branch_id
-    const { error: profileError } = await adminClient
+    // First check if profile exists
+    const { data: existingProfile } = await adminClient
       .from('profiles')
-      .update({
-        name,
-        phone: phone || null,
-        must_change_password: false,
-        profile_completed: true,
-        laundry_id: laundry_id || null,
-        branch_id: branch_id || null,
-      })
-      .eq('id', userId);
+      .select('id')
+      .eq('id', userId)
+      .maybeSingle();
 
-    if (profileError) {
-      console.error('Profile update error:', profileError);
+    if (existingProfile) {
+      // Update existing profile
+      const { error: profileError } = await adminClient
+        .from('profiles')
+        .update({
+          name,
+          phone: phone || null,
+          must_change_password: false,
+          profile_completed: true,
+          laundry_id: laundry_id || null,
+          branch_id: branch_id || null,
+        })
+        .eq('id', userId);
+
+      if (profileError) {
+        console.error('Profile update error:', profileError);
+      }
+    } else {
+      // Create profile if trigger didn't create it
+      const { error: profileInsertError } = await adminClient
+        .from('profiles')
+        .insert({
+          id: userId,
+          email,
+          name,
+          phone: phone || null,
+          must_change_password: false,
+          profile_completed: true,
+          laundry_id: laundry_id || null,
+          branch_id: branch_id || null,
+        });
+
+      if (profileInsertError) {
+        console.error('Profile insert error:', profileInsertError);
+      }
     }
 
     // If laundry_id provided, add user to laundry_users table

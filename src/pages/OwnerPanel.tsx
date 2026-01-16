@@ -595,6 +595,34 @@ export default function OwnerPanel() {
     }
   };
 
+  const handleDeleteEmployee = async (employee: LaundryUser) => {
+    if (employee.is_primary) {
+      toast.error('No se puede eliminar al usuario principal de la lavandería');
+      return;
+    }
+
+    if (!confirm(`¿Eliminar al empleado "${employee.profile?.name || 'Sin nombre'}"? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-employee', {
+        body: { user_id: employee.user_id },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast.success('Empleado eliminado exitosamente');
+      if (selectedLaundry) {
+        fetchLaundryUsers(selectedLaundry.id);
+      }
+    } catch (error) {
+      console.error('Error deleting employee:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al eliminar empleado');
+    }
+  };
+
   if (!isOwner) {
     return null;
   }
@@ -937,6 +965,16 @@ export default function OwnerPanel() {
                                   title="Editar empleado"
                                 >
                                   <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => handleDeleteEmployee(lu)}
+                                  title="Eliminar empleado"
+                                  disabled={lu.is_primary}
+                                >
+                                  <Trash2 className="w-4 h-4" />
                                 </Button>
                               </div>
                             </TableCell>
