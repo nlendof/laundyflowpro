@@ -105,6 +105,20 @@ export default function Customers() {
 
   useEffect(() => {
     fetchCustomers();
+
+    // Real-time subscription
+    const channel = supabase
+      .channel('customers-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'customers' },
+        () => fetchCustomers()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const filteredCustomers = useMemo(() => {

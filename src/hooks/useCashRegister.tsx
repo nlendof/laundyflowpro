@@ -223,6 +223,38 @@ export function useCashRegister() {
     fetchOpeningBalance();
   }, [fetchEntries, fetchExpenses, fetchOpeningBalance]);
 
+  // Real-time subscription for cash register changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('cash-register-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'cash_register' },
+        () => {
+          fetchEntries();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'expenses' },
+        () => {
+          fetchExpenses();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'cash_closings' },
+        () => {
+          fetchOpeningBalance();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchEntries, fetchExpenses, fetchOpeningBalance]);
+
   return {
     entries,
     expenses,

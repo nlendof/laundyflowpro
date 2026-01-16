@@ -176,8 +176,30 @@ export function usePurchases() {
     }
   }, [fetchPurchases]);
 
+  // Initial fetch
   useEffect(() => {
     fetchPurchases();
+  }, [fetchPurchases]);
+
+  // Real-time subscription for purchases changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('purchases-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'purchases' },
+        () => fetchPurchases()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'purchase_items' },
+        () => fetchPurchases()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchPurchases]);
 
   return {
