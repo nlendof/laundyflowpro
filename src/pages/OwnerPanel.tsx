@@ -41,7 +41,17 @@ import {
   Power,
   AlertTriangle,
   ArrowLeft,
+  UserPlus,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
@@ -99,8 +109,10 @@ export default function OwnerPanel() {
   // Dialog states
   const [isLaundryDialogOpen, setIsLaundryDialogOpen] = useState(false);
   const [isBranchDialogOpen, setIsBranchDialogOpen] = useState(false);
+  const [isEmployeeDialogOpen, setIsEmployeeDialogOpen] = useState(false);
   const [editingLaundry, setEditingLaundry] = useState<Laundry | null>(null);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   
   // Form data
   const [laundryForm, setLaundryForm] = useState({
@@ -119,6 +131,29 @@ export default function OwnerPanel() {
     is_main: false,
   });
 
+  const [employeeForm, setEmployeeForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+    role: 'cajero' as 'admin' | 'cajero' | 'operador' | 'delivery',
+    branch_id: '',
+  });
+
+  const ROLE_OPTIONS = [
+    { value: 'admin', label: 'Administrador', description: 'Acceso completo a la lavandería' },
+    { value: 'cajero', label: 'Cajero', description: 'Gestión de pedidos y caja' },
+    { value: 'operador', label: 'Operador', description: 'Procesamiento de pedidos' },
+    { value: 'delivery', label: 'Repartidor', description: 'Entregas y recolecciones' },
+  ];
+
+  const DEFAULT_PERMISSIONS: Record<string, string[]> = {
+    admin: ['dashboard', 'orders', 'customers', 'catalog', 'inventory', 'cash_register', 'employees', 'reports', 'settings'],
+    cajero: ['dashboard', 'orders', 'customers', 'cash_register'],
+    operador: ['dashboard', 'orders', 'inventory'],
+    delivery: ['dashboard', 'orders'],
+  };
+
   // Check if user is owner
   const isOwner = user?.role === 'owner';
 
@@ -133,13 +168,14 @@ export default function OwnerPanel() {
   const fetchLaundries = async () => {
     try {
       setLoading(true);
+      // @ts-ignore - laundries table exists but types not synced
       const { data, error } = await supabase
         .from('laundries')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setLaundries(data || []);
+      setLaundries((data || []) as Laundry[]);
     } catch (error) {
       console.error('Error fetching laundries:', error);
       toast.error('Error al cargar lavanderías');
@@ -158,7 +194,7 @@ export default function OwnerPanel() {
         .order('name', { ascending: true });
 
       if (error) throw error;
-      setBranches(data || []);
+      setBranches((data || []) as Branch[]);
     } catch (error) {
       console.error('Error fetching branches:', error);
     }
@@ -166,43 +202,48 @@ export default function OwnerPanel() {
 
   const fetchLaundryUsers = async (laundryId: string) => {
     try {
-      // Fetch laundry_users with profiles and branches
+      // @ts-ignore - laundry_users table exists but types not synced
       const { data: luData, error: luError } = await supabase
         .from('laundry_users')
-        .select(`
-          *,
-          profile:profiles(name, email, branch_id)
-        `)
+        .select('*')
         .eq('laundry_id', laundryId);
 
       if (luError) throw luError;
 
-      // Get user roles for these users
-      const userIds = luData?.map(lu => lu.user_id) || [];
+      const users = (luData || []) as unknown as { id: string; user_id: string; laundry_id: string; is_primary: boolean }[];
+      const userIds = users.map(lu => lu.user_id);
+      
+      // Fetch profiles separately
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, name, email, branch_id')
+        .in('id', userIds.length > 0 ? userIds : ['_none_']);
+      
       const { data: rolesData } = await supabase
         .from('user_roles')
         .select('user_id, role')
-        .in('user_id', userIds);
+        .in('user_id', userIds.length > 0 ? userIds : ['_none_']);
 
-      // Get branches for users that have branch_id
-      const branchIds = luData?.map(lu => (lu.profile as { branch_id?: string })?.branch_id).filter(Boolean) || [];
+      const profilesMap = new Map((profilesData || []).map(p => [p.id, p]));
+      const branchIds = (profilesData || []).map(p => p.branch_id).filter(Boolean) as string[];
+      
       const { data: branchesData } = await supabase
         .from('branches')
         .select('id, name, code')
-        .in('id', branchIds);
+        .in('id', branchIds.length > 0 ? branchIds : ['_none_']);
 
       const rolesMap = new Map(rolesData?.map(r => [r.user_id, r.role]) || []);
       const branchesMap = new Map(branchesData?.map(b => [b.id, b]) || []);
 
-      setLaundryUsers(luData?.map(lu => {
-        const profile = lu.profile as unknown as { name: string; email: string; branch_id: string | null } | undefined;
+      setLaundryUsers(users.map(lu => {
+        const profile = profilesMap.get(lu.user_id) as { name: string; email: string; branch_id: string | null } | undefined;
         return {
           ...lu,
           profile,
-          role: rolesMap.get(lu.user_id) || 'sin rol',
-          branch: profile?.branch_id ? branchesMap.get(profile.branch_id) || null : null,
+          role: (rolesMap.get(lu.user_id) as string) || 'sin rol',
+          branch: profile?.branch_id ? (branchesMap.get(profile.branch_id) as { id: string; name: string; code: string }) || null : null,
         };
-      }) || []);
+      }));
     } catch (error) {
       console.error('Error fetching laundry users:', error);
     }
@@ -424,10 +465,78 @@ export default function OwnerPanel() {
     }
   };
 
+  const handleOpenEmployeeDialog = () => {
+    setEmployeeForm({
+      name: '',
+      email: '',
+      phone: '',
+      password: generatePassword(),
+      role: 'cajero',
+      branch_id: '',
+    });
+    setShowPassword(false);
+    setIsEmployeeDialogOpen(true);
+  };
+
+  const generatePassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    let password = '';
+    for (let i = 0; i < 10; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
+
+  const handleCreateEmployee = async () => {
+    if (!employeeForm.name.trim() || !employeeForm.email.trim() || !employeeForm.password.trim()) {
+      toast.error('Nombre, email y contraseña son requeridos');
+      return;
+    }
+
+    if (!selectedLaundry) {
+      toast.error('Selecciona una lavandería primero');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-employee', {
+        body: {
+          appUrl: window.location.origin,
+          email: employeeForm.email,
+          password: employeeForm.password,
+          name: employeeForm.name,
+          phone: employeeForm.phone || undefined,
+          role: employeeForm.role,
+          permissions: DEFAULT_PERMISSIONS[employeeForm.role] || [],
+          laundry_id: selectedLaundry.id,
+          branch_id: employeeForm.branch_id || undefined,
+        },
+      });
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      toast.success('Empleado creado exitosamente');
+      if (data.emailSent) {
+        toast.success('Credenciales enviadas por correo');
+      } else {
+        toast.info('Recuerda compartir las credenciales con el empleado');
+      }
+
+      setIsEmployeeDialogOpen(false);
+      fetchLaundryUsers(selectedLaundry.id);
+    } catch (error) {
+      console.error('Error creating employee:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al crear empleado');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (!isOwner) {
     return null;
   }
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -671,11 +780,17 @@ export default function OwnerPanel() {
 
             <TabsContent value="users" className="space-y-4">
               <Card>
-                <CardHeader>
-                  <CardTitle>Usuarios Asignados</CardTitle>
-                  <CardDescription>
-                    Usuarios con acceso a esta lavandería. Los admins de sucursal solo ven datos de su sucursal.
-                  </CardDescription>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Usuarios Asignados</CardTitle>
+                    <CardDescription>
+                      Usuarios con acceso a esta lavandería. Los admins de sucursal solo ven datos de su sucursal.
+                    </CardDescription>
+                  </div>
+                  <Button onClick={handleOpenEmployeeDialog} className="gap-2">
+                    <UserPlus className="w-4 h-4" />
+                    Nuevo Empleado
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   {laundryUsers.length === 0 ? (
@@ -1040,6 +1155,113 @@ export default function OwnerPanel() {
               ) : (
                 'Guardar'
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Employee Dialog */}
+      <Dialog open={isEmployeeDialogOpen} onOpenChange={setIsEmployeeDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5" />
+              Nuevo Empleado
+            </DialogTitle>
+            <DialogDescription>
+              Crea un nuevo empleado para {selectedLaundry?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nombre completo *</Label>
+              <Input
+                placeholder="Juan Pérez"
+                value={employeeForm.name}
+                onChange={(e) => setEmployeeForm({ ...employeeForm, name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Email *</Label>
+              <Input
+                type="email"
+                placeholder="juan@ejemplo.com"
+                value={employeeForm.email}
+                onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Teléfono</Label>
+              <Input
+                placeholder="+1 809 123 4567"
+                value={employeeForm.phone}
+                onChange={(e) => setEmployeeForm({ ...employeeForm, phone: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Contraseña *</Label>
+              <div className="relative">
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  value={employeeForm.password}
+                  onChange={(e) => setEmployeeForm({ ...employeeForm, password: e.target.value })}
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Rol *</Label>
+              <Select
+                value={employeeForm.role}
+                onValueChange={(v) => setEmployeeForm({ ...employeeForm, role: v as 'admin' | 'cajero' | 'operador' | 'delivery' })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROLE_OPTIONS.map(r => (
+                    <SelectItem key={r.value} value={r.value}>
+                      {r.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Sucursal Asignada</Label>
+              <Select
+                value={employeeForm.branch_id}
+                onValueChange={(v) => setEmployeeForm({ ...employeeForm, branch_id: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas las sucursales" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todas las sucursales</SelectItem>
+                  {branches.map(b => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.code} - {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEmployeeDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateEmployee} disabled={saving}>
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Crear Empleado'}
             </Button>
           </DialogFooter>
         </DialogContent>

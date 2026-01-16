@@ -15,8 +15,10 @@ interface CreateEmployeeRequest {
   password: string;
   name: string;
   phone?: string;
-  role: 'admin' | 'cajero' | 'operador' | 'delivery';
+  role: 'admin' | 'cajero' | 'operador' | 'delivery' | 'owner';
   permissions: string[];
+  laundry_id?: string;
+  branch_id?: string;
 }
 
 Deno.serve(async (req) => {
@@ -63,16 +65,17 @@ Deno.serve(async (req) => {
       .eq('user_id', requestingUser.id)
       .maybeSingle();
 
-    if (roleError || roleData?.role !== 'admin') {
+    // Allow owner and admin to create employees
+    if (roleError || (roleData?.role !== 'admin' && roleData?.role !== 'owner')) {
       return new Response(
-        JSON.stringify({ error: 'Solo los administradores pueden crear empleados' }),
+        JSON.stringify({ error: 'Solo los administradores y propietarios pueden crear empleados' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Parse request body
     const body: CreateEmployeeRequest = await req.json();
-    const { appUrl, email, password, name, phone, role, permissions } = body;
+    const { appUrl, email, password, name, phone, role, permissions, laundry_id, branch_id } = body;
 
     // Validate input
     if (!email || !password || !name || !role) {
@@ -118,7 +121,7 @@ Deno.serve(async (req) => {
     // Wait a moment for the trigger to create the profile
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Update profile with additional data
+    // Update profile with additional data including laundry_id and branch_id
     const { error: profileError } = await adminClient
       .from('profiles')
       .update({
@@ -126,11 +129,28 @@ Deno.serve(async (req) => {
         phone: phone || null,
         must_change_password: false,
         profile_completed: true,
+        laundry_id: laundry_id || null,
+        branch_id: branch_id || null,
       })
       .eq('id', userId);
 
     if (profileError) {
       console.error('Profile update error:', profileError);
+    }
+
+    // If laundry_id provided, add user to laundry_users table
+    if (laundry_id) {
+      const { error: laundryUserError } = await adminClient
+        .from('laundry_users')
+        .insert({
+          user_id: userId,
+          laundry_id: laundry_id,
+          is_primary: false,
+        });
+
+      if (laundryUserError) {
+        console.error('Laundry user insert error:', laundryUserError);
+      }
     }
 
     // Update the role
