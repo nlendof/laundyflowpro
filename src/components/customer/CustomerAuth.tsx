@@ -90,24 +90,21 @@ export default function CustomerAuth({ onAuthSuccess }: CustomerAuthProps) {
         return;
       }
 
-      // Create customer profile and record
+      // Register customer via secure edge function (server-side role assignment)
       if (data.user) {
-        await supabase.from('customer_profiles').insert({
-          id: data.user.id,
-          phone: registerPhone,
+        const { error: registerError } = await supabase.functions.invoke('register-customer', {
+          body: {
+            userId: data.user.id,
+            name: registerName,
+            email: registerEmail,
+            phone: registerPhone,
+          },
         });
 
-        await supabase.from('user_roles').insert({
-          user_id: data.user.id,
-          role: 'cliente',
-        });
-
-        const { data: customerData } = await supabase.from('customers').insert({
-          name: registerName,
-          email: registerEmail,
-          phone: registerPhone,
-          user_id: data.user.id,
-        }).select().single();
+        if (registerError) {
+          console.error('Error registering customer:', registerError);
+          // Continue anyway - user was created, they can retry profile setup
+        }
       }
 
       toast.success('¡Cuenta creada! Revisa tu correo para confirmar.');
