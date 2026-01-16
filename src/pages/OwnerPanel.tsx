@@ -112,6 +112,7 @@ export default function OwnerPanel() {
   const [isEmployeeDialogOpen, setIsEmployeeDialogOpen] = useState(false);
   const [editingLaundry, setEditingLaundry] = useState<Laundry | null>(null);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
+  const [editingEmployee, setEditingEmployee] = useState<LaundryUser | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   
   // Form data
@@ -465,15 +466,28 @@ export default function OwnerPanel() {
     }
   };
 
-  const handleOpenEmployeeDialog = () => {
-    setEmployeeForm({
-      name: '',
-      email: '',
-      phone: '',
-      password: generatePassword(),
-      role: 'cajero',
-      branch_id: '',
-    });
+  const handleOpenEmployeeDialog = (employee?: LaundryUser) => {
+    if (employee) {
+      setEditingEmployee(employee);
+      setEmployeeForm({
+        name: employee.profile?.name || '',
+        email: employee.profile?.email || '',
+        phone: '',
+        password: '',
+        role: (employee.role as 'admin' | 'cajero' | 'operador' | 'delivery') || 'cajero',
+        branch_id: employee.profile?.branch_id || '',
+      });
+    } else {
+      setEditingEmployee(null);
+      setEmployeeForm({
+        name: '',
+        email: '',
+        phone: '',
+        password: generatePassword(),
+        role: 'cajero',
+        branch_id: '',
+      });
+    }
     setShowPassword(false);
     setIsEmployeeDialogOpen(true);
   };
@@ -488,8 +502,13 @@ export default function OwnerPanel() {
   };
 
   const handleCreateEmployee = async () => {
-    if (!employeeForm.name.trim() || !employeeForm.email.trim() || !employeeForm.password.trim()) {
-      toast.error('Nombre, email y contraseña son requeridos');
+    if (!employeeForm.name.trim() || !employeeForm.email.trim()) {
+      toast.error('Nombre y email son requeridos');
+      return;
+    }
+
+    if (!editingEmployee && !employeeForm.password.trim()) {
+      toast.error('La contraseña es requerida para nuevos empleados');
       return;
     }
 
@@ -500,35 +519,77 @@ export default function OwnerPanel() {
 
     setSaving(true);
     try {
-      const { data, error } = await supabase.functions.invoke('create-employee', {
-        body: {
-          appUrl: window.location.origin,
-          email: employeeForm.email,
-          password: employeeForm.password,
-          name: employeeForm.name,
-          phone: employeeForm.phone || undefined,
-          role: employeeForm.role,
-          permissions: DEFAULT_PERMISSIONS[employeeForm.role] || [],
-          laundry_id: selectedLaundry.id,
-          branch_id: employeeForm.branch_id || undefined,
-        },
-      });
+      if (editingEmployee) {
+        // Update existing employee
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            name: employeeForm.name,
+            branch_id: employeeForm.branch_id || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', editingEmployee.user_id);
 
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
+        if (profileError) throw profileError;
 
-      toast.success('Empleado creado exitosamente');
-      if (data.emailSent) {
-        toast.success('Credenciales enviadas por correo');
+        // Update role
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .update({ role: employeeForm.role })
+          .eq('user_id', editingEmployee.user_id);
+
+        if (roleError) throw roleError;
+
+        // Update permissions
+        await supabase
+          .from('user_permissions')
+          .delete()
+          .eq('user_id', editingEmployee.user_id);
+
+        const newPermissions = DEFAULT_PERMISSIONS[employeeForm.role] || [];
+        if (newPermissions.length > 0) {
+          await supabase
+            .from('user_permissions')
+            .insert(newPermissions.map(perm => ({
+              user_id: editingEmployee.user_id,
+              module_key: perm,
+            })));
+        }
+
+        toast.success('Empleado actualizado exitosamente');
       } else {
-        toast.info('Recuerda compartir las credenciales con el empleado');
+        // Create new employee
+        const { data, error } = await supabase.functions.invoke('create-employee', {
+          body: {
+            appUrl: window.location.origin,
+            email: employeeForm.email,
+            password: employeeForm.password,
+            name: employeeForm.name,
+            phone: employeeForm.phone || undefined,
+            role: employeeForm.role,
+            permissions: DEFAULT_PERMISSIONS[employeeForm.role] || [],
+            laundry_id: selectedLaundry.id,
+            branch_id: employeeForm.branch_id || undefined,
+          },
+        });
+
+        if (error) throw error;
+        if (data.error) throw new Error(data.error);
+
+        toast.success('Empleado creado exitosamente');
+        if (data.emailSent) {
+          toast.success('Credenciales enviadas por correo');
+        } else {
+          toast.info('Recuerda compartir las credenciales con el empleado');
+        }
       }
 
       setIsEmployeeDialogOpen(false);
+      setEditingEmployee(null);
       fetchLaundryUsers(selectedLaundry.id);
     } catch (error) {
-      console.error('Error creating employee:', error);
-      toast.error(error instanceof Error ? error.message : 'Error al crear empleado');
+      console.error('Error saving employee:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al guardar empleado');
     } finally {
       setSaving(false);
     }
@@ -787,7 +848,7 @@ export default function OwnerPanel() {
                       Usuarios con acceso a esta lavandería. Los admins de sucursal solo ven datos de su sucursal.
                     </CardDescription>
                   </div>
-                  <Button onClick={handleOpenEmployeeDialog} className="gap-2">
+                  <Button onClick={() => handleOpenEmployeeDialog()} className="gap-2">
                     <UserPlus className="w-4 h-4" />
                     Nuevo Empleado
                   </Button>
@@ -842,32 +903,42 @@ export default function OwnerPanel() {
                               )}
                             </TableCell>
                             <TableCell className="text-right">
-                              <select
-                                className="text-sm border rounded px-2 py-1 bg-background"
-                                value={lu.profile?.branch_id || ''}
-                                onChange={async (e) => {
-                                  const branchId = e.target.value || null;
-                                  try {
-                                    const { error } = await supabase
-                                      .from('profiles')
-                                      .update({ branch_id: branchId })
-                                      .eq('id', lu.user_id);
-                                    if (error) throw error;
-                                    toast.success('Sucursal actualizada');
-                                    fetchLaundryUsers(selectedLaundry!.id);
-                                  } catch (error) {
-                                    console.error('Error updating branch:', error);
-                                    toast.error('Error al actualizar sucursal');
-                                  }
-                                }}
-                              >
-                                <option value="">Todas las sucursales</option>
-                                {branches.map(b => (
-                                  <option key={b.id} value={b.id}>
-                                    {b.code} - {b.name}
-                                  </option>
-                                ))}
-                              </select>
+                              <div className="flex items-center justify-end gap-2">
+                                <select
+                                  className="text-sm border rounded px-2 py-1 bg-background"
+                                  value={lu.profile?.branch_id || ''}
+                                  onChange={async (e) => {
+                                    const branchId = e.target.value || null;
+                                    try {
+                                      const { error } = await supabase
+                                        .from('profiles')
+                                        .update({ branch_id: branchId })
+                                        .eq('id', lu.user_id);
+                                      if (error) throw error;
+                                      toast.success('Sucursal actualizada');
+                                      fetchLaundryUsers(selectedLaundry!.id);
+                                    } catch (error) {
+                                      console.error('Error updating branch:', error);
+                                      toast.error('Error al actualizar sucursal');
+                                    }
+                                  }}
+                                >
+                                  <option value="">Todas</option>
+                                  {branches.map(b => (
+                                    <option key={b.id} value={b.id}>
+                                      {b.code}
+                                    </option>
+                                  ))}
+                                </select>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleOpenEmployeeDialog(lu)}
+                                  title="Editar empleado"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -1161,15 +1232,21 @@ export default function OwnerPanel() {
       </Dialog>
 
       {/* Employee Dialog */}
-      <Dialog open={isEmployeeDialogOpen} onOpenChange={setIsEmployeeDialogOpen}>
+      <Dialog open={isEmployeeDialogOpen} onOpenChange={(open) => {
+        setIsEmployeeDialogOpen(open);
+        if (!open) setEditingEmployee(null);
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <UserPlus className="w-5 h-5" />
-              Nuevo Empleado
+              {editingEmployee ? <Edit className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
+              {editingEmployee ? 'Editar Empleado' : 'Nuevo Empleado'}
             </DialogTitle>
             <DialogDescription>
-              Crea un nuevo empleado para {selectedLaundry?.name}
+              {editingEmployee 
+                ? `Actualiza la información de ${editingEmployee.profile?.name}`
+                : `Crea un nuevo empleado para ${selectedLaundry?.name}`
+              }
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -1182,42 +1259,51 @@ export default function OwnerPanel() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Email *</Label>
+              <Label>Email {editingEmployee ? '' : '*'}</Label>
               <Input
                 type="email"
                 placeholder="juan@ejemplo.com"
                 value={employeeForm.email}
                 onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })}
+                disabled={!!editingEmployee}
+                className={editingEmployee ? 'bg-muted' : ''}
               />
+              {editingEmployee && (
+                <p className="text-xs text-muted-foreground">El email no se puede cambiar</p>
+              )}
             </div>
-            <div className="space-y-2">
-              <Label>Teléfono</Label>
-              <Input
-                placeholder="+1 809 123 4567"
-                value={employeeForm.phone}
-                onChange={(e) => setEmployeeForm({ ...employeeForm, phone: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Contraseña *</Label>
-              <div className="relative">
-                <Input
-                  type={showPassword ? 'text' : 'password'}
-                  value={employeeForm.password}
-                  onChange={(e) => setEmployeeForm({ ...employeeForm, password: e.target.value })}
-                  className="pr-10"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-full"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </Button>
-              </div>
-            </div>
+            {!editingEmployee && (
+              <>
+                <div className="space-y-2">
+                  <Label>Teléfono</Label>
+                  <Input
+                    placeholder="+1 809 123 4567"
+                    value={employeeForm.phone}
+                    onChange={(e) => setEmployeeForm({ ...employeeForm, phone: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Contraseña *</Label>
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? 'text' : 'password'}
+                      value={employeeForm.password}
+                      onChange={(e) => setEmployeeForm({ ...employeeForm, password: e.target.value })}
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
             <div className="space-y-2">
               <Label>Rol *</Label>
               <Select
@@ -1257,11 +1343,14 @@ export default function OwnerPanel() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEmployeeDialogOpen(false)}>
+            <Button variant="outline" onClick={() => {
+              setIsEmployeeDialogOpen(false);
+              setEditingEmployee(null);
+            }}>
               Cancelar
             </Button>
             <Button onClick={handleCreateEmployee} disabled={saving}>
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Crear Empleado'}
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : (editingEmployee ? 'Guardar Cambios' : 'Crear Empleado')}
             </Button>
           </DialogFooter>
         </DialogContent>
