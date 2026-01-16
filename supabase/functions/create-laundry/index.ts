@@ -23,7 +23,8 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    if (!authHeader?.startsWith("Bearer ")) {
+      console.error("No valid authorization header");
       return new Response(
         JSON.stringify({ error: "Authorization required" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -32,21 +33,22 @@ const handler = async (req: Request): Promise<Response> => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Verify user identity
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
-    });
-
-    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    // Use service role client to get user from token
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+    
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: userError } = await adminClient.auth.getUser(token);
     
     if (userError || !user) {
+      console.error("Auth error:", userError);
       return new Response(
         JSON.stringify({ error: "Invalid or expired token" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    console.log("User authenticated:", user.id);
 
     const requestData: CreateLaundryRequest = await req.json();
 
@@ -56,8 +58,6 @@ const handler = async (req: Request): Promise<Response> => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
     // Generate slug from name if not provided
     const slug = requestData.slug || requestData.name
@@ -104,6 +104,8 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    console.log("Laundry created:", laundry.id);
+
     // Check if user already has owner role
     const { data: existingRole } = await adminClient
       .from("user_roles")
@@ -123,6 +125,8 @@ const handler = async (req: Request): Promise<Response> => {
 
       if (roleError) {
         console.error("Error assigning owner role:", roleError);
+      } else {
+        console.log("Owner role assigned");
       }
     }
 
@@ -137,6 +141,8 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (linkError) {
       console.error("Error linking user to laundry:", linkError);
+    } else {
+      console.log("User linked to laundry");
     }
 
     // Update user's profile with laundry_id
@@ -158,6 +164,8 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (branchError) {
       console.error("Error creating default branch:", branchError);
+    } else {
+      console.log("Default branch created");
     }
 
     console.log("Laundry created successfully:", laundry.id);
