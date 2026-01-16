@@ -118,39 +118,14 @@ Deno.serve(async (req) => {
 
     const userId = authData.user.id;
 
-    // Wait a moment for the trigger to create the profile
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Wait a moment for the trigger to potentially create the profile
+    await new Promise(resolve => setTimeout(resolve, 800));
 
-    // Update profile with additional data including laundry_id and branch_id
-    // First check if profile exists
-    const { data: existingProfile } = await adminClient
+    // Upsert profile to guarantee name/email are saved correctly
+    const { error: profileError } = await adminClient
       .from('profiles')
-      .select('id')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (existingProfile) {
-      // Update existing profile
-      const { error: profileError } = await adminClient
-        .from('profiles')
-        .update({
-          name,
-          phone: phone || null,
-          must_change_password: false,
-          profile_completed: true,
-          laundry_id: laundry_id || null,
-          branch_id: branch_id || null,
-        })
-        .eq('id', userId);
-
-      if (profileError) {
-        console.error('Profile update error:', profileError);
-      }
-    } else {
-      // Create profile if trigger didn't create it
-      const { error: profileInsertError } = await adminClient
-        .from('profiles')
-        .insert({
+      .upsert(
+        {
           id: userId,
           email,
           name,
@@ -159,11 +134,12 @@ Deno.serve(async (req) => {
           profile_completed: true,
           laundry_id: laundry_id || null,
           branch_id: branch_id || null,
-        });
+        },
+        { onConflict: 'id' }
+      );
 
-      if (profileInsertError) {
-        console.error('Profile insert error:', profileInsertError);
-      }
+    if (profileError) {
+      console.error('Profile upsert error:', profileError);
     }
 
     // If laundry_id provided, add user to laundry_users table

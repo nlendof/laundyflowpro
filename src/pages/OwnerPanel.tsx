@@ -265,6 +265,7 @@ export default function OwnerPanel() {
 
       // Hide orphan rows (e.g. users already deleted but still linked in laundry_users)
       setLaundryUsers(enriched.filter((u) => !!u.profile));
+    } catch (error) {
       console.error('Error fetching laundry users:', error);
     }
   };
