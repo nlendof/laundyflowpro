@@ -24,6 +24,7 @@ export type Database = {
           expires_at: string | null
           id: string
           is_active: boolean | null
+          laundry_id: string | null
           uses_remaining: number | null
         }
         Insert: {
@@ -35,6 +36,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_active?: boolean | null
+          laundry_id?: string | null
           uses_remaining?: number | null
         }
         Update: {
@@ -46,6 +48,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_active?: boolean | null
+          laundry_id?: string | null
           uses_remaining?: number | null
         }
         Relationships: [
@@ -54,6 +57,13 @@ export type Database = {
             columns: ["admin_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_discount_codes_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
             referencedColumns: ["id"]
           },
         ]
@@ -65,6 +75,7 @@ export type Database = {
           created_at: string | null
           date: string
           id: string
+          laundry_id: string | null
           notes: string | null
           status: string
           user_id: string
@@ -75,6 +86,7 @@ export type Database = {
           created_at?: string | null
           date: string
           id?: string
+          laundry_id?: string | null
           notes?: string | null
           status?: string
           user_id: string
@@ -85,11 +97,20 @@ export type Database = {
           created_at?: string | null
           date?: string
           id?: string
+          laundry_id?: string | null
           notes?: string | null
           status?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "attendance_records_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       audit_logs: {
         Row: {
@@ -97,6 +118,7 @@ export type Database = {
           created_at: string | null
           id: string
           ip_address: string | null
+          laundry_id: string | null
           new_data: Json | null
           old_data: Json | null
           record_id: string | null
@@ -109,6 +131,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           ip_address?: string | null
+          laundry_id?: string | null
           new_data?: Json | null
           old_data?: Json | null
           record_id?: string | null
@@ -121,6 +144,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           ip_address?: string | null
+          laundry_id?: string | null
           new_data?: Json | null
           old_data?: Json | null
           record_id?: string | null
@@ -128,7 +152,15 @@ export type Database = {
           user_agent?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       backup_history: {
         Row: {
@@ -139,6 +171,7 @@ export type Database = {
           error_message: string | null
           file_size_bytes: number | null
           id: string
+          laundry_id: string | null
           status: string
           tables_backed_up: Json | null
         }
@@ -150,6 +183,7 @@ export type Database = {
           error_message?: string | null
           file_size_bytes?: number | null
           id?: string
+          laundry_id?: string | null
           status?: string
           tables_backed_up?: Json | null
         }
@@ -161,10 +195,19 @@ export type Database = {
           error_message?: string | null
           file_size_bytes?: number | null
           id?: string
+          laundry_id?: string | null
           status?: string
           tables_backed_up?: Json | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "backup_history_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       backup_schedules: {
         Row: {
@@ -174,6 +217,7 @@ export type Database = {
           id: string
           is_enabled: boolean
           last_backup_at: string | null
+          laundry_id: string | null
           next_backup_at: string | null
           notification_email: string | null
           tables_to_backup: Json
@@ -187,6 +231,7 @@ export type Database = {
           id?: string
           is_enabled?: boolean
           last_backup_at?: string | null
+          laundry_id?: string | null
           next_backup_at?: string | null
           notification_email?: string | null
           tables_to_backup?: Json
@@ -200,13 +245,22 @@ export type Database = {
           id?: string
           is_enabled?: boolean
           last_backup_at?: string | null
+          laundry_id?: string | null
           next_backup_at?: string | null
           notification_email?: string | null
           tables_to_backup?: Json
           time_of_day?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "backup_schedules_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       branches: {
         Row: {
@@ -216,6 +270,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           is_main: boolean | null
+          laundry_id: string | null
           name: string
           phone: string | null
           updated_at: string | null
@@ -227,6 +282,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_main?: boolean | null
+          laundry_id?: string | null
           name: string
           phone?: string | null
           updated_at?: string | null
@@ -238,11 +294,20 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_main?: boolean | null
+          laundry_id?: string | null
           name?: string
           phone?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "branches_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cash_closings: {
         Row: {
@@ -253,6 +318,7 @@ export type Database = {
           difference: number | null
           expected_balance: number
           id: string
+          laundry_id: string | null
           notes: string | null
           opening_balance: number
           total_expense: number
@@ -266,6 +332,7 @@ export type Database = {
           difference?: number | null
           expected_balance?: number
           id?: string
+          laundry_id?: string | null
           notes?: string | null
           opening_balance?: number
           total_expense?: number
@@ -279,12 +346,21 @@ export type Database = {
           difference?: number | null
           expected_balance?: number
           id?: string
+          laundry_id?: string | null
           notes?: string | null
           opening_balance?: number
           total_expense?: number
           total_income?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "cash_closings_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cash_register: {
         Row: {
@@ -295,6 +371,7 @@ export type Database = {
           description: string | null
           entry_type: string
           id: string
+          laundry_id: string | null
           order_id: string | null
         }
         Insert: {
@@ -305,6 +382,7 @@ export type Database = {
           description?: string | null
           entry_type: string
           id?: string
+          laundry_id?: string | null
           order_id?: string | null
         }
         Update: {
@@ -315,9 +393,17 @@ export type Database = {
           description?: string | null
           entry_type?: string
           id?: string
+          laundry_id?: string | null
           order_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "cash_register_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cash_register_order_id_fkey"
             columns: ["order_id"]
@@ -335,6 +421,7 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean | null
+          laundry_id: string | null
           min_stock: number | null
           name: string
           price: number
@@ -349,6 +436,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          laundry_id?: string | null
           min_stock?: number | null
           name: string
           price: number
@@ -363,6 +451,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          laundry_id?: string | null
           min_stock?: number | null
           name?: string
           price?: number
@@ -370,13 +459,22 @@ export type Database = {
           track_inventory?: boolean | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "catalog_articles_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       catalog_extras: {
         Row: {
           created_at: string | null
           id: string
           is_active: boolean | null
+          laundry_id: string | null
           name: string
           price: number
         }
@@ -384,6 +482,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          laundry_id?: string | null
           name: string
           price: number
         }
@@ -391,10 +490,19 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          laundry_id?: string | null
           name?: string
           price?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "catalog_extras_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       catalog_services: {
         Row: {
@@ -404,6 +512,7 @@ export type Database = {
           estimated_time: number | null
           id: string
           is_active: boolean | null
+          laundry_id: string | null
           name: string
           price: number
           unit: string
@@ -416,6 +525,7 @@ export type Database = {
           estimated_time?: number | null
           id?: string
           is_active?: boolean | null
+          laundry_id?: string | null
           name: string
           price: number
           unit?: string
@@ -428,12 +538,21 @@ export type Database = {
           estimated_time?: number | null
           id?: string
           is_active?: boolean | null
+          laundry_id?: string | null
           name?: string
           price?: number
           unit?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "catalog_services_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       customer_addresses: {
         Row: {
@@ -514,6 +633,7 @@ export type Database = {
           created_at: string | null
           email: string | null
           id: string
+          laundry_id: string | null
           name: string
           nickname: string | null
           notes: string | null
@@ -529,6 +649,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           id?: string
+          laundry_id?: string | null
           name: string
           nickname?: string | null
           notes?: string | null
@@ -544,6 +665,7 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           id?: string
+          laundry_id?: string | null
           name?: string
           nickname?: string | null
           notes?: string | null
@@ -553,7 +675,15 @@ export type Database = {
           updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "customers_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       employee_loans: {
         Row: {
@@ -563,6 +693,7 @@ export type Database = {
           deduction_frequency: string | null
           employee_id: string
           id: string
+          laundry_id: string | null
           monthly_deduction: number | null
           reason: string | null
           remaining_amount: number
@@ -577,6 +708,7 @@ export type Database = {
           deduction_frequency?: string | null
           employee_id: string
           id?: string
+          laundry_id?: string | null
           monthly_deduction?: number | null
           reason?: string | null
           remaining_amount: number
@@ -591,6 +723,7 @@ export type Database = {
           deduction_frequency?: string | null
           employee_id?: string
           id?: string
+          laundry_id?: string | null
           monthly_deduction?: number | null
           reason?: string | null
           remaining_amount?: number
@@ -613,6 +746,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "employee_loans_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
         ]
       }
       employee_salaries: {
@@ -623,6 +763,7 @@ export type Database = {
           currency: string
           effective_date: string
           id: string
+          laundry_id: string | null
           notes: string | null
           salary_type: string
           user_id: string
@@ -634,6 +775,7 @@ export type Database = {
           currency?: string
           effective_date?: string
           id?: string
+          laundry_id?: string | null
           notes?: string | null
           salary_type?: string
           user_id: string
@@ -645,11 +787,20 @@ export type Database = {
           currency?: string
           effective_date?: string
           id?: string
+          laundry_id?: string | null
           notes?: string | null
           salary_type?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "employee_salaries_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       expenses: {
         Row: {
@@ -660,6 +811,7 @@ export type Database = {
           description: string | null
           expense_date: string
           id: string
+          laundry_id: string | null
         }
         Insert: {
           amount: number
@@ -669,6 +821,7 @@ export type Database = {
           description?: string | null
           expense_date?: string
           id?: string
+          laundry_id?: string | null
         }
         Update: {
           amount?: number
@@ -678,8 +831,17 @@ export type Database = {
           description?: string | null
           expense_date?: string
           id?: string
+          laundry_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "expenses_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventory: {
         Row: {
@@ -688,6 +850,7 @@ export type Database = {
           current_stock: number
           id: string
           last_restocked: string | null
+          laundry_id: string | null
           min_stock: number
           name: string
           unit: string
@@ -700,6 +863,7 @@ export type Database = {
           current_stock?: number
           id?: string
           last_restocked?: string | null
+          laundry_id?: string | null
           min_stock?: number
           name: string
           unit?: string
@@ -712,13 +876,22 @@ export type Database = {
           current_stock?: number
           id?: string
           last_restocked?: string | null
+          laundry_id?: string | null
           min_stock?: number
           name?: string
           unit?: string
           unit_cost?: number | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "inventory_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventory_movements: {
         Row: {
@@ -754,6 +927,86 @@ export type Database = {
             columns: ["inventory_id"]
             isOneToOne: false
             referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      laundries: {
+        Row: {
+          address: string | null
+          created_at: string | null
+          currency: string | null
+          email: string | null
+          id: string
+          is_active: boolean | null
+          logo_url: string | null
+          name: string
+          phone: string | null
+          slug: string
+          subscription_status: string | null
+          timezone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string | null
+          currency?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          logo_url?: string | null
+          name: string
+          phone?: string | null
+          slug: string
+          subscription_status?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          created_at?: string | null
+          currency?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          logo_url?: string | null
+          name?: string
+          phone?: string | null
+          slug?: string
+          subscription_status?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      laundry_users: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_primary: boolean | null
+          laundry_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_primary?: boolean | null
+          laundry_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_primary?: boolean | null
+          laundry_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "laundry_users_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
             referencedColumns: ["id"]
           },
         ]
@@ -868,6 +1121,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          laundry_id: string | null
           notes: string | null
           order_id: string
           processed_at: string | null
@@ -881,6 +1135,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
+          laundry_id?: string | null
           notes?: string | null
           order_id: string
           processed_at?: string | null
@@ -894,6 +1149,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          laundry_id?: string | null
           notes?: string | null
           order_id?: string
           processed_at?: string | null
@@ -905,6 +1161,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "order_returns_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "order_returns_order_id_fkey"
             columns: ["order_id"]
@@ -943,6 +1206,7 @@ export type Database = {
           id: string
           is_paid: boolean | null
           item_checks: Json | null
+          laundry_id: string | null
           needs_delivery: boolean | null
           needs_pickup: boolean | null
           notes: string | null
@@ -981,6 +1245,7 @@ export type Database = {
           id?: string
           is_paid?: boolean | null
           item_checks?: Json | null
+          laundry_id?: string | null
           needs_delivery?: boolean | null
           needs_pickup?: boolean | null
           notes?: string | null
@@ -1019,6 +1284,7 @@ export type Database = {
           id?: string
           is_paid?: boolean | null
           item_checks?: Json | null
+          laundry_id?: string | null
           needs_delivery?: boolean | null
           needs_pickup?: boolean | null
           notes?: string | null
@@ -1049,6 +1315,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
             referencedColumns: ["id"]
           },
         ]
@@ -1101,6 +1374,7 @@ export type Database = {
           created_by: string | null
           deductions: number
           id: string
+          laundry_id: string | null
           notes: string | null
           overtime_amount: number
           overtime_hours: number
@@ -1121,6 +1395,7 @@ export type Database = {
           created_by?: string | null
           deductions?: number
           id?: string
+          laundry_id?: string | null
           notes?: string | null
           overtime_amount?: number
           overtime_hours?: number
@@ -1141,6 +1416,7 @@ export type Database = {
           created_by?: string | null
           deductions?: number
           id?: string
+          laundry_id?: string | null
           notes?: string | null
           overtime_amount?: number
           overtime_hours?: number
@@ -1152,7 +1428,15 @@ export type Database = {
           total_amount?: number
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "payroll_records_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -1163,6 +1447,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           last_login: string | null
+          laundry_id: string | null
           must_change_password: boolean | null
           name: string
           phone: string | null
@@ -1177,6 +1462,7 @@ export type Database = {
           id: string
           is_active?: boolean | null
           last_login?: string | null
+          laundry_id?: string | null
           must_change_password?: boolean | null
           name: string
           phone?: string | null
@@ -1191,13 +1477,22 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_login?: string | null
+          laundry_id?: string | null
           must_change_password?: boolean | null
           name?: string
           phone?: string | null
           profile_completed?: boolean | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       purchase_items: {
         Row: {
@@ -1271,6 +1566,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          laundry_id: string | null
           notes: string | null
           purchase_date: string
           status: string
@@ -1282,6 +1578,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          laundry_id?: string | null
           notes?: string | null
           purchase_date?: string
           status?: string
@@ -1293,6 +1590,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          laundry_id?: string | null
           notes?: string | null
           purchase_date?: string
           status?: string
@@ -1300,28 +1598,47 @@ export type Database = {
           total_amount?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "purchases_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       system_config: {
         Row: {
           id: string
           key: string
+          laundry_id: string | null
           updated_at: string | null
           value: Json
         }
         Insert: {
           id?: string
           key: string
+          laundry_id?: string | null
           updated_at?: string | null
           value: Json
         }
         Update: {
           id?: string
           key?: string
+          laundry_id?: string | null
           updated_at?: string | null
           value?: Json
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "system_config_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       time_off_requests: {
         Row: {
@@ -1330,6 +1647,7 @@ export type Database = {
           created_at: string | null
           end_date: string
           id: string
+          laundry_id: string | null
           reason: string | null
           request_type: string
           response_notes: string | null
@@ -1343,6 +1661,7 @@ export type Database = {
           created_at?: string | null
           end_date: string
           id?: string
+          laundry_id?: string | null
           reason?: string | null
           request_type: string
           response_notes?: string | null
@@ -1356,6 +1675,7 @@ export type Database = {
           created_at?: string | null
           end_date?: string
           id?: string
+          laundry_id?: string | null
           reason?: string | null
           request_type?: string
           response_notes?: string | null
@@ -1363,7 +1683,15 @@ export type Database = {
           status?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "time_off_requests_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_permissions: {
         Row: {
@@ -1411,6 +1739,7 @@ export type Database = {
           end_time: string
           id: string
           is_active: boolean | null
+          laundry_id: string | null
           start_time: string
           updated_at: string | null
           user_id: string
@@ -1421,6 +1750,7 @@ export type Database = {
           end_time: string
           id?: string
           is_active?: boolean | null
+          laundry_id?: string | null
           start_time: string
           updated_at?: string | null
           user_id: string
@@ -1431,17 +1761,27 @@ export type Database = {
           end_time?: string
           id?: string
           is_active?: boolean | null
+          laundry_id?: string | null
           start_time?: string
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "work_schedules_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      get_user_laundry_id: { Args: never; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -1455,9 +1795,23 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_customer: { Args: { _user_id: string }; Returns: boolean }
+      is_laundry_admin: {
+        Args: { _laundry_id: string; _user_id: string }
+        Returns: boolean
+      }
+      user_belongs_to_laundry: {
+        Args: { _laundry_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      app_role: "admin" | "cajero" | "operador" | "delivery" | "cliente"
+      app_role:
+        | "admin"
+        | "cajero"
+        | "operador"
+        | "delivery"
+        | "cliente"
+        | "owner"
       expense_category: "rent" | "utilities" | "payroll" | "supplies" | "other"
       inventory_category: "detergent" | "softener" | "stain_remover" | "other"
       item_type: "weight" | "piece"
@@ -1597,7 +1951,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "cajero", "operador", "delivery", "cliente"],
+      app_role: ["admin", "cajero", "operador", "delivery", "cliente", "owner"],
       expense_category: ["rent", "utilities", "payroll", "supplies", "other"],
       inventory_category: ["detergent", "softener", "stain_remover", "other"],
       item_type: ["weight", "piece"],
