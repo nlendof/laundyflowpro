@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 interface DeleteEmployeeRequest {
-  userId: string;
+  user_id: string;
 }
 
 Deno.serve(async (req) => {
@@ -52,15 +52,15 @@ Deno.serve(async (req) => {
       .eq('user_id', requestingUser.id)
       .maybeSingle();
 
-    if (roleError || roleData?.role !== 'admin') {
-      return new Response(JSON.stringify({ error: 'Solo administradores' }), {
+    if (roleError || (roleData?.role !== 'admin' && roleData?.role !== 'owner')) {
+      return new Response(JSON.stringify({ error: 'Solo administradores y propietarios' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const body: DeleteEmployeeRequest = await req.json();
-    const { userId } = body;
+    const userId = body.user_id;
 
     if (!userId) {
       return new Response(JSON.stringify({ error: 'Datos incompletos' }), {
