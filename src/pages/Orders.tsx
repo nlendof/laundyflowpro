@@ -23,6 +23,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Plus,
   Search,
@@ -36,6 +38,8 @@ import {
   Banknote,
   CreditCard,
   Smartphone,
+  CalendarIcon,
+  History,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrders } from '@/hooks/useOrders';
@@ -43,6 +47,9 @@ import { useNewOrders } from '@/contexts/NewOrdersContext';
 import { useOperationsFlow } from '@/hooks/useOperationsFlow';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/currency';
+import { format, isToday, startOfDay, endOfDay } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 const PAYMENT_METHODS = [
   { id: 'cash', name: 'Efectivo', icon: Banknote },
@@ -58,7 +65,8 @@ export default function Orders() {
     onNewOrder: incrementCount
   });
   const { statusFlow, getStatusConfig, getNextStatus, getPreviousStatus } = useOperationsFlow();
-  const [activeStatus, setActiveStatus] = useState<OrderStatus | 'all'>('all');
+  // Default to ready_delivery
+  const [activeStatus, setActiveStatus] = useState<OrderStatus | 'all'>('ready_delivery');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [showDeliveryOnly, setShowDeliveryOnly] = useState(false);
@@ -66,6 +74,9 @@ export default function Orders() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewOrderModalOpen, setIsNewOrderModalOpen] = useState(false);
   const [qrOrder, setQrOrder] = useState<Order | null>(null);
+  
+  // History date picker for delivered orders
+  const [historyDate, setHistoryDate] = useState<Date | undefined>(undefined);
   
   // Payment dialog state for delivery
   const [paymentWarningOpen, setPaymentWarningOpen] = useState(false);
@@ -103,6 +114,25 @@ export default function Orders() {
     // Filter by status
     if (activeStatus !== 'all') {
       result = result.filter(order => order.status === activeStatus);
+      
+      // Special handling for delivered: show only today's or selected history date
+      if (activeStatus === 'delivered') {
+        if (historyDate) {
+          // Show orders from selected history date
+          const dayStart = startOfDay(historyDate);
+          const dayEnd = endOfDay(historyDate);
+          result = result.filter(order => {
+            const deliveredAt = order.deliveredAt || order.updatedAt;
+            return deliveredAt >= dayStart && deliveredAt <= dayEnd;
+          });
+        } else {
+          // Show only today's delivered orders
+          result = result.filter(order => {
+            const deliveredAt = order.deliveredAt || order.updatedAt;
+            return isToday(deliveredAt);
+          });
+        }
+      }
     }
 
     // Filter by delivery
@@ -138,7 +168,7 @@ export default function Orders() {
     });
 
     return result;
-  }, [orders, activeStatus, searchQuery, sortBy, showDeliveryOnly]);
+  }, [orders, activeStatus, searchQuery, sortBy, showDeliveryOnly, historyDate]);
 
   const handleViewDetails = (order: Order) => {
     setSelectedOrder(order);
@@ -287,10 +317,60 @@ export default function Orders() {
       <div className="overflow-x-auto -mx-6 px-6 lg:-mx-8 lg:px-8 pb-2">
         <OrderStatusTabs
           activeStatus={activeStatus}
-          onStatusChange={setActiveStatus}
+          onStatusChange={(status) => {
+            setActiveStatus(status);
+            // Clear history date when switching away from delivered
+            if (status !== 'delivered') {
+              setHistoryDate(undefined);
+            }
+          }}
           counts={statusCounts}
         />
       </div>
+
+      {/* History Date Picker for Delivered */}
+      {activeStatus === 'delivered' && (
+        <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-xl border">
+          <History className="w-5 h-5 text-muted-foreground" />
+          <span className="text-sm font-medium">
+            {historyDate ? 'Historial del' : 'Mostrando entregas de hoy'}
+          </span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "gap-2",
+                  historyDate && "text-primary border-primary"
+                )}
+              >
+                <CalendarIcon className="w-4 h-4" />
+                {historyDate ? format(historyDate, "PPP", { locale: es }) : "Ver historial"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={historyDate}
+                onSelect={setHistoryDate}
+                disabled={(date) => date > new Date()}
+                initialFocus
+                className="pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+          {historyDate && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setHistoryDate(undefined)}
+              className="text-muted-foreground"
+            >
+              Ver solo hoy
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Filters Bar */}
       <div className="flex flex-col sm:flex-row gap-3">
