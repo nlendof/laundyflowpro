@@ -89,7 +89,7 @@ export default function Orders() {
     clearCount();
   }, [clearCount]);
 
-  // Calculate counts
+  // Calculate counts - only count today's delivered orders
   const statusCounts = useMemo(() => {
     const counts: Record<OrderStatus, number> = {
       pending_pickup: 0,
@@ -102,7 +102,15 @@ export default function Orders() {
       delivered: 0,
     };
     orders.forEach(order => {
-      counts[order.status] = (counts[order.status] || 0) + 1;
+      // For delivered orders, only count if delivered today
+      if (order.status === 'delivered') {
+        const deliveredAt = order.deliveredAt || order.updatedAt;
+        if (isToday(deliveredAt)) {
+          counts.delivered += 1;
+        }
+      } else {
+        counts[order.status] = (counts[order.status] || 0) + 1;
+      }
     });
     return counts;
   }, [orders]);
