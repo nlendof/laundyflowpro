@@ -102,13 +102,19 @@ Deno.serve(async (req) => {
     if (profileDeleteError) console.error('profileDeleteError', profileDeleteError);
 
     // Delete auth user (revokes access)
+    // If the user was already removed from the auth system, treat it as success.
     const { error: authDeleteError } = await adminClient.auth.admin.deleteUser(userId);
     if (authDeleteError) {
-      console.error('authDeleteError', authDeleteError);
-      return new Response(JSON.stringify({ error: 'No se pudo eliminar el usuario' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      const anyErr = authDeleteError as any;
+      if (anyErr?.status === 404 || anyErr?.code === 'user_not_found') {
+        console.warn('authDeleteError (already deleted):', authDeleteError);
+      } else {
+        console.error('authDeleteError', authDeleteError);
+        return new Response(JSON.stringify({ error: 'No se pudo eliminar el usuario' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     return new Response(JSON.stringify({ success: true }), {
