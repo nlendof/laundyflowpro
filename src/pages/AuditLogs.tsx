@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -77,6 +77,22 @@ const AuditLogs = () => {
       })) as AuditLog[];
     }
   });
+
+  // Real-time subscription for audit logs
+  useEffect(() => {
+    const channel = supabase
+      .channel('audit-logs-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'audit_logs' },
+        () => refetch()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetch]);
 
   const { data: tables } = useQuery({
     queryKey: ['audit-tables'],

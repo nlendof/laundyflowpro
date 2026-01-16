@@ -237,6 +237,32 @@ export function useCatalog() {
     fetchCatalog();
   }, [fetchCatalog]);
 
+  // Real-time subscription for catalog changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('catalog-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'catalog_services' },
+        () => fetchCatalog()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'catalog_articles' },
+        () => fetchCatalog()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'catalog_extras' },
+        () => fetchCatalog()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchCatalog]);
+
   return {
     items,
     services,
