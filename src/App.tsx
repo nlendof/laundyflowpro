@@ -24,6 +24,7 @@ import Employees from "./pages/Employees";
 import EmployeePortal from "./pages/EmployeePortal";
 import FirstLoginSetup from "./pages/FirstLoginSetup";
 import LaundryOnboarding from "./pages/LaundryOnboarding";
+import OwnerPanel from "./pages/OwnerPanel";
 import Reports from "./pages/Reports";
 import Purchases from "./pages/Purchases";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -138,6 +139,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <EmployeePortal />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/owner-panel"
+          element={
+            <ProtectedRoute>
+              <OwnerPanel />
             </ProtectedRoute>
           }
         />
