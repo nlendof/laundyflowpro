@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { ConfigProvider } from "./contexts/ConfigContext";
 import { NewOrdersProvider } from "./contexts/NewOrdersContext";
+import { LaundryProvider } from "./contexts/LaundryContext";
 import { AppLayout } from "./components/layout/AppLayout";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -260,17 +261,19 @@ function AppRoutes() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <ConfigProvider>
-        <NewOrdersProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <AppRoutes />
-            </BrowserRouter>
-          </TooltipProvider>
-        </NewOrdersProvider>
-      </ConfigProvider>
+      <LaundryProvider>
+        <ConfigProvider>
+          <NewOrdersProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <AppRoutes />
+              </BrowserRouter>
+            </TooltipProvider>
+          </NewOrdersProvider>
+        </ConfigProvider>
+      </LaundryProvider>
     </AuthProvider>
   </QueryClientProvider>
 );
