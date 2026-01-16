@@ -17,6 +17,16 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Table,
   TableBody,
   TableCell,
@@ -113,6 +123,8 @@ export default function OwnerPanel() {
   const [editingLaundry, setEditingLaundry] = useState<Laundry | null>(null);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
   const [editingEmployee, setEditingEmployee] = useState<LaundryUser | null>(null);
+  const [deletingEmployee, setDeletingEmployee] = useState<LaundryUser | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
   // Form data
@@ -595,19 +607,19 @@ export default function OwnerPanel() {
     }
   };
 
-  const handleDeleteEmployee = async (employee: LaundryUser) => {
-    if (employee.is_primary) {
+  const handleDeleteEmployee = async () => {
+    if (!deletingEmployee) return;
+    
+    if (deletingEmployee.is_primary) {
       toast.error('No se puede eliminar al usuario principal de la lavandería');
+      setDeletingEmployee(null);
       return;
     }
 
-    if (!confirm(`¿Eliminar al empleado "${employee.profile?.name || 'Sin nombre'}"? Esta acción no se puede deshacer.`)) {
-      return;
-    }
-
+    setIsDeleting(true);
     try {
       const { data, error } = await supabase.functions.invoke('delete-employee', {
-        body: { user_id: employee.user_id },
+        body: { user_id: deletingEmployee.user_id },
       });
 
       if (error) throw error;
@@ -620,6 +632,9 @@ export default function OwnerPanel() {
     } catch (error) {
       console.error('Error deleting employee:', error);
       toast.error(error instanceof Error ? error.message : 'Error al eliminar empleado');
+    } finally {
+      setIsDeleting(false);
+      setDeletingEmployee(null);
     }
   };
 
@@ -970,7 +985,7 @@ export default function OwnerPanel() {
                                   variant="ghost"
                                   size="icon"
                                   className="text-destructive hover:text-destructive"
-                                  onClick={() => handleDeleteEmployee(lu)}
+                                  onClick={() => setDeletingEmployee(lu)}
                                   title="Eliminar empleado"
                                   disabled={lu.is_primary}
                                 >
@@ -1393,6 +1408,36 @@ export default function OwnerPanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Employee Confirmation Dialog */}
+      <AlertDialog open={!!deletingEmployee} onOpenChange={(open) => !open && setDeletingEmployee(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar empleado?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de eliminar a <strong>{deletingEmployee?.profile?.name || 'este empleado'}</strong>. 
+              Esta acción no se puede deshacer y se eliminarán todos sus datos del sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteEmployee}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                'Eliminar'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
