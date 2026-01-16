@@ -21,6 +21,7 @@ import {
   FileText,
   User,
   RotateCcw,
+  Crown,
 } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -119,6 +120,24 @@ export function AppSidebar() {
             </div>
           )}
         </button>
+
+        {/* Owner Panel Link */}
+        {user.role === 'owner' && (
+          <button
+            onClick={() => navigate('/owner-panel')}
+            className={cn(
+              'flex items-center gap-3 w-full rounded-lg p-2 mt-2 transition-colors',
+              'hover:bg-amber-500/20 group border border-amber-500/30',
+              collapsed && 'justify-center',
+              location.pathname === '/owner-panel' && 'bg-amber-500/20 border-amber-500'
+            )}
+          >
+            <Crown className="w-5 h-5 text-amber-500" />
+            {!collapsed && (
+              <span className="font-medium text-sm text-amber-500">Panel Propietario</span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
