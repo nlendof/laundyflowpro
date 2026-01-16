@@ -1239,14 +1239,14 @@ export default function OwnerPanel() {
             <div className="space-y-2">
               <Label>Sucursal Asignada</Label>
               <Select
-                value={employeeForm.branch_id}
-                onValueChange={(v) => setEmployeeForm({ ...employeeForm, branch_id: v })}
+                value={employeeForm.branch_id || "all"}
+                onValueChange={(v) => setEmployeeForm({ ...employeeForm, branch_id: v === "all" ? "" : v })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Todas las sucursales" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas las sucursales</SelectItem>
+                  <SelectItem value="all">Todas las sucursales</SelectItem>
                   {branches.map(b => (
                     <SelectItem key={b.id} value={b.id}>
                       {b.code} - {b.name}
