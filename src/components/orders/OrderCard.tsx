@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useOperationsFlow } from '@/hooks/useOperationsFlow';
+import { WhatsAppNotifyButton } from './WhatsAppNotifyButton';
 import {
   Phone,
   MapPin,
@@ -122,19 +123,33 @@ export function OrderCard({ order, onViewDetails, isNew = false }: OrderCardProp
               {format(order.createdAt, "dd MMM, HH:mm", { locale: es })}
             </div>
 
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="group-hover:bg-primary group-hover:text-primary-foreground"
-              onClick={(e) => {
-                e.stopPropagation();
-                onViewDetails(order);
-              }}
-            >
-              <Eye className="w-4 h-4 mr-1" />
-              Ver
-              <ChevronRight className="w-4 h-4 ml-1" />
-            </Button>
+            <div className="flex items-center gap-2">
+              {order.status === 'ready_delivery' && (
+                <div onClick={(e) => e.stopPropagation()}>
+                  <WhatsAppNotifyButton
+                    order={order}
+                    notificationType="ready"
+                    variant="outline"
+                    size="sm"
+                    showLabel={false}
+                    className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                  />
+                </div>
+              )}
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="group-hover:bg-primary group-hover:text-primary-foreground"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewDetails(order);
+                }}
+              >
+                <Eye className="w-4 h-4 mr-1" />
+                Ver
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
           </div>
         </div>
 
