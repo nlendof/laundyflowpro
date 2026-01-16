@@ -119,8 +119,17 @@ export default function Orders() {
   const filteredOrders = useMemo(() => {
     let result = [...orders];
 
-    // Filter by status
-    if (activeStatus !== 'all') {
+    // For "all" status, exclude delivered orders that are not from today (history)
+    if (activeStatus === 'all') {
+      result = result.filter(order => {
+        if (order.status === 'delivered') {
+          const deliveredAt = order.deliveredAt || order.updatedAt;
+          return isToday(deliveredAt);
+        }
+        return true;
+      });
+    } else {
+      // Filter by specific status
       result = result.filter(order => order.status === activeStatus);
       
       // Special handling for delivered: show only today's or selected history date
