@@ -353,9 +353,11 @@ export default function EmployeePortal() {
                       <Label className="text-muted-foreground text-xs">Rol</Label>
                       <p className="font-medium flex items-center gap-2">
                         <Briefcase className="w-4 h-4 text-muted-foreground" />
-                        {user?.role === 'admin' ? 'Administrador' : 
+                        {user?.role === 'owner' ? 'Propietario' :
+                         user?.role === 'admin' ? 'Administrador' : 
                          user?.role === 'cajero' ? 'Cajero' :
-                         user?.role === 'operador' ? 'Operador' : 'Repartidor'}
+                         user?.role === 'operador' ? 'Operador' : 
+                         user?.role === 'delivery' ? 'Repartidor' : 'Cliente'}
                       </p>
                     </div>
                   </div>
