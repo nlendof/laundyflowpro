@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useCurrentLaundryId } from '@/contexts/LaundryContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,6 +36,7 @@ interface Branch {
 }
 
 export function BranchSettings() {
+  const laundryId = useCurrentLaundryId();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -51,11 +53,18 @@ export function BranchSettings() {
   });
 
   const fetchBranches = async () => {
+    if (!laundryId) {
+      setBranches([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from('branches')
         .select('*')
+        .eq('laundry_id', laundryId)
         .order('is_main', { ascending: false })
         .order('name', { ascending: true });
 
@@ -71,7 +80,7 @@ export function BranchSettings() {
 
   useEffect(() => {
     fetchBranches();
-  }, []);
+  }, [laundryId]);
 
   const handleOpenDialog = (branch?: Branch) => {
     if (branch) {
@@ -110,6 +119,11 @@ export function BranchSettings() {
       return;
     }
 
+    if (!laundryId) {
+      toast.error('No se ha seleccionado una lavandería');
+      return;
+    }
+
     setSaving(true);
     try {
       // If setting as main, unset other main branches
@@ -117,6 +131,7 @@ export function BranchSettings() {
         await supabase
           .from('branches')
           .update({ is_main: false })
+          .eq('laundry_id', laundryId)
           .neq('id', editingBranch?.id || '');
       }
 
@@ -146,6 +161,7 @@ export function BranchSettings() {
             phone: formData.phone || null,
             is_active: formData.is_active,
             is_main: formData.is_main,
+            laundry_id: laundryId,
           });
 
         if (error) throw error;
