@@ -77,6 +77,12 @@ Deno.serve(async (req) => {
     }
 
     // Delete public data first (best-effort)
+    const { error: laundryUserDeleteError } = await adminClient
+      .from('laundry_users')
+      .delete()
+      .eq('user_id', userId);
+    if (laundryUserDeleteError) console.error('laundryUserDeleteError', laundryUserDeleteError);
+
     const { error: permDeleteError } = await adminClient
       .from('user_permissions')
       .delete()
