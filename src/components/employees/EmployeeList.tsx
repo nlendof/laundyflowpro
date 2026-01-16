@@ -61,9 +61,15 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { CreateEmployeeModal } from './CreateEmployeeModal';
 
-type AppRole = 'admin' | 'cajero' | 'operador' | 'delivery';
+type AppRole = 'owner' | 'admin' | 'cajero' | 'operador' | 'delivery' | 'cliente';
 
-const ROLE_CONFIG: Record<AppRole, { label: string; color: string; icon: React.ElementType; description: string }> = {
+const ROLE_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType; description: string }> = {
+  owner: {
+    label: 'Propietario',
+    color: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300',
+    icon: ShieldCheck,
+    description: 'Propietario del negocio con acceso total',
+  },
   admin: {
     label: 'Administrador',
     color: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
@@ -109,7 +115,8 @@ const MODULES = [
 
 type ModuleKey = typeof MODULES[number]['key'];
 
-const DEFAULT_PERMISSIONS: Record<AppRole, ModuleKey[]> = {
+const DEFAULT_PERMISSIONS: Record<string, ModuleKey[]> = {
+  owner: MODULES.map(m => m.key),
   admin: MODULES.map(m => m.key),
   cajero: ['dashboard', 'pos', 'orders', 'cash_register', 'customers'],
   operador: ['dashboard', 'orders', 'operations'],

@@ -29,9 +29,10 @@ import { AttendanceManagement } from '@/components/employees/AttendanceManagemen
 import { TimeOffManagement } from '@/components/employees/TimeOffManagement';
 import { LoanManagement } from '@/components/employees/LoanManagement';
 
-type AppRole = 'admin' | 'cajero' | 'operador' | 'delivery';
+type AppRole = 'owner' | 'admin' | 'cajero' | 'operador' | 'delivery' | 'cliente';
 
-const ROLE_CONFIG: Record<AppRole, { label: string; color: string; icon: React.ElementType }> = {
+const ROLE_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
+  owner: { label: 'Propietario', color: 'bg-amber-100 text-amber-700', icon: ShieldCheck },
   admin: { label: 'Administrador', color: 'bg-purple-100 text-purple-700', icon: ShieldCheck },
   cajero: { label: 'Cajero', color: 'bg-green-100 text-green-700', icon: Wallet },
   operador: { label: 'Operador', color: 'bg-blue-100 text-blue-700', icon: Settings },
@@ -44,7 +45,7 @@ export default function Employees() {
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [activeTab, setActiveTab] = useState('list');
 
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'owner';
 
   const fetchEmployees = async () => {
     try {
@@ -106,9 +107,9 @@ export default function Employees() {
     total: employees.length,
     active: employees.filter(e => e.is_active).length,
     byRole: Object.keys(ROLE_CONFIG).reduce((acc, role) => {
-      acc[role as AppRole] = employees.filter(e => e.role === role).length;
+      acc[role] = employees.filter(e => e.role === role).length;
       return acc;
-    }, {} as Record<AppRole, number>),
+    }, {} as Record<string, number>),
   }), [employees]);
 
   if (!isAdmin) {
@@ -170,7 +171,7 @@ export default function Employees() {
         {Object.entries(ROLE_CONFIG).map(([role, config]) => (
           <Card key={role}>
             <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold">{stats.byRole[role as AppRole] || 0}</p>
+              <p className="text-2xl font-bold">{stats.byRole[role] || 0}</p>
               <p className="text-xs text-muted-foreground">{config.label}</p>
             </CardContent>
           </Card>
