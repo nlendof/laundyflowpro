@@ -55,6 +55,7 @@ import {
   Eye,
   EyeOff,
   RotateCcw,
+  Wrench,
 } from 'lucide-react';
 import { 
   Select,
@@ -65,6 +66,8 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { TechnicianManagement } from '@/components/owner/TechnicianManagement';
+import { SystemMaintenanceTools } from '@/components/owner/SystemMaintenanceTools';
 
 interface Laundry {
   id: string;
@@ -174,8 +177,9 @@ export default function OwnerPanel() {
     delivery: ['dashboard', 'orders'],
   };
 
-  // Check if user is owner
-  const isOwner = user?.role === 'owner';
+  // Check if user is owner or technician
+  const isOwner = user?.role === 'owner' || user?.role === 'technician';
+  const [activeMainTab, setActiveMainTab] = useState<'laundries' | 'technicians' | 'maintenance'>('laundries');
 
   useEffect(() => {
     if (!isOwner) {
@@ -828,12 +832,12 @@ export default function OwnerPanel() {
               <p className="text-muted-foreground">
                 {selectedLaundry 
                   ? `Gestionando: ${selectedLaundry.name}`
-                  : 'Gestiona todas tus lavanderías y sucursales'
+                  : 'Gestiona todas tus lavanderías, técnicos y mantenimiento'
                 }
               </p>
             </div>
           </div>
-          {!selectedLaundry && (
+          {!selectedLaundry && activeMainTab === 'laundries' && (
             <Button onClick={() => handleOpenLaundryDialog()} className="gap-2">
               <Plus className="w-4 h-4" />
               Nueva Lavandería
@@ -841,9 +845,26 @@ export default function OwnerPanel() {
           )}
         </div>
 
-        {/* Main Content */}
+        {/* Main Tabs - Only show when no laundry is selected */}
         {!selectedLaundry ? (
-          // Laundries List
+          <Tabs value={activeMainTab} onValueChange={(v) => setActiveMainTab(v as any)} className="space-y-6">
+            <TabsList className="grid w-full max-w-md grid-cols-3">
+              <TabsTrigger value="laundries" className="gap-2">
+                <Building2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Lavanderías</span>
+              </TabsTrigger>
+              <TabsTrigger value="technicians" className="gap-2">
+                <Wrench className="w-4 h-4" />
+                <span className="hidden sm:inline">Técnicos</span>
+              </TabsTrigger>
+              <TabsTrigger value="maintenance" className="gap-2">
+                <Settings className="w-4 h-4" />
+                <span className="hidden sm:inline">Mantenimiento</span>
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="laundries">
+              {/* Laundries List */}
           <div className="grid gap-4">
             {laundries.length === 0 ? (
               <Card>
@@ -936,6 +957,16 @@ export default function OwnerPanel() {
               ))
             )}
           </div>
+            </TabsContent>
+
+            <TabsContent value="technicians">
+              <TechnicianManagement />
+            </TabsContent>
+
+            <TabsContent value="maintenance">
+              <SystemMaintenanceTools />
+            </TabsContent>
+          </Tabs>
         ) : (
           // Selected Laundry Details
           <Tabs defaultValue="branches" className="space-y-6">
