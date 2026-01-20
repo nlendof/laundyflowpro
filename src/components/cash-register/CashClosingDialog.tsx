@@ -150,7 +150,7 @@ export function CashClosingDialog({
     }, 250);
   };
 
-  const isClosed = existingClosing?.actual_balance !== null;
+  const isClosed = existingClosing !== null && existingClosing !== undefined && existingClosing.actual_balance !== null;
 
   // Build closing data for ticket
   const closingForTicket: CashClosingData = existingClosing || {
