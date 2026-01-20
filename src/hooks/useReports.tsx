@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfDay, endOfDay, subDays, startOfWeek, startOfMonth, startOfYear, endOfMonth, endOfYear, format, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useBranchFilter } from '@/contexts/LaundryContext';
 
 export type ReportPeriod = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'custom';
 
@@ -171,6 +172,7 @@ export function useReports(initialFilters?: Partial<ReportFilters>) {
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
+  const { laundryId, branchId } = useBranchFilter();
 
   const fetchReports = useCallback(async () => {
     try {
@@ -181,21 +183,39 @@ export function useReports(initialFilters?: Partial<ReportFilters>) {
         filters.endDate
       );
 
-      // Fetch orders
-      const { data: orders, error: ordersError } = await supabase
+      // Build orders query with filters
+      let ordersQuery = supabase
         .from('orders')
         .select('*')
         .gte('created_at', start.toISOString())
         .lte('created_at', end.toISOString());
 
+      if (laundryId) {
+        ordersQuery = ordersQuery.eq('laundry_id', laundryId);
+      }
+      if (branchId) {
+        ordersQuery = ordersQuery.eq('branch_id', branchId);
+      }
+
+      const { data: orders, error: ordersError } = await ordersQuery;
+
       if (ordersError) throw ordersError;
 
       // Fetch previous period orders
-      const { data: prevOrders } = await supabase
+      let prevOrdersQuery = supabase
         .from('orders')
         .select('*')
         .gte('created_at', prevStart.toISOString())
         .lte('created_at', prevEnd.toISOString());
+
+      if (laundryId) {
+        prevOrdersQuery = prevOrdersQuery.eq('laundry_id', laundryId);
+      }
+      if (branchId) {
+        prevOrdersQuery = prevOrdersQuery.eq('branch_id', branchId);
+      }
+
+      const { data: prevOrders } = await prevOrdersQuery;
 
       // Fetch order items
       const orderIds = orders?.map(o => o.id) || [];
@@ -208,22 +228,40 @@ export function useReports(initialFilters?: Partial<ReportFilters>) {
         orderItems = itemsData || [];
       }
 
-      // Fetch cash register for expenses
-      const { data: cashEntries } = await supabase
+      // Fetch cash register for expenses with filters
+      let cashQuery = supabase
         .from('cash_register')
         .select('*')
         .gte('created_at', start.toISOString())
         .lte('created_at', end.toISOString());
 
-      // Fetch employees
-      const { data: employeesData } = await supabase
+      if (laundryId) {
+        cashQuery = cashQuery.eq('laundry_id', laundryId);
+      }
+
+      const { data: cashEntries } = await cashQuery;
+
+      // Fetch employees for the laundry
+      let employeesQuery = supabase
         .from('profiles')
         .select('id, name');
 
-      // Fetch customers
-      const { data: customers } = await supabase
+      if (laundryId) {
+        employeesQuery = employeesQuery.eq('laundry_id', laundryId);
+      }
+
+      const { data: employeesData } = await employeesQuery;
+
+      // Fetch customers for the laundry
+      let customersQuery = supabase
         .from('customers')
         .select('*');
+
+      if (laundryId) {
+        customersQuery = customersQuery.eq('laundry_id', laundryId);
+      }
+
+      const { data: customers } = await customersQuery;
 
       // Process data
       const totalRevenue = cashEntries?.filter(e => e.entry_type === 'income').reduce((sum, e) => sum + Number(e.amount), 0) || 0;
@@ -414,7 +452,7 @@ export function useReports(initialFilters?: Partial<ReportFilters>) {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, laundryId, branchId]);
 
   useEffect(() => {
     fetchReports();

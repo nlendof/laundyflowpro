@@ -5,6 +5,7 @@ import { CashRegisterEntry, Expense } from '@/types';
 import { useAuth } from './useAuth';
 import { Tables, TablesInsert } from '@/integrations/supabase/types';
 import { startOfDay, endOfDay } from 'date-fns';
+import { useBranchFilter } from '@/contexts/LaundryContext';
 
 type DbCashRegister = Tables<'cash_register'>;
 type DbExpense = Tables<'expenses'>;
@@ -12,6 +13,7 @@ type DbCashClosing = Tables<'cash_closings'>;
 
 export function useCashRegister() {
   const { user } = useAuth();
+  const { laundryId } = useBranchFilter();
   const [entries, setEntries] = useState<CashRegisterEntry[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,12 +27,18 @@ export function useCashRegister() {
       const start = startOfDay(selectedDate).toISOString();
       const end = endOfDay(selectedDate).toISOString();
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('cash_register')
         .select('*')
         .gte('created_at', start)
         .lte('created_at', end)
         .order('created_at', { ascending: false });
+
+      if (laundryId) {
+        query = query.eq('laundry_id', laundryId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -52,15 +60,21 @@ export function useCashRegister() {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate]);
+  }, [selectedDate, laundryId]);
 
   // Fetch all expenses
   const fetchExpenses = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('expenses')
         .select('*')
         .order('expense_date', { ascending: false });
+
+      if (laundryId) {
+        query = query.eq('laundry_id', laundryId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -77,7 +91,7 @@ export function useCashRegister() {
     } catch (error) {
       console.error('Error fetching expenses:', error);
     }
-  }, []);
+  }, [laundryId]);
 
   // Fetch opening balance for the day
   const fetchOpeningBalance = useCallback(async () => {
