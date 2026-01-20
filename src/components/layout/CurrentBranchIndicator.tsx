@@ -2,11 +2,18 @@ import { useLaundryContext } from '@/contexts/LaundryContext';
 import { useAuth } from '@/hooks/useAuth';
 import { Building2, Store } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CurrentBranchIndicatorProps {
   collapsed?: boolean;
   variant?: 'sidebar' | 'header';
+}
+
+interface BranchInfo {
+  code: string;
+  name: string;
+  is_main: boolean;
 }
 
 export function CurrentBranchIndicator({ 
@@ -18,13 +25,39 @@ export function CurrentBranchIndicator({
     currentLaundry, 
     branches, 
     selectedBranchId,
-    isOwnerOrTechnician,
-    isGeneralAdmin,
     isBranchAdmin,
   } = useLaundryContext();
 
-  // Get laundry name - for non-owner users, get from user's laundry
-  const laundryName = currentLaundry?.name || 'Sin lavandería';
+  // For branch admins, we need to fetch their branch directly since branches array is empty for them
+  const [branchAdminBranch, setBranchAdminBranch] = useState<BranchInfo | null>(null);
+  const [branchAdminLaundryName, setBranchAdminLaundryName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isBranchAdmin && user?.branchId) {
+      const fetchBranchInfo = async () => {
+        const { data, error } = await supabase
+          .from('branches')
+          .select('code, name, is_main, laundry_id, laundries(name)')
+          .eq('id', user.branchId)
+          .single();
+        
+        if (!error && data) {
+          setBranchAdminBranch({
+            code: data.code,
+            name: data.name,
+            is_main: data.is_main || false,
+          });
+          setBranchAdminLaundryName((data.laundries as any)?.name || null);
+        }
+      };
+      fetchBranchInfo();
+    }
+  }, [isBranchAdmin, user?.branchId]);
+
+  // Get laundry name - for branch admins use fetched name, otherwise use currentLaundry
+  const laundryName = isBranchAdmin && branchAdminLaundryName 
+    ? branchAdminLaundryName 
+    : currentLaundry?.name || 'Sin lavandería';
 
   // Get branch info
   const selectedBranch = selectedBranchId 
@@ -32,16 +65,11 @@ export function CurrentBranchIndicator({
     : null;
 
   // For branch admin, get branch name from their assigned branch
-  const getBranchDisplay = () => {
-    if (isBranchAdmin && user?.branchId) {
-      // Branch admin shows their assigned branch
-      const assignedBranch = branches.find(b => b.id === user.branchId);
-      if (assignedBranch) {
-        return {
-          code: assignedBranch.code,
-          name: assignedBranch.name,
-          isMain: assignedBranch.is_main,
-        };
+  const getBranchDisplay = (): BranchInfo | null => {
+    if (isBranchAdmin) {
+      // Use fetched branch info for branch admin
+      if (branchAdminBranch) {
+        return branchAdminBranch;
       }
       return null;
     }
@@ -50,7 +78,7 @@ export function CurrentBranchIndicator({
       return {
         code: selectedBranch.code,
         name: selectedBranch.name,
-        isMain: selectedBranch.is_main,
+        is_main: selectedBranch.is_main,
       };
     }
     
@@ -95,7 +123,7 @@ export function CurrentBranchIndicator({
             <div className="flex items-center gap-1 min-w-0">
               <span className="font-mono text-[10px] text-muted-foreground">[{branchDisplay.code}]</span>
               <span className="text-xs text-sidebar-foreground truncate">{branchDisplay.name}</span>
-              {branchDisplay.isMain && <span className="text-primary text-xs">★</span>}
+              {branchDisplay.is_main && <span className="text-primary text-xs">★</span>}
             </div>
           ) : showAllBranches ? (
             <span className="text-xs text-muted-foreground italic">Todas las sucursales</span>
@@ -123,7 +151,7 @@ export function CurrentBranchIndicator({
           <Badge variant="secondary" className="font-normal">
             <span className="font-mono text-xs mr-1">[{branchDisplay.code}]</span>
             {branchDisplay.name}
-            {branchDisplay.isMain && <span className="ml-1 text-primary">★</span>}
+            {branchDisplay.is_main && <span className="ml-1 text-primary">★</span>}
           </Badge>
         ) : showAllBranches ? (
           <Badge variant="outline" className="font-normal">
