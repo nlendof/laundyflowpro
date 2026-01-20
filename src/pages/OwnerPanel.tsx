@@ -566,6 +566,7 @@ export default function OwnerPanel() {
     setResettingBranch(true);
     try {
       const branchId = branchToReset.id;
+      let deletedOrdersCount = 0;
 
       // Get orders from this branch
       const { data: branchOrders } = await supabase
@@ -574,6 +575,7 @@ export default function OwnerPanel() {
         .eq('branch_id', branchId);
 
       if (branchOrders && branchOrders.length > 0) {
+        deletedOrdersCount = branchOrders.length;
         const orderIds = branchOrders.map(o => o.id);
         
         // Delete order items
@@ -595,7 +597,26 @@ export default function OwnerPanel() {
         .delete()
         .eq('branch_id', branchId);
 
-      toast.success(`Datos de la sucursal "${branchToReset.name}" eliminados correctamente`);
+      // Register audit log
+      await supabase
+        .from('audit_logs')
+        .insert({
+          user_id: user?.id,
+          action: 'BRANCH_DATA_RESET',
+          table_name: 'orders',
+          record_id: branchId,
+          old_data: {
+            branch_id: branchId,
+            branch_name: branchToReset.name,
+            branch_code: branchToReset.code,
+            laundry_id: selectedLaundry?.id,
+            orders_deleted: deletedOrdersCount,
+          },
+          new_data: null,
+          laundry_id: selectedLaundry?.id,
+        });
+
+      toast.success(`Datos de la sucursal "${branchToReset.name}" eliminados correctamente (${deletedOrdersCount} pedidos)`);
       setResetBranchDialogOpen(false);
       setBranchToReset(null);
       setResetConfirmText('');
