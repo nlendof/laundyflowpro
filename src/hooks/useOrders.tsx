@@ -7,6 +7,7 @@ import { Tables, TablesInsert } from '@/integrations/supabase/types';
 import { Package } from 'lucide-react';
 import { playNotificationSound } from '@/lib/notificationSound';
 import { notifyNewOrder, notifyOrderStatusChange, getNotificationPermission } from '@/lib/pushNotifications';
+import { useBranchFilter } from '@/contexts/LaundryContext';
 
 type DbOrder = Tables<'orders'>;
 type DbOrderItem = Tables<'order_items'>;
@@ -65,6 +66,7 @@ const mapDbOrderToOrder = (dbOrder: DbOrder, dbItems: DbOrderItem[]): Order => {
 
 export function useOrders(options?: { onNewOrder?: () => void }) {
   const { user } = useAuth();
+  const { laundryId, branchId } = useBranchFilter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [newOrderIds, setNewOrderIds] = useState<Set<string>>(new Set());
@@ -76,10 +78,22 @@ export function useOrders(options?: { onNewOrder?: () => void }) {
     try {
       setLoading(true);
       
-      const { data: ordersData, error: ordersError } = await supabase
+      let query = supabase
         .from('orders')
         .select('*')
         .order('created_at', { ascending: false });
+
+      // Apply laundry filter
+      if (laundryId) {
+        query = query.eq('laundry_id', laundryId);
+      }
+
+      // Apply branch filter if selected
+      if (branchId) {
+        query = query.eq('branch_id', branchId);
+      }
+
+      const { data: ordersData, error: ordersError } = await query;
 
       if (ordersError) throw ordersError;
 
@@ -117,7 +131,7 @@ export function useOrders(options?: { onNewOrder?: () => void }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [laundryId, branchId]);
 
   // Create a new order
   const createOrder = useCallback(async (orderData: Omit<Order, 'id' | 'ticketCode' | 'qrCode' | 'createdAt' | 'updatedAt'>) => {

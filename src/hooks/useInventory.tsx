@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { InventoryItem } from '@/types';
 import { Tables, TablesInsert } from '@/integrations/supabase/types';
 import { useAuth } from './useAuth';
+import { useBranchFilter } from '@/contexts/LaundryContext';
 
 type DbInventory = Tables<'inventory'>;
 
@@ -17,6 +18,7 @@ interface InventoryStats {
 
 export function useInventory() {
   const { user } = useAuth();
+  const { laundryId } = useBranchFilter();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,10 +26,17 @@ export function useInventory() {
   const fetchInventory = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      let query = supabase
         .from('inventory')
         .select('*')
         .order('name');
+
+      if (laundryId) {
+        query = query.eq('laundry_id', laundryId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -49,7 +58,7 @@ export function useInventory() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [laundryId]);
 
   // Calculate stats
   const stats = useMemo<InventoryStats>(() => {

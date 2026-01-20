@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { OrderStatus } from '@/types';
 import { startOfDay, endOfDay, subDays, startOfWeek, startOfMonth, startOfYear, format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useBranchFilter } from '@/contexts/LaundryContext';
 
 export type DatePeriod = 'today' | 'week' | 'month' | 'year';
 
@@ -98,6 +99,7 @@ function getDateRange(period: DatePeriod): { start: Date; end: Date; prevStart: 
 export function useDashboardStats(period: DatePeriod = 'today') {
   const [stats, setStats] = useState<DashboardStats>(defaultStats);
   const [loading, setLoading] = useState(true);
+  const { laundryId, branchId } = useBranchFilter();
 
   const fetchStats = useCallback(async () => {
     try {
@@ -108,24 +110,41 @@ export function useDashboardStats(period: DatePeriod = 'today') {
       const prevStartISO = prevStart.toISOString();
       const prevEndISO = prevEnd.toISOString();
 
-      // Fetch all orders
-      const { data: allOrders, error: ordersError } = await supabase
+      // Build orders query with filters
+      let ordersQuery = supabase
         .from('orders')
-        .select('id, status, total_amount, created_at, is_paid, paid_amount, customer_name, ticket_code');
+        .select('id, status, total_amount, created_at, is_paid, paid_amount, customer_name, ticket_code, laundry_id, branch_id');
+
+      if (laundryId) {
+        ordersQuery = ordersQuery.eq('laundry_id', laundryId);
+      }
+      if (branchId) {
+        ordersQuery = ordersQuery.eq('branch_id', branchId);
+      }
+
+      const { data: allOrders, error: ordersError } = await ordersQuery;
 
       if (ordersError) throw ordersError;
 
       // Fetch order items
+      const orderIds = allOrders?.map(o => o.id) || [];
       const { data: orderItems, error: itemsError } = await supabase
         .from('order_items')
-        .select('order_id, name, quantity');
+        .select('order_id, name, quantity')
+        .in('order_id', orderIds.length > 0 ? orderIds : ['_none_']);
 
       if (itemsError) throw itemsError;
 
-      // Fetch low stock inventory
-      const { data: inventory, error: inventoryError } = await supabase
+      // Build inventory query with filter
+      let inventoryQuery = supabase
         .from('inventory')
         .select('name, current_stock, min_stock');
+
+      if (laundryId) {
+        inventoryQuery = inventoryQuery.eq('laundry_id', laundryId);
+      }
+
+      const { data: inventory, error: inventoryError } = await inventoryQuery;
 
       if (inventoryError) throw inventoryError;
 
@@ -141,21 +160,33 @@ export function useDashboardStats(period: DatePeriod = 'today') {
         return createdAt >= prevStart && createdAt <= prevEnd;
       }) || [];
 
-      // Fetch cash register entries for current period
-      const { data: cashEntries } = await supabase
+      // Fetch cash register entries for current period with filters
+      let cashQuery = supabase
         .from('cash_register')
         .select('amount, entry_type, created_at')
         .eq('entry_type', 'income')
         .gte('created_at', startISO)
         .lte('created_at', endISO);
 
+      if (laundryId) {
+        cashQuery = cashQuery.eq('laundry_id', laundryId);
+      }
+
+      const { data: cashEntries } = await cashQuery;
+
       // Fetch cash register for previous period
-      const { data: prevCashEntries } = await supabase
+      let prevCashQuery = supabase
         .from('cash_register')
         .select('amount')
         .eq('entry_type', 'income')
         .gte('created_at', prevStartISO)
         .lte('created_at', prevEndISO);
+
+      if (laundryId) {
+        prevCashQuery = prevCashQuery.eq('laundry_id', laundryId);
+      }
+
+      const { data: prevCashEntries } = await prevCashQuery;
 
       // Status counts (all time, for overview)
       const statusCounts: Record<OrderStatus, number> = {
@@ -258,7 +289,7 @@ export function useDashboardStats(period: DatePeriod = 'today') {
     } finally {
       setLoading(false);
     }
-  }, [period]);
+  }, [period, laundryId, branchId]);
 
 function buildChartData(
   period: DatePeriod,
