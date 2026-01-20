@@ -1809,15 +1809,16 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
-      is_branch_admin: {
-        Args: { _branch_id: string; _user_id: string }
-        Returns: boolean
-      }
+      is_branch_admin:
+        | { Args: { _user_id: string }; Returns: boolean }
+        | { Args: { _branch_id: string; _user_id: string }; Returns: boolean }
       is_customer: { Args: { _user_id: string }; Returns: boolean }
+      is_general_admin: { Args: { _user_id: string }; Returns: boolean }
       is_laundry_admin: {
         Args: { _laundry_id: string; _user_id: string }
         Returns: boolean
       }
+      is_owner_or_technician: { Args: { _user_id: string }; Returns: boolean }
       user_belongs_to_laundry: {
         Args: { _laundry_id: string; _user_id: string }
         Returns: boolean
@@ -1831,6 +1832,7 @@ export type Database = {
         | "delivery"
         | "cliente"
         | "owner"
+        | "technician"
       expense_category: "rent" | "utilities" | "payroll" | "supplies" | "other"
       inventory_category: "detergent" | "softener" | "stain_remover" | "other"
       item_type: "weight" | "piece"
@@ -1970,7 +1972,15 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "cajero", "operador", "delivery", "cliente", "owner"],
+      app_role: [
+        "admin",
+        "cajero",
+        "operador",
+        "delivery",
+        "cliente",
+        "owner",
+        "technician",
+      ],
       expense_category: ["rent", "utilities", "payroll", "supplies", "other"],
       inventory_category: ["detergent", "softener", "stain_remover", "other"],
       item_type: ["weight", "piece"],

@@ -31,17 +31,17 @@ export function LaundryBranchSelector({ collapsed = false }: LaundryBranchSelect
     selectedBranchId,
     setSelectedBranchId,
     loadingBranches,
+    isOwnerOrTechnician,
+    isGeneralAdmin,
+    isBranchAdmin,
   } = useLaundryContext();
   
   const [ownerLaundries, setOwnerLaundries] = useState<Laundry[]>([]);
   const [loadingOwnerLaundries, setLoadingOwnerLaundries] = useState(false);
 
-  const isOwner = user?.role === 'owner';
-  const isAdmin = user?.role === 'admin';
-
-  // For owners: fetch all laundries
+  // For owners/technicians: fetch all laundries
   useEffect(() => {
-    if (!isOwner) return;
+    if (!isOwnerOrTechnician) return;
 
     const fetchAllLaundries = async () => {
       setLoadingOwnerLaundries(true);
@@ -62,7 +62,7 @@ export function LaundryBranchSelector({ collapsed = false }: LaundryBranchSelect
     };
 
     fetchAllLaundries();
-  }, [isOwner]);
+  }, [isOwnerOrTechnician]);
 
   const handleLaundryChange = (laundryId: string) => {
     switchLaundry(laundryId);
@@ -74,28 +74,32 @@ export function LaundryBranchSelector({ collapsed = false }: LaundryBranchSelect
     setSelectedBranchId(branchId === 'all' ? null : branchId);
   };
 
-  // Don't show for non-admin/non-owner users
-  if (!isAdmin && !isOwner) return null;
+  // Branch admins and other staff don't see any selectors
+  if (isBranchAdmin || (!isOwnerOrTechnician && !isGeneralAdmin)) {
+    return null;
+  }
 
   if (collapsed) {
     return (
       <div className="flex flex-col gap-2 items-center">
-        {isOwner && (
+        {isOwnerOrTechnician && (
           <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center" title="Lavandería">
             <Store className="w-4 h-4 text-accent-foreground" />
           </div>
         )}
-        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center" title="Sucursal">
-          <Building2 className="w-4 h-4 text-primary" />
-        </div>
+        {(isOwnerOrTechnician || isGeneralAdmin) && (
+          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center" title="Sucursal">
+            <Building2 className="w-4 h-4 text-primary" />
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="space-y-2">
-      {/* Laundry Selector - Only for owners */}
-      {isOwner && (
+      {/* Laundry Selector - Only for owners/technicians */}
+      {isOwnerOrTechnician && (
         <div className="space-y-1">
           <label className="text-xs text-sidebar-foreground/60 font-medium flex items-center gap-1">
             <Store className="w-3 h-3" />
@@ -127,8 +131,8 @@ export function LaundryBranchSelector({ collapsed = false }: LaundryBranchSelect
         </div>
       )}
 
-      {/* Branch Selector - For admins and owners */}
-      {(isAdmin || isOwner) && currentLaundry && (
+      {/* Branch Selector - For owners/technicians and general admins */}
+      {(isOwnerOrTechnician || isGeneralAdmin) && currentLaundry && (
         <div className="space-y-1">
           <label className="text-xs text-sidebar-foreground/60 font-medium flex items-center gap-1">
             <Building2 className="w-3 h-3" />

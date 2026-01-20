@@ -85,6 +85,12 @@ export const ROLE_CONFIG: Record<UserRole, { label: string; labelEs: string; col
     color: 'bg-role-admin',
     icon: 'Crown',
   },
+  technician: {
+    label: 'Technician',
+    labelEs: 'Técnico',
+    color: 'bg-role-admin',
+    icon: 'Wrench',
+  },
   admin: {
     label: 'Administrator',
     labelEs: 'Administrador',
