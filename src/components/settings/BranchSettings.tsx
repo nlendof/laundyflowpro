@@ -260,6 +260,7 @@ export function BranchSettings() {
     setResetting(true);
     try {
       const branchId = branchToReset.id;
+      let deletedOrdersCount = 0;
 
       // Delete order_items for orders from this branch
       const { data: branchOrders } = await supabase
@@ -268,6 +269,7 @@ export function BranchSettings() {
         .eq('branch_id', branchId);
 
       if (branchOrders && branchOrders.length > 0) {
+        deletedOrdersCount = branchOrders.length;
         const orderIds = branchOrders.map(o => o.id);
         
         // Delete order items
@@ -289,13 +291,26 @@ export function BranchSettings() {
         .delete()
         .eq('branch_id', branchId);
 
-      // Delete cash register entries related to deleted orders (cascades handled) 
-      // Also delete any cash_register entries not linked to orders for this branch
-      // Note: We need laundry_id for cash_register, not branch_id directly
-      // We'll delete based on the orders we deleted (via order_id foreign key cascade if set)
-      // For safety, let's also clear cash register for the laundry if needed
+      // Register audit log
+      await supabase
+        .from('audit_logs')
+        .insert({
+          user_id: user?.id,
+          action: 'BRANCH_DATA_RESET',
+          table_name: 'orders',
+          record_id: branchId,
+          old_data: {
+            branch_id: branchId,
+            branch_name: branchToReset.name,
+            branch_code: branchToReset.code,
+            laundry_id: laundryId,
+            orders_deleted: deletedOrdersCount,
+          },
+          new_data: null,
+          laundry_id: laundryId,
+        });
 
-      toast.success(`Datos de la sucursal "${branchToReset.name}" eliminados correctamente`);
+      toast.success(`Datos de la sucursal "${branchToReset.name}" eliminados correctamente (${deletedOrdersCount} pedidos)`);
       setResetDialogOpen(false);
       setBranchToReset(null);
       setConfirmText('');

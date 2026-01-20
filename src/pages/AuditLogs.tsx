@@ -128,6 +128,8 @@ const AuditLogs = () => {
         return <Badge className="bg-blue-500">Actualizar</Badge>;
       case 'DELETE':
         return <Badge className="bg-red-500">Eliminar</Badge>;
+      case 'BRANCH_DATA_RESET':
+        return <Badge className="bg-amber-500">Reset Sucursal</Badge>;
       default:
         return <Badge>{action}</Badge>;
     }
@@ -142,7 +144,8 @@ const AuditLogs = () => {
       catalog_services: 'Servicios',
       catalog_articles: 'Artículos',
       user_roles: 'Roles',
-      purchases: 'Compras'
+      purchases: 'Compras',
+      branches: 'Sucursales',
     };
     return labels[tableName] || tableName;
   };

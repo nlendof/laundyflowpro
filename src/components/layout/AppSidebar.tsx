@@ -27,6 +27,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
+import { LaundryBranchSelector } from './LaundryBranchSelector';
 
 
 interface NavItem {
@@ -138,6 +139,11 @@ export function AppSidebar() {
             )}
           </button>
         )}
+      </div>
+
+      {/* Laundry/Branch Selector */}
+      <div className={cn('px-4 py-3 border-b border-sidebar-border', collapsed && 'px-2')}>
+        <LaundryBranchSelector collapsed={collapsed} />
       </div>
 
       {/* Navigation */}
