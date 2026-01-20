@@ -54,6 +54,7 @@ import {
   UserPlus,
   Eye,
   EyeOff,
+  RotateCcw,
 } from 'lucide-react';
 import { 
   Select,
@@ -126,6 +127,10 @@ export default function OwnerPanel() {
   const [deletingEmployee, setDeletingEmployee] = useState<LaundryUser | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [resetBranchDialogOpen, setResetBranchDialogOpen] = useState(false);
+  const [branchToReset, setBranchToReset] = useState<Branch | null>(null);
+  const [resettingBranch, setResettingBranch] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState('');
   
   // Form data
   const [laundryForm, setLaundryForm] = useState({
@@ -524,6 +529,64 @@ export default function OwnerPanel() {
     }
   };
 
+  const openResetBranchDialog = (branch: Branch) => {
+    setBranchToReset(branch);
+    setResetConfirmText('');
+    setResetBranchDialogOpen(true);
+  };
+
+  const handleResetBranchData = async () => {
+    if (!branchToReset) return;
+    
+    if (resetConfirmText !== 'BORRAR') {
+      toast.error('Escribe BORRAR para confirmar');
+      return;
+    }
+
+    setResettingBranch(true);
+    try {
+      const branchId = branchToReset.id;
+
+      // Get orders from this branch
+      const { data: branchOrders } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('branch_id', branchId);
+
+      if (branchOrders && branchOrders.length > 0) {
+        const orderIds = branchOrders.map(o => o.id);
+        
+        // Delete order items
+        await supabase
+          .from('order_items')
+          .delete()
+          .in('order_id', orderIds);
+
+        // Delete order returns
+        await supabase
+          .from('order_returns')
+          .delete()
+          .in('order_id', orderIds);
+      }
+
+      // Delete orders from this branch
+      await supabase
+        .from('orders')
+        .delete()
+        .eq('branch_id', branchId);
+
+      toast.success(`Datos de la sucursal "${branchToReset.name}" eliminados correctamente`);
+      setResetBranchDialogOpen(false);
+      setBranchToReset(null);
+      setResetConfirmText('');
+    } catch (error) {
+      console.error('Error resetting branch data:', error);
+      toast.error('Error al borrar los datos de la sucursal');
+    } finally {
+      setResettingBranch(false);
+    }
+  };
+
   const handleOpenEmployeeDialog = (employee?: LaundryUser) => {
     if (employee) {
       setEditingEmployee(employee);
@@ -911,8 +974,18 @@ export default function OwnerPanel() {
                                   variant="ghost"
                                   size="icon"
                                   onClick={() => handleOpenBranchDialog(branch)}
+                                  title="Editar sucursal"
                                 >
                                   <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-amber-600 hover:text-amber-700 hover:bg-amber-100"
+                                  onClick={() => openResetBranchDialog(branch)}
+                                  title="Restablecer datos de sucursal"
+                                >
+                                  <RotateCcw className="w-4 h-4" />
                                 </Button>
                                 <Button
                                   variant="ghost"
@@ -920,6 +993,7 @@ export default function OwnerPanel() {
                                   className="text-destructive hover:text-destructive"
                                   onClick={() => handleDeleteBranch(branch)}
                                   disabled={branch.is_main}
+                                  title="Eliminar sucursal"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
@@ -1485,6 +1559,76 @@ export default function OwnerPanel() {
                 </>
               ) : (
                 'Eliminar'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reset Branch Data Alert Dialog */}
+      <AlertDialog open={resetBranchDialogOpen} onOpenChange={setResetBranchDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Restablecer datos de sucursal
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4">
+                <p>
+                  Estás a punto de <strong className="text-destructive">eliminar todos los datos</strong> de la sucursal <strong>"{branchToReset?.name}"</strong>.
+                </p>
+                <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm">
+                  <p className="font-medium text-destructive mb-2">Se eliminarán permanentemente:</p>
+                  <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                    <li>Todos los pedidos de esta sucursal</li>
+                    <li>Artículos de los pedidos</li>
+                    <li>Devoluciones registradas</li>
+                  </ul>
+                </div>
+                <div className="p-3 bg-muted rounded-lg text-sm">
+                  <p className="font-medium mb-2">Se mantendrán intactos:</p>
+                  <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                    <li>Configuración de la sucursal</li>
+                    <li>Catálogo de servicios y artículos</li>
+                    <li>Empleados y usuarios</li>
+                    <li>Inventario</li>
+                  </ul>
+                </div>
+                <div className="space-y-2">
+                  <Label>Escribe <strong>BORRAR</strong> para confirmar:</Label>
+                  <Input
+                    value={resetConfirmText}
+                    onChange={(e) => setResetConfirmText(e.target.value)}
+                    placeholder="BORRAR"
+                    className="font-mono"
+                  />
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setBranchToReset(null);
+              setResetConfirmText('');
+            }}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResetBranchData}
+              disabled={resetConfirmText !== 'BORRAR' || resettingBranch}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {resettingBranch ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Restablecer
+                </>
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
