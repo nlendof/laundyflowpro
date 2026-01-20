@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useLaundryContext } from '@/contexts/LaundryContext';
 import {
   Dialog,
   DialogContent,
@@ -12,8 +13,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, UserPlus, Copy, Check, Eye, EyeOff } from 'lucide-react';
+import { Loader2, UserPlus, Copy, Check, Eye, EyeOff, Building2 } from 'lucide-react';
 import { z } from 'zod';
+import { Badge } from '@/components/ui/badge';
 
 type AppRole = 'admin' | 'cajero' | 'operador' | 'delivery';
 
@@ -46,6 +48,9 @@ interface CreateEmployeeModalProps {
 }
 
 export function CreateEmployeeModal({ isOpen, onClose, onSuccess }: CreateEmployeeModalProps) {
+  const { currentLaundry, branches, laundryId } = useLaundryContext();
+  
+  const [selectedBranchId, setSelectedBranchId] = useState<string>('');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -111,6 +116,8 @@ export function CreateEmployeeModal({ isOpen, onClose, onSuccess }: CreateEmploy
           phone: formData.phone || undefined,
           role: formData.role,
           permissions: DEFAULT_PERMISSIONS[formData.role],
+          laundry_id: laundryId,
+          branch_id: selectedBranchId || undefined,
         },
       });
 
@@ -154,6 +161,7 @@ export function CreateEmployeeModal({ isOpen, onClose, onSuccess }: CreateEmploy
       role: 'cajero',
       password: '',
     });
+    setSelectedBranchId('');
     setErrors({});
     setCreatedCredentials(null);
     onClose();
@@ -171,8 +179,8 @@ export function CreateEmployeeModal({ isOpen, onClose, onSuccess }: CreateEmploy
 
         {createdCredentials ? (
           <div className="space-y-4 py-4">
-            <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
-              <p className="text-sm text-green-800 dark:text-green-200 mb-4">
+            <div className="bg-success/10 border border-success/30 rounded-lg p-4">
+              <p className="text-sm text-success-foreground mb-4">
                 El empleado ha sido creado exitosamente. Comparte estas credenciales con el empleado:
               </p>
               
@@ -202,7 +210,7 @@ export function CreateEmployeeModal({ isOpen, onClose, onSuccess }: CreateEmploy
                       size="icon"
                       onClick={copyPassword}
                     >
-                      {copiedPassword ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                      {copiedPassword ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
                     </Button>
                   </div>
                 </div>
@@ -279,6 +287,50 @@ export function CreateEmployeeModal({ isOpen, onClose, onSuccess }: CreateEmploy
               </Select>
             </div>
 
+            {/* Branch selector */}
+            {branches.length > 0 && (
+              <div className="space-y-2">
+                <Label htmlFor="branch">Sucursal asignada</Label>
+                <Select
+                  value={selectedBranchId}
+                  onValueChange={setSelectedBranchId}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar sucursal (opcional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {branches.map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id}>
+                        <div className="flex items-center gap-2">
+                          <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span className="font-mono text-xs">[{branch.code}]</span>
+                          <span>{branch.name}</span>
+                          {branch.is_main && <span className="text-primary">★</span>}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Si no seleccionas sucursal, el empleado tendrá acceso a todas las sucursales de la lavandería.
+                </p>
+              </div>
+            )}
+
+            {/* Laundry info badge */}
+            {currentLaundry && (
+              <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                <Badge variant="outline" className="gap-1">
+                  <Building2 className="w-3 h-3" />
+                  {currentLaundry.name}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  El empleado será asignado a esta lavandería
+                </span>
+              </div>
+            )}
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Contraseña *</Label>
@@ -320,7 +372,7 @@ export function CreateEmployeeModal({ isOpen, onClose, onSuccess }: CreateEmploy
                   onClick={copyPassword}
                   disabled={!formData.password}
                 >
-                  {copiedPassword ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                  {copiedPassword ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
                 </Button>
               </div>
               {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
