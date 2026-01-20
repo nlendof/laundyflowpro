@@ -22,12 +22,15 @@ import {
   User,
   RotateCcw,
   Crown,
+  Wrench,
 } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
 import { LaundryBranchSelector } from './LaundryBranchSelector';
+import { CurrentBranchIndicator } from './CurrentBranchIndicator';
+import { useLaundryContext } from '@/contexts/LaundryContext';
 
 
 interface NavItem {
@@ -58,6 +61,7 @@ const navItems: NavItem[] = [
 export function AppSidebar() {
   const { user, logout } = useAuth();
   const { newOrderCount, clearCount } = useNewOrders();
+  const { isOwnerOrTechnician, isGeneralAdmin, isBranchAdmin } = useLaundryContext();
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
@@ -66,6 +70,9 @@ export function AppSidebar() {
 
   const roleConfig = ROLE_CONFIG[user.role];
   const filteredNavItems = navItems.filter(item => user.permissions.includes(item.permissionKey));
+  
+  // Show selectors for owner/technician and general admin only
+  const showSelectors = isOwnerOrTechnician || isGeneralAdmin;
 
   return (
     <aside
@@ -82,8 +89,8 @@ export function AppSidebar() {
               <WashingMachine className="w-6 h-6 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="font-bold text-lg text-sidebar-foreground">Luis Cap</h1>
-              <p className="text-xs text-sidebar-foreground/60">Lavandería</p>
+              <h1 className="font-bold text-lg text-sidebar-foreground">LaundryFlow</h1>
+              <p className="text-xs text-sidebar-foreground/60">Sistema de Gestión</p>
             </div>
           </div>
         )}
@@ -122,29 +129,42 @@ export function AppSidebar() {
           )}
         </button>
 
-        {/* Owner Panel Link */}
-        {user.role === 'owner' && (
+        {/* Owner/Technician Panel Link */}
+        {isOwnerOrTechnician && (
           <button
             onClick={() => navigate('/owner-panel')}
             className={cn(
               'flex items-center gap-3 w-full rounded-lg p-2 mt-2 transition-colors',
-              'hover:bg-amber-500/20 group border border-amber-500/30',
+              'hover:bg-warning/20 group border border-warning/30',
               collapsed && 'justify-center',
-              location.pathname === '/owner-panel' && 'bg-amber-500/20 border-amber-500'
+              location.pathname === '/owner-panel' && 'bg-warning/20 border-warning'
             )}
           >
-            <Crown className="w-5 h-5 text-amber-500" />
+            {user.role === 'technician' ? (
+              <Wrench className="w-5 h-5 text-warning" />
+            ) : (
+              <Crown className="w-5 h-5 text-warning" />
+            )}
             {!collapsed && (
-              <span className="font-medium text-sm text-amber-500">Panel Propietario</span>
+              <span className="font-medium text-sm text-warning">
+                {user.role === 'technician' ? 'Panel Técnico' : 'Panel Propietario'}
+              </span>
             )}
           </button>
         )}
       </div>
 
-      {/* Laundry/Branch Selector */}
-      <div className={cn('px-4 py-3 border-b border-sidebar-border', collapsed && 'px-2')}>
-        <LaundryBranchSelector collapsed={collapsed} />
+      {/* Current Laundry/Branch Indicator */}
+      <div className={cn('border-b border-sidebar-border', collapsed ? 'px-2 py-2' : 'px-4 py-3')}>
+        <CurrentBranchIndicator collapsed={collapsed} variant="sidebar" />
       </div>
+
+      {/* Laundry/Branch Selector - Only for owner/technician/general admin */}
+      {showSelectors && (
+        <div className={cn('px-4 py-3 border-b border-sidebar-border', collapsed && 'px-2')}>
+          <LaundryBranchSelector collapsed={collapsed} />
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-2">

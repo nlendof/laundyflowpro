@@ -25,6 +25,12 @@ interface LaundryContextType {
   selectedBranchId: string | null;
   setSelectedBranchId: (branchId: string | null) => void;
   loadingBranches: boolean;
+  // Role helpers
+  isOwnerOrTechnician: boolean;
+  isGeneralAdmin: boolean;
+  isBranchAdmin: boolean;
+  effectiveLaundryId: string | null;
+  effectiveBranchId: string | null;
 }
 
 const LaundryContext = createContext<LaundryContextType | undefined>(undefined);
@@ -36,14 +42,46 @@ export function LaundryProvider({ children }: { children: ReactNode }) {
   const [selectedBranchId, setSelectedBranchIdState] = useState<string | null>(null);
   const [loadingBranches, setLoadingBranches] = useState(false);
 
-  const isOwner = user?.role === 'owner';
+  // Role detection
+  const isOwnerOrTechnician = user?.role === 'owner' || user?.role === 'technician';
   const isAdmin = user?.role === 'admin';
+  
+  // General admin = admin without branch_id (can see all branches of their laundry)
+  const isGeneralAdmin = isAdmin && !user?.branchId;
+  
+  // Branch admin = admin with branch_id (can only see their assigned branch)
+  const isBranchAdmin = isAdmin && !!user?.branchId;
 
-  // Fetch branches when laundry changes
+  // For branch admins, their effective branch is always their assigned branch
+  // For general admins and owners/technicians, it's the selected branch (or null for all)
+  const effectiveBranchId = isBranchAdmin 
+    ? user?.branchId || null 
+    : selectedBranchId;
+
+  // For non-owner users, their effective laundry is their assigned laundry
+  // For owners/technicians, it's the selected laundry from the selector
+  const effectiveLaundryId = isOwnerOrTechnician 
+    ? laundryData.laundryId 
+    : user?.laundryId || null;
+
+  // Fetch branches when laundry changes (only for roles that can see branches)
   useEffect(() => {
-    if (!laundryData.currentLaundry?.id || (!isAdmin && !isOwner)) {
+    const currentLaundryId = isOwnerOrTechnician 
+      ? laundryData.currentLaundry?.id 
+      : user?.laundryId;
+    
+    if (!currentLaundryId || isBranchAdmin) {
+      // Branch admin doesn't need the branch list, they're locked to their branch
+      if (!isBranchAdmin) {
+        setBranches([]);
+        setSelectedBranchIdState(null);
+      }
+      return;
+    }
+
+    // Only owners, technicians, and general admins need to fetch branches
+    if (!isOwnerOrTechnician && !isGeneralAdmin) {
       setBranches([]);
-      setSelectedBranchIdState(null);
       return;
     }
 
@@ -53,7 +91,7 @@ export function LaundryProvider({ children }: { children: ReactNode }) {
         const { data, error } = await supabase
           .from('branches')
           .select('id, code, name, is_main, laundry_id')
-          .eq('laundry_id', laundryData.currentLaundry!.id)
+          .eq('laundry_id', currentLaundryId)
           .eq('is_active', true)
           .order('is_main', { ascending: false })
           .order('name');
@@ -61,16 +99,15 @@ export function LaundryProvider({ children }: { children: ReactNode }) {
         if (error) throw error;
         setBranches(data || []);
 
-        // Load stored branch preference or select main branch
-        const storedBranchId = localStorage.getItem(`selectedBranch_${laundryData.currentLaundry!.id}`);
+        // Load stored branch preference
+        const storedBranchId = localStorage.getItem(`selectedBranch_${currentLaundryId}`);
         const branchExists = data?.some(b => b.id === storedBranchId);
         
         if (storedBranchId && branchExists) {
           setSelectedBranchIdState(storedBranchId);
         } else {
-          // Default to null (all branches) for owner/admin, or main branch
-          const mainBranch = data?.find(b => b.is_main);
-          setSelectedBranchIdState(null); // Show all by default
+          // Default to null (all branches) for owner/technician/general admin
+          setSelectedBranchIdState(null);
         }
       } catch (error) {
         console.error('Error fetching branches:', error);
@@ -80,28 +117,40 @@ export function LaundryProvider({ children }: { children: ReactNode }) {
     };
 
     fetchBranches();
-  }, [laundryData.currentLaundry?.id, isAdmin, isOwner]);
+  }, [laundryData.currentLaundry?.id, user?.laundryId, isOwnerOrTechnician, isGeneralAdmin, isBranchAdmin]);
 
   const setSelectedBranchId = useCallback((branchId: string | null) => {
+    // Branch admins cannot change their branch
+    if (isBranchAdmin) return;
+    
     setSelectedBranchIdState(branchId);
-    if (laundryData.currentLaundry?.id) {
+    const currentLaundryId = isOwnerOrTechnician 
+      ? laundryData.currentLaundry?.id 
+      : user?.laundryId;
+    
+    if (currentLaundryId) {
       if (branchId) {
-        localStorage.setItem(`selectedBranch_${laundryData.currentLaundry.id}`, branchId);
+        localStorage.setItem(`selectedBranch_${currentLaundryId}`, branchId);
       } else {
-        localStorage.removeItem(`selectedBranch_${laundryData.currentLaundry.id}`);
+        localStorage.removeItem(`selectedBranch_${currentLaundryId}`);
       }
     }
     // Dispatch event for components that need to react
     window.dispatchEvent(new CustomEvent('branchChanged', { detail: { branchId } }));
-  }, [laundryData.currentLaundry?.id]);
+  }, [laundryData.currentLaundry?.id, user?.laundryId, isOwnerOrTechnician, isBranchAdmin]);
 
   return (
     <LaundryContext.Provider value={{
       ...laundryData,
       branches,
-      selectedBranchId,
+      selectedBranchId: effectiveBranchId,
       setSelectedBranchId,
       loadingBranches,
+      isOwnerOrTechnician,
+      isGeneralAdmin,
+      isBranchAdmin,
+      effectiveLaundryId,
+      effectiveBranchId,
     }}>
       {children}
     </LaundryContext.Provider>
@@ -118,12 +167,12 @@ export function useLaundryContext() {
 
 // Helper hook for getting laundry_id for queries
 export function useCurrentLaundryId(): string | null {
-  const { laundryId } = useLaundryContext();
-  return laundryId;
+  const { effectiveLaundryId } = useLaundryContext();
+  return effectiveLaundryId;
 }
 
 // Helper hook for getting branch filter for queries
 export function useBranchFilter(): { laundryId: string | null; branchId: string | null } {
-  const { laundryId, selectedBranchId } = useLaundryContext();
-  return { laundryId, branchId: selectedBranchId };
+  const { effectiveLaundryId, effectiveBranchId } = useLaundryContext();
+  return { laundryId: effectiveLaundryId, branchId: effectiveBranchId };
 }

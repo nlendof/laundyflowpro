@@ -3,7 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-type AppRole = 'owner' | 'admin' | 'cajero' | 'operador' | 'delivery' | 'cliente';
+type AppRole = 'owner' | 'technician' | 'admin' | 'cajero' | 'operador' | 'delivery' | 'cliente';
 
 interface Profile {
   id: string;
@@ -15,6 +15,8 @@ interface Profile {
   hire_date?: string;
   must_change_password?: boolean;
   profile_completed?: boolean;
+  laundry_id?: string;
+  branch_id?: string;
 }
 
 interface AuthUser {
@@ -27,6 +29,8 @@ interface AuthUser {
   permissions: string[];
   mustChangePassword: boolean;
   profileCompleted: boolean;
+  laundryId?: string;
+  branchId?: string;
 }
 
 interface AuthContextType {
@@ -48,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserData = async (userId: string): Promise<AuthUser | null> => {
     try {
-      // Fetch profile
+      // Fetch profile with laundry_id and branch_id
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -99,6 +103,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         permissions,
         mustChangePassword: profile.must_change_password ?? false,
         profileCompleted: profile.profile_completed ?? true,
+        laundryId: profile.laundry_id || undefined,
+        branchId: profile.branch_id || undefined,
       };
     } catch (error) {
       console.error('Error in fetchUserData:', error);

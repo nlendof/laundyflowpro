@@ -10,7 +10,6 @@ import { useOperationsFlow } from '@/hooks/useOperationsFlow';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
-import { CurrentBranchIndicator } from '@/components/layout/CurrentBranchIndicator';
 import {
   Package,
   DollarSign,
@@ -82,10 +81,7 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-            <CurrentBranchIndicator />
-          </div>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">
             Bienvenido, {user?.name}. Aquí está el resumen de {PERIOD_LABELS[period].toLowerCase()}.
           </p>
