@@ -4,12 +4,26 @@ import { toast } from 'sonner';
 import { CashRegisterEntry, Expense } from '@/types';
 import { useAuth } from './useAuth';
 import { Tables, TablesInsert } from '@/integrations/supabase/types';
-import { startOfDay, endOfDay } from 'date-fns';
+import { startOfDay, endOfDay, format } from 'date-fns';
 import { useBranchFilter } from '@/contexts/LaundryContext';
 
 type DbCashRegister = Tables<'cash_register'>;
 type DbExpense = Tables<'expenses'>;
 type DbCashClosing = Tables<'cash_closings'>;
+
+export interface CashClosingData {
+  id: string;
+  closing_date: string;
+  opening_balance: number;
+  total_income: number;
+  total_expense: number;
+  expected_balance: number;
+  actual_balance: number | null;
+  difference: number | null;
+  notes: string | null;
+  created_at: string;
+  closed_by: string | null;
+}
 
 export function useCashRegister() {
   const { user } = useAuth();
@@ -19,6 +33,7 @@ export function useCashRegister() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [openingBalance, setOpeningBalanceState] = useState(0);
+  const [currentClosing, setCurrentClosing] = useState<CashClosingData | null>(null);
 
   // Fetch entries for selected date
   const fetchEntries = useCallback(async () => {
@@ -93,36 +108,51 @@ export function useCashRegister() {
     }
   }, [laundryId]);
 
-  // Fetch opening balance for the day
-  const fetchOpeningBalance = useCallback(async () => {
+  // Fetch closing for selected date
+  const fetchClosing = useCallback(async () => {
     try {
-      const dateStr = selectedDate.toISOString().split('T')[0];
-      const { data } = await supabase
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      let query = supabase
         .from('cash_closings')
-        .select('expected_balance')
-        .eq('closing_date', dateStr)
-        .single();
+        .select('*')
+        .eq('closing_date', dateStr);
 
+      if (laundryId) {
+        query = query.eq('laundry_id', laundryId);
+      }
+
+      const { data, error } = await query.maybeSingle();
+
+      if (error) throw error;
+
+      setCurrentClosing(data);
+      
       if (data) {
-        setOpeningBalanceState(data.expected_balance);
+        setOpeningBalanceState(data.opening_balance);
       } else {
-        // Get previous day's closing balance or default
+        // Get previous day's closing balance
         const prevDate = new Date(selectedDate);
         prevDate.setDate(prevDate.getDate() - 1);
-        const prevDateStr = prevDate.toISOString().split('T')[0];
+        const prevDateStr = format(prevDate, 'yyyy-MM-dd');
         
-        const { data: prevData } = await supabase
+        let prevQuery = supabase
           .from('cash_closings')
-          .select('expected_balance')
-          .eq('closing_date', prevDateStr)
-          .single();
+          .select('expected_balance, actual_balance')
+          .eq('closing_date', prevDateStr);
 
-        setOpeningBalanceState(prevData?.expected_balance || 0);
+        if (laundryId) {
+          prevQuery = prevQuery.eq('laundry_id', laundryId);
+        }
+
+        const { data: prevData } = await prevQuery.maybeSingle();
+
+        setOpeningBalanceState(prevData?.actual_balance ?? prevData?.expected_balance ?? 0);
       }
     } catch {
       setOpeningBalanceState(0);
+      setCurrentClosing(null);
     }
-  }, [selectedDate]);
+  }, [selectedDate, laundryId]);
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -149,6 +179,7 @@ export function useCashRegister() {
         description: entryData.description,
         order_id: entryData.orderId,
         created_by: user?.id,
+        laundry_id: laundryId || undefined,
       };
 
       const { error } = await supabase.from('cash_register').insert(insert);
@@ -162,6 +193,7 @@ export function useCashRegister() {
           description: entryData.description,
           expense_date: new Date().toISOString().split('T')[0],
           created_by: user?.id,
+          laundry_id: laundryId || undefined,
         });
       }
 
@@ -171,7 +203,7 @@ export function useCashRegister() {
       console.error('Error adding entry:', error);
       toast.error('Error al registrar el movimiento');
     }
-  }, [user, fetchEntries]);
+  }, [user, laundryId, fetchEntries]);
 
   // Add expense
   const addExpense = useCallback(async (expenseData: Omit<Expense, 'id' | 'createdBy'>) => {
@@ -180,8 +212,9 @@ export function useCashRegister() {
         category: expenseData.category,
         amount: expenseData.amount,
         description: expenseData.description,
-        expense_date: expenseData.date.toISOString().split('T')[0],
+        expense_date: format(expenseData.date, 'yyyy-MM-dd'),
         created_by: user?.id,
+        laundry_id: laundryId || undefined,
       };
 
       const { error: expenseError } = await supabase.from('expenses').insert(insert);
@@ -194,6 +227,7 @@ export function useCashRegister() {
         amount: expenseData.amount,
         description: expenseData.description,
         created_by: user?.id,
+        laundry_id: laundryId || undefined,
       });
 
       await Promise.all([fetchEntries(), fetchExpenses()]);
@@ -202,40 +236,109 @@ export function useCashRegister() {
       console.error('Error adding expense:', error);
       toast.error('Error al registrar el gasto');
     }
-  }, [user, fetchEntries, fetchExpenses]);
+  }, [user, laundryId, fetchEntries, fetchExpenses]);
+
+  // Update expense
+  const updateExpense = useCallback(async (id: string, expenseData: Partial<Expense>) => {
+    try {
+      const update: Partial<TablesInsert<'expenses'>> = {};
+      
+      if (expenseData.category) update.category = expenseData.category;
+      if (expenseData.amount !== undefined) update.amount = expenseData.amount;
+      if (expenseData.description !== undefined) update.description = expenseData.description;
+      if (expenseData.date) update.expense_date = format(expenseData.date, 'yyyy-MM-dd');
+
+      const { error } = await supabase.from('expenses').update(update).eq('id', id);
+      if (error) throw error;
+
+      await fetchExpenses();
+      toast.success('Gasto actualizado');
+    } catch (error) {
+      console.error('Error updating expense:', error);
+      toast.error('Error al actualizar el gasto');
+    }
+  }, [fetchExpenses]);
+
+  // Delete expense
+  const deleteExpense = useCallback(async (id: string) => {
+    try {
+      const { error } = await supabase.from('expenses').delete().eq('id', id);
+      if (error) throw error;
+
+      await fetchExpenses();
+      toast.success('Gasto eliminado');
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+      toast.error('Error al eliminar el gasto');
+    }
+  }, [fetchExpenses]);
 
   // Set opening balance
   const setOpeningBalance = useCallback(async (balance: number) => {
     try {
-      const dateStr = selectedDate.toISOString().split('T')[0];
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
       
       const { error } = await supabase
         .from('cash_closings')
         .upsert({
           closing_date: dateStr,
           opening_balance: balance,
-          expected_balance: balance,
-          total_income: 0,
-          total_expense: 0,
+          expected_balance: balance + totals.income - totals.expense,
+          total_income: totals.income,
+          total_expense: totals.expense,
           closed_by: user?.id,
+          laundry_id: laundryId || undefined,
         });
 
       if (error) throw error;
 
       setOpeningBalanceState(balance);
+      await fetchClosing();
       toast.success('Saldo inicial actualizado');
     } catch (error) {
       console.error('Error setting opening balance:', error);
       toast.error('Error al establecer el saldo');
     }
-  }, [selectedDate, user]);
+  }, [selectedDate, user, laundryId, totals, fetchClosing]);
+
+  // Close cash register
+  const closeCashRegister = useCallback(async (data: { actualBalance: number; notes: string }) => {
+    try {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const expectedBalance = openingBalance + totals.income - totals.expense;
+      const difference = data.actualBalance - expectedBalance;
+      
+      const { error } = await supabase
+        .from('cash_closings')
+        .upsert({
+          closing_date: dateStr,
+          opening_balance: openingBalance,
+          total_income: totals.income,
+          total_expense: totals.expense,
+          expected_balance: expectedBalance,
+          actual_balance: data.actualBalance,
+          difference: difference,
+          notes: data.notes || null,
+          closed_by: user?.id,
+          laundry_id: laundryId || undefined,
+        });
+
+      if (error) throw error;
+
+      await fetchClosing();
+      toast.success('Caja cerrada correctamente');
+    } catch (error) {
+      console.error('Error closing cash register:', error);
+      toast.error('Error al cerrar la caja');
+    }
+  }, [selectedDate, user, laundryId, openingBalance, totals, fetchClosing]);
 
   // Initial fetch
   useEffect(() => {
     fetchEntries();
     fetchExpenses();
-    fetchOpeningBalance();
-  }, [fetchEntries, fetchExpenses, fetchOpeningBalance]);
+    fetchClosing();
+  }, [fetchEntries, fetchExpenses, fetchClosing]);
 
   // Real-time subscription for cash register changes
   useEffect(() => {
@@ -259,7 +362,7 @@ export function useCashRegister() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'cash_closings' },
         () => {
-          fetchOpeningBalance();
+          fetchClosing();
         }
       )
       .subscribe();
@@ -267,7 +370,7 @@ export function useCashRegister() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchEntries, fetchExpenses, fetchOpeningBalance]);
+  }, [fetchEntries, fetchExpenses, fetchClosing]);
 
   return {
     entries,
@@ -280,6 +383,10 @@ export function useCashRegister() {
     totals,
     addEntry,
     addExpense,
+    updateExpense,
+    deleteExpense,
+    closeCashRegister,
+    currentClosing,
     fetchEntries,
     fetchExpenses,
   };
