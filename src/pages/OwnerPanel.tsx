@@ -131,6 +131,8 @@ export default function OwnerPanel() {
   const [branchToReset, setBranchToReset] = useState<Branch | null>(null);
   const [resettingBranch, setResettingBranch] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState('');
+  const [branchOrderCount, setBranchOrderCount] = useState<number | null>(null);
+  const [loadingOrderCount, setLoadingOrderCount] = useState(false);
   
   // Form data
   const [laundryForm, setLaundryForm] = useState({
@@ -529,10 +531,28 @@ export default function OwnerPanel() {
     }
   };
 
-  const openResetBranchDialog = (branch: Branch) => {
+  const openResetBranchDialog = async (branch: Branch) => {
     setBranchToReset(branch);
     setResetConfirmText('');
+    setBranchOrderCount(null);
     setResetBranchDialogOpen(true);
+    
+    // Fetch order count
+    setLoadingOrderCount(true);
+    try {
+      const { count, error } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('branch_id', branch.id);
+      
+      if (!error) {
+        setBranchOrderCount(count || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching order count:', error);
+    } finally {
+      setLoadingOrderCount(false);
+    }
   };
 
   const handleResetBranchData = async () => {
@@ -1578,14 +1598,24 @@ export default function OwnerPanel() {
                 <p>
                   Estás a punto de <strong className="text-destructive">eliminar todos los datos</strong> de la sucursal <strong>"{branchToReset?.name}"</strong>.
                 </p>
-                <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm">
-                  <p className="font-medium text-destructive mb-2">Se eliminarán permanentemente:</p>
-                  <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                    <li>Todos los pedidos de esta sucursal</li>
-                    <li>Artículos de los pedidos</li>
-                    <li>Devoluciones registradas</li>
-                  </ul>
+                
+                {/* Order count display */}
+                <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-medium text-destructive">Registros a eliminar:</span>
+                    {loadingOrderCount ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                    ) : (
+                      <Badge variant="destructive" className="text-lg px-3 py-1">
+                        {branchOrderCount ?? 0} pedidos
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Incluye todos los artículos y devoluciones asociadas a estos pedidos.
+                  </p>
                 </div>
+
                 <div className="p-3 bg-muted rounded-lg text-sm">
                   <p className="font-medium mb-2">Se mantendrán intactos:</p>
                   <ul className="list-disc list-inside space-y-1 text-muted-foreground">
