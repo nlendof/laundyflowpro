@@ -56,6 +56,7 @@ import {
   EyeOff,
   RotateCcw,
   Wrench,
+  Activity,
 } from 'lucide-react';
 import { 
   Select,
@@ -68,6 +69,7 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { TechnicianManagement } from '@/components/owner/TechnicianManagement';
 import { SystemMaintenanceTools } from '@/components/owner/SystemMaintenanceTools';
+import { TechnicianMonitoringDashboard } from '@/components/owner/TechnicianMonitoringDashboard';
 
 interface Laundry {
   id: string;
@@ -179,7 +181,7 @@ export default function OwnerPanel() {
 
   // Check if user is owner or technician
   const isOwner = user?.role === 'owner' || user?.role === 'technician';
-  const [activeMainTab, setActiveMainTab] = useState<'laundries' | 'technicians' | 'maintenance'>('laundries');
+  const [activeMainTab, setActiveMainTab] = useState<'laundries' | 'monitoring' | 'technicians' | 'maintenance'>('laundries');
 
   useEffect(() => {
     if (!isOwner) {
@@ -848,10 +850,14 @@ export default function OwnerPanel() {
         {/* Main Tabs - Only show when no laundry is selected */}
         {!selectedLaundry ? (
           <Tabs value={activeMainTab} onValueChange={(v) => setActiveMainTab(v as any)} className="space-y-6">
-            <TabsList className="grid w-full max-w-md grid-cols-3">
+            <TabsList className="grid w-full max-w-lg grid-cols-4">
               <TabsTrigger value="laundries" className="gap-2">
                 <Building2 className="w-4 h-4" />
                 <span className="hidden sm:inline">Lavanderías</span>
+              </TabsTrigger>
+              <TabsTrigger value="monitoring" className="gap-2">
+                <Activity className="w-4 h-4" />
+                <span className="hidden sm:inline">Monitoreo</span>
               </TabsTrigger>
               <TabsTrigger value="technicians" className="gap-2">
                 <Wrench className="w-4 h-4" />
@@ -961,6 +967,10 @@ export default function OwnerPanel() {
 
             <TabsContent value="technicians">
               <TechnicianManagement />
+            </TabsContent>
+
+            <TabsContent value="monitoring">
+              <TechnicianMonitoringDashboard />
             </TabsContent>
 
             <TabsContent value="maintenance">
