@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
@@ -23,7 +23,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
   DollarSign,
@@ -34,9 +33,13 @@ import {
   TrendingUp,
   TrendingDown,
   Calculator,
+  Printer,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/currency';
+import { CashClosingData } from '@/hooks/useCashRegister';
+import { CashRegisterEntry } from '@/types';
+import { CashClosingTicket } from './CashClosingTicket';
 
 interface CashClosingDialogProps {
   open: boolean;
@@ -51,12 +54,8 @@ interface CashClosingDialogProps {
     actualBalance: number;
     notes: string;
   }) => Promise<void>;
-  existingClosing?: {
-    actual_balance: number | null;
-    difference: number | null;
-    notes: string | null;
-    created_at: string;
-  } | null;
+  existingClosing?: CashClosingData | null;
+  entries?: CashRegisterEntry[];
 }
 
 export function CashClosingDialog({
@@ -70,11 +69,13 @@ export function CashClosingDialog({
   currency,
   onClose,
   existingClosing,
+  entries = [],
 }: CashClosingDialogProps) {
   const [actualBalance, setActualBalance] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const ticketRef = useRef<HTMLDivElement>(null);
 
   const parsedActualBalance = parseFloat(actualBalance) || 0;
   const difference = parsedActualBalance - expectedBalance;
@@ -102,7 +103,69 @@ export function CashClosingDialog({
     }
   };
 
+  const handlePrint = () => {
+    if (!ticketRef.current) return;
+
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    if (!printWindow) return;
+
+    const ticketHtml = ticketRef.current.innerHTML;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Cierre de Caja - ${format(selectedDate, 'dd/MM/yyyy')}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+              font-family: monospace, 'Courier New', Courier; 
+              font-size: 12px;
+              line-height: 1.3;
+              padding: 8px;
+              width: 302px;
+              margin: 0 auto;
+            }
+            @media print {
+              body { width: 80mm; }
+              @page { 
+                size: 80mm auto; 
+                margin: 0;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          ${ticketHtml}
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+    
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
+  };
+
   const isClosed = existingClosing?.actual_balance !== null;
+
+  // Build closing data for ticket
+  const closingForTicket: CashClosingData = existingClosing || {
+    id: '',
+    closing_date: format(selectedDate, 'yyyy-MM-dd'),
+    opening_balance: openingBalance,
+    total_income: totalIncome,
+    total_expense: totalExpense,
+    expected_balance: expectedBalance,
+    actual_balance: null,
+    difference: null,
+    notes: null,
+    created_at: new Date().toISOString(),
+    closed_by: null,
+  };
 
   return (
     <>
@@ -120,8 +183,8 @@ export function CashClosingDialog({
 
           {isClosed ? (
             <div className="space-y-4 py-4">
-              <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-green-700 dark:text-green-300 font-medium mb-2">
+              <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-primary font-medium mb-2">
                   <CheckCircle className="w-5 h-5" />
                   Caja cerrada
                 </div>
@@ -145,8 +208,8 @@ export function CashClosingDialog({
                 <div className={cn(
                   "p-3 rounded-lg",
                   existingClosing.difference > 0 
-                    ? "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300"
-                    : "bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300"
+                    ? "bg-primary/10 text-primary"
+                    : "bg-destructive/10 text-destructive"
                 )}>
                   <div className="flex items-center justify-between">
                     <span>Diferencia:</span>
@@ -164,6 +227,12 @@ export function CashClosingDialog({
                   <p className="text-sm bg-muted p-2 rounded">{existingClosing.notes}</p>
                 </div>
               )}
+
+              {/* Print Button for closed cash register */}
+              <Button onClick={handlePrint} className="w-full gap-2" variant="outline">
+                <Printer className="w-4 h-4" />
+                Imprimir Reporte
+              </Button>
             </div>
           ) : (
             <div className="space-y-4 py-4">
@@ -173,14 +242,14 @@ export function CashClosingDialog({
                   <span className="text-muted-foreground">Saldo inicial</span>
                   <span className="font-medium">{formatCurrency(openingBalance, currency)}</span>
                 </div>
-                <div className="flex items-center justify-between text-green-600">
+                <div className="flex items-center justify-between text-primary">
                   <span className="flex items-center gap-1">
                     <TrendingUp className="w-4 h-4" />
                     Ingresos
                   </span>
                   <span className="font-medium">+{formatCurrency(totalIncome, currency)}</span>
                 </div>
-                <div className="flex items-center justify-between text-red-600">
+                <div className="flex items-center justify-between text-destructive">
                   <span className="flex items-center gap-1">
                     <TrendingDown className="w-4 h-4" />
                     Egresos
@@ -218,10 +287,10 @@ export function CashClosingDialog({
                 <div className={cn(
                   "p-3 rounded-lg flex items-center justify-between",
                   difference === 0
-                    ? "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300"
+                    ? "bg-primary/10 text-primary"
                     : difference > 0
-                    ? "bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300"
-                    : "bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300"
+                    ? "bg-secondary text-secondary-foreground"
+                    : "bg-destructive/10 text-destructive"
                 )}>
                   <span className="flex items-center gap-2">
                     {difference === 0 ? (
@@ -280,7 +349,7 @@ export function CashClosingDialog({
               {difference !== 0 && (
                 <span className={cn(
                   "block mt-2 font-medium",
-                  difference > 0 ? "text-blue-600" : "text-red-600"
+                  difference > 0 ? "text-primary" : "text-destructive"
                 )}>
                   Existe una diferencia de {difference > 0 ? '+' : ''}
                   {formatCurrency(difference, currency)}
@@ -297,6 +366,16 @@ export function CashClosingDialog({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Hidden ticket for printing */}
+      <div className="hidden">
+        <CashClosingTicket
+          ref={ticketRef}
+          closing={closingForTicket}
+          entries={entries}
+          selectedDate={selectedDate}
+        />
+      </div>
     </>
   );
 }

@@ -548,6 +548,7 @@ export default function CashRegister() {
         currency={business.currency}
         onClose={closeCashRegister}
         existingClosing={currentClosing}
+        entries={entries}
       />
     </div>
   );
