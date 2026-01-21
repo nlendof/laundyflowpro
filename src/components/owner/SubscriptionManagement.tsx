@@ -156,6 +156,24 @@ export function SubscriptionManagement() {
     return branch.subscription?.status === statusFilter;
   });
 
+  // Group by laundry
+  const groupedByLaundry = filteredBranches.reduce((acc, branch) => {
+    const key = branch.laundry_id || 'unknown';
+    if (!acc[key]) {
+      acc[key] = {
+        laundry_name: branch.laundry_name,
+        branches: []
+      };
+    }
+    acc[key].branches.push(branch);
+    return acc;
+  }, {} as Record<string, { laundry_name: string; branches: BranchWithSubscription[] }>);
+
+  // Sort laundries alphabetically
+  const sortedLaundries = Object.entries(groupedByLaundry).sort((a, b) => 
+    a[1].laundry_name.localeCompare(b[1].laundry_name)
+  );
+
   // Stats
   const stats = {
     total: branches.length,
@@ -307,64 +325,71 @@ export function SubscriptionManagement() {
               <p>No se encontraron sucursales</p>
             </div>
           ) : (
-            <div className="rounded-md border overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Sucursal</TableHead>
-                    <TableHead>Lavandería</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Plan</TableHead>
-                    <TableHead>Precio</TableHead>
-                    <TableHead>Próxima fecha</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredBranches.map((branch) => (
-                    <TableRow key={branch.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Building2 className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <div className="font-medium">{branch.name}</div>
-                            <div className="text-xs text-muted-foreground">{branch.code}</div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {branch.laundry_name}
-                      </TableCell>
-                      <TableCell>
-                        {branch.subscription ? (
-                          <SubscriptionStatusBadge status={branch.subscription.status as any} />
-                        ) : (
-                          <Badge variant="outline">Sin suscripción</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          {getStatusIcon(branch.subscription?.status)}
-                          <span>{branch.subscription?.plan_name || '-'}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {getPrice(branch)}
-                        {branch.subscription && (
-                          <span className="text-xs text-muted-foreground ml-1">
-                            /{branch.subscription.billing_interval === 'annual' ? 'año' : 'mes'}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-sm">
-                          <Calendar className="h-3 w-3 text-muted-foreground" />
-                          {getNextDate(branch)}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="space-y-6">
+              {sortedLaundries.map(([laundryId, { laundry_name, branches: laundryBranches }]) => (
+                <div key={laundryId} className="rounded-md border overflow-hidden">
+                  {/* Laundry Header */}
+                  <div className="bg-muted/50 px-4 py-3 border-b flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-primary" />
+                    <span className="font-semibold">{laundry_name}</span>
+                    <Badge variant="secondary" className="ml-2">
+                      {laundryBranches.length} {laundryBranches.length === 1 ? 'sucursal' : 'sucursales'}
+                    </Badge>
+                  </div>
+                  
+                  {/* Branches Table */}
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Sucursal</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Plan</TableHead>
+                        <TableHead>Precio</TableHead>
+                        <TableHead>Próxima fecha</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {laundryBranches.map((branch) => (
+                        <TableRow key={branch.id}>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{branch.name}</div>
+                              <div className="text-xs text-muted-foreground">{branch.code}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {branch.subscription ? (
+                              <SubscriptionStatusBadge status={branch.subscription.status as any} />
+                            ) : (
+                              <Badge variant="outline">Sin suscripción</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              {getStatusIcon(branch.subscription?.status)}
+                              <span>{branch.subscription?.plan_name || '-'}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {getPrice(branch)}
+                            {branch.subscription && (
+                              <span className="text-xs text-muted-foreground ml-1">
+                                /{branch.subscription.billing_interval === 'annual' ? 'año' : 'mes'}
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1 text-sm">
+                              <Calendar className="h-3 w-3 text-muted-foreground" />
+                              {getNextDate(branch)}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
