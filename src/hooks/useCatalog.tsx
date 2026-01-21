@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Tables, TablesInsert } from '@/integrations/supabase/types';
+import { useBranchFilter } from '@/contexts/LaundryContext';
 
 type DbService = Tables<'catalog_services'>;
 type DbArticle = Tables<'catalog_articles'>;
@@ -32,6 +33,7 @@ export interface CatalogItem {
 }
 
 export function useCatalog() {
+  const { laundryId } = useBranchFilter();
   const [services, setServices] = useState<CatalogItem[]>([]);
   const [articles, setArticles] = useState<CatalogItem[]>([]);
   const [extras, setExtras] = useState<CatalogExtra[]>([]);
@@ -42,10 +44,21 @@ export function useCatalog() {
     try {
       setLoading(true);
 
+      // Build queries with laundry_id filter
+      let servicesQuery = supabase.from('catalog_services').select('*').order('name');
+      let articlesQuery = supabase.from('catalog_articles').select('*').order('name');
+      let extrasQuery = supabase.from('catalog_extras').select('*').order('name');
+
+      if (laundryId) {
+        servicesQuery = servicesQuery.eq('laundry_id', laundryId);
+        articlesQuery = articlesQuery.eq('laundry_id', laundryId);
+        extrasQuery = extrasQuery.eq('laundry_id', laundryId);
+      }
+
       const [servicesRes, articlesRes, extrasRes] = await Promise.all([
-        supabase.from('catalog_services').select('*').order('name'),
-        supabase.from('catalog_articles').select('*').order('name'),
-        supabase.from('catalog_extras').select('*').order('name'),
+        servicesQuery,
+        articlesQuery,
+        extrasQuery,
       ]);
 
       if (servicesRes.error) throw servicesRes.error;
@@ -96,7 +109,7 @@ export function useCatalog() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [laundryId]);
 
   // Combined items
   const items = useMemo(() => [...services, ...articles], [services, articles]);
@@ -117,6 +130,7 @@ export function useCatalog() {
           unit: itemData.pricingType === 'weight' ? 'kg' : 'pieza',
           estimated_time: itemData.estimatedTime,
           is_active: itemData.isActive,
+          laundry_id: laundryId,
         };
         const { error } = await supabase.from('catalog_services').insert(insert);
         if (error) throw error;
@@ -127,6 +141,7 @@ export function useCatalog() {
           category: itemData.category,
           price: itemData.price,
           is_active: itemData.isActive,
+          laundry_id: laundryId,
         };
         const { error } = await supabase.from('catalog_articles').insert(insert);
         if (error) throw error;
@@ -222,6 +237,7 @@ export function useCatalog() {
         name: extraData.name,
         price: extraData.price,
         is_active: extraData.isActive,
+        laundry_id: laundryId,
       });
       if (error) throw error;
       await fetchCatalog();
@@ -230,7 +246,7 @@ export function useCatalog() {
       console.error('Error adding extra:', error);
       toast.error('Error al agregar el extra');
     }
-  }, [fetchCatalog]);
+  }, [fetchCatalog, laundryId]);
 
   // Initial fetch
   useEffect(() => {

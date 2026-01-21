@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -48,6 +48,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { CustomerFormModal, CustomerFormData } from '@/components/customers/CustomerFormModal';
+import { useBranchFilter } from '@/contexts/LaundryContext';
 
 interface Customer {
   id: string;
@@ -73,6 +74,7 @@ const parseNameWithNickname = (fullName: string): { name: string; nickname: stri
 };
 
 export default function Customers() {
+  const { laundryId } = useBranchFilter();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -85,13 +87,20 @@ export default function Customers() {
   const [deleteCustomer, setDeleteCustomer] = useState<Customer | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('customers')
         .select('*')
         .order('created_at', { ascending: false });
+
+      // Filter by laundry_id
+      if (laundryId) {
+        query = query.eq('laundry_id', laundryId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setCustomers(data || []);
@@ -101,7 +110,7 @@ export default function Customers() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [laundryId]);
 
   useEffect(() => {
     fetchCustomers();
@@ -119,7 +128,7 @@ export default function Customers() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchCustomers, laundryId]);
 
   const filteredCustomers = useMemo(() => {
     if (!searchQuery.trim()) return customers;

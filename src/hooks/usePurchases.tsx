@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from './useAuth';
+import { useBranchFilter } from '@/contexts/LaundryContext';
 
 export interface PurchaseItem {
   id?: string;
@@ -30,19 +31,28 @@ export interface Purchase {
 
 export function usePurchases() {
   const { user } = useAuth();
+  const { laundryId } = useBranchFilter();
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchPurchases = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      let query = supabase
         .from('purchases')
         .select(`
           *,
           purchase_items (*)
         `)
         .order('purchase_date', { ascending: false });
+
+      // Filter by laundry_id
+      if (laundryId) {
+        query = query.eq('laundry_id', laundryId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -76,7 +86,7 @@ export function usePurchases() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [laundryId]);
 
   const createPurchase = useCallback(async (
     purchaseData: {
@@ -96,6 +106,7 @@ export function usePurchases() {
           notes: purchaseData.notes,
           total_amount: totalAmount,
           created_by: user?.id,
+          laundry_id: laundryId,
         })
         .select()
         .single();
@@ -161,7 +172,7 @@ export function usePurchases() {
       toast.error('Error al registrar la compra');
       return null;
     }
-  }, [user, fetchPurchases]);
+  }, [user, laundryId, fetchPurchases]);
 
   const deletePurchase = useCallback(async (id: string) => {
     try {

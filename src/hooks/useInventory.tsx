@@ -86,6 +86,7 @@ export function useInventory() {
         unit: itemData.unit,
         unit_cost: itemData.unitCost,
         last_restocked: new Date().toISOString(),
+        laundry_id: laundryId,
       };
 
       const { error } = await supabase.from('inventory').insert(insert);
@@ -97,7 +98,7 @@ export function useInventory() {
       console.error('Error adding inventory item:', error);
       toast.error('Error al agregar el producto');
     }
-  }, [fetchInventory]);
+  }, [fetchInventory, laundryId]);
 
   // Update item
   const updateItem = useCallback(async (id: string, updates: Partial<InventoryItem>) => {

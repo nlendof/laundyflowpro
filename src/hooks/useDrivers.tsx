@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useBranchFilter } from '@/contexts/LaundryContext';
 
 export interface Driver {
   id: string;
@@ -15,6 +16,7 @@ export interface Driver {
 }
 
 export function useDrivers() {
+  const { laundryId } = useBranchFilter();
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -22,7 +24,7 @@ export function useDrivers() {
     try {
       setLoading(true);
 
-      // Get users with delivery role
+      // Get users with delivery role that belong to the current laundry
       const { data: deliveryRoles, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id')
@@ -37,11 +39,18 @@ export function useDrivers() {
 
       const driverUserIds = deliveryRoles.map(r => r.user_id);
 
-      // Get profiles for delivery users
-      const { data: profiles, error: profilesError } = await supabase
+      // Get profiles for delivery users - filter by laundry_id
+      let profilesQuery = supabase
         .from('profiles')
-        .select('id, name, phone, avatar_url, is_active')
+        .select('id, name, phone, avatar_url, is_active, laundry_id')
         .in('id', driverUserIds);
+
+      // Filter by laundry_id if available
+      if (laundryId) {
+        profilesQuery = profilesQuery.eq('laundry_id', laundryId);
+      }
+
+      const { data: profiles, error: profilesError } = await profilesQuery;
 
       if (profilesError) throw profilesError;
 
@@ -119,7 +128,7 @@ export function useDrivers() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [laundryId]);
 
   // Assign driver to pickup - changes status to "on_way_to_store"
   const assignPickupDriver = useCallback(async (orderId: string, driverId: string) => {
@@ -256,9 +265,10 @@ export function useDrivers() {
     }
   }, []);
 
+  // Re-fetch when laundryId changes
   useEffect(() => {
     fetchDrivers();
-  }, [fetchDrivers]);
+  }, [fetchDrivers, laundryId]);
 
   // Real-time subscription for orders changes
   useEffect(() => {

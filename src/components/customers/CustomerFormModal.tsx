@@ -21,6 +21,7 @@ import {
 import { User, Phone, Mail, MapPin, FileText, Loader2, UserCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { useBranchFilter } from '@/contexts/LaundryContext';
 
 // Country codes for phone
 const COUNTRY_CODES = [
@@ -99,6 +100,7 @@ export function CustomerFormModal({
   mode = 'create',
   title,
 }: CustomerFormModalProps) {
+  const { laundryId } = useBranchFilter();
   const [formData, setFormData] = useState<CustomerFormData>({
     name: '',
     nickname: '',
@@ -191,7 +193,10 @@ export function CustomerFormModal({
       } else {
         const { data, error } = await supabase
           .from('customers')
-          .insert(customerData)
+          .insert({
+            ...customerData,
+            laundry_id: laundryId,
+          })
           .select('id')
           .single();
 
