@@ -1746,6 +1746,36 @@ export type Database = {
           },
         ]
       }
+      scheduled_jobs: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_enabled: boolean | null
+          job_name: string
+          last_run_at: string | null
+          next_run_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          job_name: string
+          last_run_at?: string | null
+          next_run_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          job_name?: string
+          last_run_at?: string | null
+          next_run_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       subscription_invoices: {
         Row: {
           billing_address: string | null
@@ -2238,6 +2268,7 @@ export type Database = {
         Returns: boolean
       }
       is_owner_or_technician: { Args: { _user_id: string }; Returns: boolean }
+      process_subscription_expirations: { Args: never; Returns: undefined }
       user_belongs_to_laundry: {
         Args: { _laundry_id: string; _user_id: string }
         Returns: boolean
