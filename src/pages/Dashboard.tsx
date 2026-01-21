@@ -10,6 +10,7 @@ import { useOperationsFlow } from '@/hooks/useOperationsFlow';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNavigate } from 'react-router-dom';
+import { DashboardSubscriptionBanner } from '@/components/subscription/DashboardSubscriptionBanner';
 import {
   Package,
   DollarSign,
@@ -78,6 +79,9 @@ export default function Dashboard() {
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
+      {/* Subscription Status Banner */}
+      <DashboardSubscriptionBanner />
+
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex flex-col gap-2">
