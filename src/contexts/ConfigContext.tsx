@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode, Dispatch, SetStateAction, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
+import { useCurrentLaundryId } from './LaundryContext';
 // Types
 export interface CatalogCategory {
   id: string;
@@ -184,7 +184,9 @@ const DEFAULT_TICKET_SETTINGS: TicketSettings = {
 
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 
-export function ConfigProvider({ children }: { children: ReactNode }) {
+// Inner component that uses laundry context
+function ConfigProviderInner({ children }: { children: ReactNode }) {
+  const laundryId = useCurrentLaundryId();
   const [categories, setCategories] = useState<CatalogCategory[]>(DEFAULT_CATEGORIES);
   const [operations, setOperations] = useState<OperationStep[]>(DEFAULT_OPERATIONS);
   const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>(DEFAULT_ZONES);
@@ -194,24 +196,38 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [ticketSettings, setTicketSettings] = useState<TicketSettings>(DEFAULT_TICKET_SETTINGS);
   const [loading, setLoading] = useState(true);
 
-  // Load config from database
+  // Load config from database filtered by laundry_id
   const loadConfig = useCallback(async () => {
     try {
       setLoading(true);
       
+      // Reset to defaults when laundry changes
+      setCategories(DEFAULT_CATEGORIES);
+      setOperations(DEFAULT_OPERATIONS);
+      setDeliveryZones(DEFAULT_ZONES);
+      setExtraServices(DEFAULT_EXTRAS);
+      setPaymentMethods(DEFAULT_PAYMENTS);
+      setBusiness(DEFAULT_BUSINESS);
+      setTicketSettings(DEFAULT_TICKET_SETTINGS);
+      
       // Check if user is authenticated first
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session) {
-        // Use defaults when not authenticated
         return;
       }
 
+      // If no laundry selected, use defaults
+      if (!laundryId) {
+        return;
+      }
+
+      // Load config filtered by laundry_id
       const { data, error } = await supabase
         .from('system_config')
-        .select('*');
+        .select('*')
+        .eq('laundry_id', laundryId);
 
       if (error) {
-        // If permission denied, just use defaults
         if (error.code === '42501' || error.message?.includes('permission')) {
           console.log('Config: Using defaults (no permission)');
           return;
@@ -256,15 +272,20 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [laundryId]);
 
-  // Save config to database
+  // Save config to database with laundry_id
   const saveConfig = useCallback(async () => {
     try {
       // Check if user is authenticated
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session) {
         toast.error('Debes iniciar sesión para guardar la configuración');
+        return;
+      }
+
+      if (!laundryId) {
+        toast.error('No hay lavandería seleccionada');
         return;
       }
 
@@ -279,23 +300,25 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       ];
 
       for (const config of configs) {
-        // First try to update existing
+        // First try to update existing for this laundry
         const { data: existing } = await supabase
           .from('system_config')
           .select('id')
           .eq('key', config.key)
+          .eq('laundry_id', laundryId)
           .single();
 
         if (existing) {
           const { error } = await supabase
             .from('system_config')
             .update({ value: JSON.parse(JSON.stringify(config.value)), updated_at: new Date().toISOString() })
-            .eq('key', config.key);
+            .eq('key', config.key)
+            .eq('laundry_id', laundryId);
           if (error) throw error;
         } else {
           const { error } = await supabase
             .from('system_config')
-            .insert([{ key: config.key, value: JSON.parse(JSON.stringify(config.value)) }]);
+            .insert([{ key: config.key, value: JSON.parse(JSON.stringify(config.value)), laundry_id: laundryId }]);
           if (error) throw error;
         }
       }
@@ -305,7 +328,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       console.error('Error saving config:', error);
       toast.error('Error al guardar la configuración');
     }
-  }, [categories, operations, deliveryZones, extraServices, paymentMethods, business, ticketSettings]);
+  }, [categories, operations, deliveryZones, extraServices, paymentMethods, business, ticketSettings, laundryId]);
 
   // Load on mount
   useEffect(() => {
@@ -357,6 +380,11 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       {children}
     </ConfigContext.Provider>
   );
+}
+
+// Wrapper that doesn't require LaundryContext (for use at top level)
+export function ConfigProvider({ children }: { children: ReactNode }) {
+  return <ConfigProviderInner>{children}</ConfigProviderInner>;
 }
 
 export function useConfig() {
