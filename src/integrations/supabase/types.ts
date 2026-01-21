@@ -685,6 +685,41 @@ export type Database = {
           },
         ]
       }
+      deletion_confirmation_codes: {
+        Row: {
+          code: string
+          created_at: string
+          expires_at: string
+          id: string
+          laundry_id: string
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          laundry_id: string
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          laundry_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deletion_confirmation_codes_laundry_id_fkey"
+            columns: ["laundry_id"]
+            isOneToOne: false
+            referencedRelation: "laundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_loans: {
         Row: {
           amount: number
@@ -1795,6 +1830,7 @@ export type Database = {
         Args: { _branch_id: string; _user_id: string }
         Returns: boolean
       }
+      cleanup_expired_deletion_codes: { Args: never; Returns: undefined }
       get_user_branch_id: { Args: { _user_id: string }; Returns: string }
       get_user_laundry_id: { Args: never; Returns: string }
       get_user_role: {
