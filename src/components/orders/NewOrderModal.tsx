@@ -6,6 +6,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { DiscountInput } from '@/components/DiscountInput';
 import { CustomerFormModal } from '@/components/customers/CustomerFormModal';
 import { TimeSlotPicker } from '@/components/TimeSlotPicker';
+import { useSubscriptionValidation } from '@/hooks/useSubscriptionValidation';
+import { PaymentReminderDialog } from '@/components/subscription/PaymentReminderDialog';
 import {
   Dialog,
   DialogContent,
@@ -104,6 +106,11 @@ interface OrderItemDraft {
 export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalProps) {
   const { activeDeliveryZones } = useConfig();
   const { activeServices, activeArticles } = useCatalog();
+  const { validateOperation, checkResult } = useSubscriptionValidation();
+  
+  // Subscription validation state
+  const [showPaymentReminder, setShowPaymentReminder] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   
   // Combine services and articles for selection
   const catalogItems = useMemo(() => [...activeServices, ...activeArticles], [activeServices, activeArticles]);
@@ -330,7 +337,7 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
     }
   };
 
-  // Create order
+  // Create order with subscription validation
   const handleCreateOrder = async () => {
     if (!customerName || !customerPhone || items.length === 0) return;
     
@@ -339,6 +346,27 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
     const requiresAddress = needsPickup || needsDelivery;
     
     if (requiresAddress && !customerAddress) return;
+
+    // Validate subscription status
+    const validation = validateOperation();
+    if (!validation.canProceed) {
+      setShowPaymentReminder(true);
+      return;
+    }
+    if (validation.shouldShowReminder) {
+      setPendingAction(() => executeCreateOrder);
+      setShowPaymentReminder(true);
+      return;
+    }
+
+    await executeCreateOrder();
+  };
+
+  // Execute the actual order creation (separated for subscription validation flow)
+  const executeCreateOrder = async () => {
+    const needsPickup = receptionType === 'pickup';
+    const needsDelivery = deliveryType === 'delivery';
+    const requiresAddress = needsPickup || needsDelivery;
 
     // Get or create customer ID
     let customerId: string;
@@ -1111,6 +1139,23 @@ export function NewOrderModal({ isOpen, onClose, onCreateOrder }: NewOrderModalP
       mode="create"
       title="Nuevo Cliente"
     />
+
+    {/* Payment Reminder Dialog */}
+    {checkResult && (
+      <PaymentReminderDialog
+        open={showPaymentReminder}
+        onClose={() => {
+          setShowPaymentReminder(false);
+          setPendingAction(null);
+        }}
+        onProceed={pendingAction ? () => {
+          setShowPaymentReminder(false);
+          pendingAction();
+          setPendingAction(null);
+        } : undefined}
+        checkResult={checkResult}
+      />
+    )}
     </>
   );
 }

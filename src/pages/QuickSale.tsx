@@ -65,6 +65,9 @@ import { Order, OrderItem } from '@/types';
 import { useOrders } from '@/hooks/useOrders';
 import { supabase } from '@/integrations/supabase/client';
 import { CustomerFormModal } from '@/components/customers/CustomerFormModal';
+import { SubscriptionAlert } from '@/components/subscription/SubscriptionAlert';
+import { useSubscriptionValidation } from '@/hooks/useSubscriptionValidation';
+import { PaymentReminderDialog } from '@/components/subscription/PaymentReminderDialog';
 
 // Payment methods
 const PAYMENT_METHODS = [
@@ -121,6 +124,11 @@ export default function QuickSale() {
   const { activeServices, activeArticles } = useCatalog();
   const { activePaymentMethods } = useConfig();
   const { createOrder } = useOrders();
+  const { validateOperation, checkResult } = useSubscriptionValidation();
+  
+  // Subscription validation state
+  const [showPaymentReminder, setShowPaymentReminder] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   
   // Search
   
@@ -470,6 +478,23 @@ export default function QuickSale() {
       return;
     }
 
+    // Validate subscription status
+    const validation = validateOperation();
+    if (!validation.canProceed) {
+      setShowPaymentReminder(true);
+      return;
+    }
+    if (validation.shouldShowReminder) {
+      setPendingAction(() => executeSale);
+      setShowPaymentReminder(true);
+      return;
+    }
+
+    await executeSale();
+  };
+
+  // Execute the actual sale (separated for subscription validation flow)
+  const executeSale = async () => {
     setIsProcessing(true);
 
     try {
@@ -1392,6 +1417,23 @@ ${completedDirectSale.itemsSold.map(item => `• ${item}`).join('\n')}
         mode="create"
         title="Nuevo Cliente"
       />
+
+      {/* Payment Reminder Dialog */}
+      {checkResult && (
+        <PaymentReminderDialog
+          open={showPaymentReminder}
+          onClose={() => {
+            setShowPaymentReminder(false);
+            setPendingAction(null);
+          }}
+          onProceed={pendingAction ? () => {
+            setShowPaymentReminder(false);
+            pendingAction();
+            setPendingAction(null);
+          } : undefined}
+          checkResult={checkResult}
+        />
+      )}
     </div>
   );
 }
