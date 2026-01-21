@@ -37,14 +37,14 @@ const LaundryContext = createContext<LaundryContextType | undefined>(undefined);
 
 export function LaundryProvider({ children }: { children: ReactNode }) {
   const laundryData = useLaundry();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedBranchId, setSelectedBranchIdState] = useState<string | null>(null);
   const [loadingBranches, setLoadingBranches] = useState(false);
 
-  // Role detection
-  const isOwnerOrTechnician = user?.role === 'owner' || user?.role === 'technician';
-  const isAdmin = user?.role === 'admin';
+  // Role detection - only compute when user is fully loaded
+  const isOwnerOrTechnician = !authLoading && user !== null && (user.role === 'owner' || user.role === 'technician');
+  const isAdmin = !authLoading && user !== null && user.role === 'admin';
   
   // General admin = admin without branch_id (can see all branches of their laundry)
   const isGeneralAdmin = isAdmin && !user?.branchId;
@@ -66,6 +66,9 @@ export function LaundryProvider({ children }: { children: ReactNode }) {
 
   // Fetch branches when laundry changes (only for roles that can see branches)
   useEffect(() => {
+    // Don't fetch until auth is fully loaded
+    if (authLoading) return;
+    
     const currentLaundryId = isOwnerOrTechnician 
       ? laundryData.currentLaundry?.id 
       : user?.laundryId;
@@ -117,7 +120,7 @@ export function LaundryProvider({ children }: { children: ReactNode }) {
     };
 
     fetchBranches();
-  }, [laundryData.currentLaundry?.id, user?.laundryId, isOwnerOrTechnician, isGeneralAdmin, isBranchAdmin]);
+  }, [authLoading, laundryData.currentLaundry?.id, user?.laundryId, isOwnerOrTechnician, isGeneralAdmin, isBranchAdmin]);
 
   const setSelectedBranchId = useCallback((branchId: string | null) => {
     // Branch admins cannot change their branch

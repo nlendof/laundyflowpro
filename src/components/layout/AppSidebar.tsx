@@ -59,7 +59,7 @@ const navItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
-  const { user, logout } = useAuth();
+  const { user, logout, isLoading: authLoading } = useAuth();
   const { newOrderCount, clearCount } = useNewOrders();
   const { isOwnerOrTechnician, isGeneralAdmin, isBranchAdmin } = useLaundryContext();
   const location = useLocation();
@@ -71,8 +71,8 @@ export function AppSidebar() {
   const roleConfig = ROLE_CONFIG[user.role];
   const filteredNavItems = navItems.filter(item => user.permissions.includes(item.permissionKey));
   
-  // Show selectors for owner/technician and general admin only
-  const showSelectors = isOwnerOrTechnician || isGeneralAdmin;
+  // Show selectors for owner/technician and general admin only - wait for auth to finish loading
+  const showSelectors = !authLoading && (isOwnerOrTechnician || isGeneralAdmin);
 
   return (
     <aside
