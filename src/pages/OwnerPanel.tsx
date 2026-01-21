@@ -57,6 +57,7 @@ import {
   RotateCcw,
   Wrench,
   Activity,
+  CreditCard,
 } from 'lucide-react';
 import { 
   Select,
@@ -71,6 +72,7 @@ import { TechnicianManagement } from '@/components/owner/TechnicianManagement';
 import { SystemMaintenanceTools } from '@/components/owner/SystemMaintenanceTools';
 import { DeleteLaundryDialog } from '@/components/owner/DeleteLaundryDialog';
 import { TechnicianMonitoringDashboard } from '@/components/owner/TechnicianMonitoringDashboard';
+import { SubscriptionManagement } from '@/components/owner/SubscriptionManagement';
 
 interface Laundry {
   id: string;
@@ -184,7 +186,7 @@ export default function OwnerPanel() {
 
   // Check if user is owner or technician
   const isOwner = user?.role === 'owner' || user?.role === 'technician';
-  const [activeMainTab, setActiveMainTab] = useState<'laundries' | 'monitoring' | 'technicians' | 'maintenance'>('laundries');
+  const [activeMainTab, setActiveMainTab] = useState<'laundries' | 'subscriptions' | 'monitoring' | 'technicians' | 'maintenance'>('laundries');
 
   useEffect(() => {
     if (!isOwner) {
@@ -853,10 +855,14 @@ export default function OwnerPanel() {
         {/* Main Tabs - Only show when no laundry is selected */}
         {!selectedLaundry ? (
           <Tabs value={activeMainTab} onValueChange={(v) => setActiveMainTab(v as any)} className="space-y-6">
-            <TabsList className="grid w-full max-w-lg grid-cols-4">
+            <TabsList className="grid w-full max-w-2xl grid-cols-5">
               <TabsTrigger value="laundries" className="gap-2">
                 <Building2 className="w-4 h-4" />
                 <span className="hidden sm:inline">Lavanderías</span>
+              </TabsTrigger>
+              <TabsTrigger value="subscriptions" className="gap-2">
+                <CreditCard className="w-4 h-4" />
+                <span className="hidden sm:inline">Suscripciones</span>
               </TabsTrigger>
               <TabsTrigger value="monitoring" className="gap-2">
                 <Activity className="w-4 h-4" />
@@ -982,6 +988,10 @@ export default function OwnerPanel() {
               ))
             )}
           </div>
+            </TabsContent>
+
+            <TabsContent value="subscriptions">
+              <SubscriptionManagement />
             </TabsContent>
 
             <TabsContent value="technicians">

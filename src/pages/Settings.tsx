@@ -71,6 +71,7 @@ import { BranchSettings } from '@/components/settings/BranchSettings';
 import { AdminDiscountCodes } from '@/components/settings/AdminDiscountCodes';
 import { AppearanceSettings } from '@/components/settings/AppearanceSettings';
 import { SubscriptionSettings } from '@/components/settings/SubscriptionSettings';
+import { AdminSubscriptionView } from '@/components/subscription/AdminSubscriptionView';
 
 // ServiceItem is local to Settings (not in context yet)
 interface ServiceItem {
@@ -1259,7 +1260,7 @@ export default function SettingsPage() {
         {/* Subscription Settings */}
         {isAdmin && (
           <TabsContent value="subscription" className="space-y-6">
-            <SubscriptionSettings />
+            <AdminSubscriptionView />
           </TabsContent>
         )}
       </Tabs>
