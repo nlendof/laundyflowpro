@@ -1,8 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode, Dispatch, SetStateAction, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useCurrentLaundryId } from './LaundryContext';
-// Types
+import { useLaundryContext } from './LaundryContext';
 export interface CatalogCategory {
   id: string;
   name: string;
@@ -184,9 +183,8 @@ const DEFAULT_TICKET_SETTINGS: TicketSettings = {
 
 const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 
-// Inner component that uses laundry context
-function ConfigProviderInner({ children }: { children: ReactNode }) {
-  const laundryId = useCurrentLaundryId();
+// Inner component that uses laundry ID passed as prop
+function ConfigProviderInner({ children, laundryId }: { children: ReactNode; laundryId: string | null }) {
   const [categories, setCategories] = useState<CatalogCategory[]>(DEFAULT_CATEGORIES);
   const [operations, setOperations] = useState<OperationStep[]>(DEFAULT_OPERATIONS);
   const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>(DEFAULT_ZONES);
@@ -382,9 +380,10 @@ function ConfigProviderInner({ children }: { children: ReactNode }) {
   );
 }
 
-// Wrapper that doesn't require LaundryContext (for use at top level)
+// Wrapper that safely gets laundry ID from context
 export function ConfigProvider({ children }: { children: ReactNode }) {
-  return <ConfigProviderInner>{children}</ConfigProviderInner>;
+  const { effectiveLaundryId } = useLaundryContext();
+  return <ConfigProviderInner laundryId={effectiveLaundryId}>{children}</ConfigProviderInner>;
 }
 
 export function useConfig() {
