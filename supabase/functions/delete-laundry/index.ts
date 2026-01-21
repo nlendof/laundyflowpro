@@ -13,9 +13,6 @@ interface DeleteLaundryRequest {
   confirmation_code?: string;
 }
 
-// Store confirmation codes temporarily (in production, use a proper cache)
-const confirmationCodes = new Map<string, { code: string; expires: number; laundry_id: string }>();
-
 const handler = async (req: Request): Promise<Response> => {
   console.log("Delete laundry function called");
 
@@ -100,13 +97,31 @@ const handler = async (req: Request): Promise<Response> => {
       // Generate 6-digit confirmation code
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       
-      // Store code with 10-minute expiration
-      const key = `${user.id}_${requestData.laundry_id}`;
-      confirmationCodes.set(key, {
-        code,
-        expires: Date.now() + 10 * 60 * 1000, // 10 minutes
-        laundry_id: requestData.laundry_id,
-      });
+      // Delete any existing codes for this user/laundry
+      await adminClient
+        .from("deletion_confirmation_codes")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("laundry_id", requestData.laundry_id);
+      
+      // Store code in database with 10-minute expiration
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+      const { error: insertError } = await adminClient
+        .from("deletion_confirmation_codes")
+        .insert({
+          user_id: user.id,
+          laundry_id: requestData.laundry_id,
+          code,
+          expires_at: expiresAt,
+        });
+
+      if (insertError) {
+        console.error("Error storing confirmation code:", insertError);
+        return new Response(
+          JSON.stringify({ error: "Failed to generate confirmation code" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
       // Send email with confirmation code
       if (resendApiKey) {
@@ -176,33 +191,45 @@ const handler = async (req: Request): Promise<Response> => {
         );
       }
 
-      const key = `${user.id}_${requestData.laundry_id}`;
-      const stored = confirmationCodes.get(key);
+      // Fetch the stored code from database
+      const { data: storedCode, error: fetchError } = await adminClient
+        .from("deletion_confirmation_codes")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("laundry_id", requestData.laundry_id)
+        .single();
 
-      if (!stored) {
+      if (fetchError || !storedCode) {
         return new Response(
           JSON.stringify({ error: "No pending confirmation. Request a new code." }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      if (Date.now() > stored.expires) {
-        confirmationCodes.delete(key);
+      if (new Date() > new Date(storedCode.expires_at)) {
+        // Delete expired code
+        await adminClient
+          .from("deletion_confirmation_codes")
+          .delete()
+          .eq("id", storedCode.id);
         return new Response(
           JSON.stringify({ error: "Code expired. Request a new one." }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      if (stored.code !== requestData.confirmation_code) {
+      if (storedCode.code !== requestData.confirmation_code) {
         return new Response(
           JSON.stringify({ error: "Invalid confirmation code" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Code is valid - proceed with deletion
-      confirmationCodes.delete(key);
+      // Code is valid - delete the code from database
+      await adminClient
+        .from("deletion_confirmation_codes")
+        .delete()
+        .eq("id", storedCode.id);
 
       console.log("Starting deletion of laundry:", requestData.laundry_id);
 
