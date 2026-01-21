@@ -22,7 +22,7 @@ interface LaundryBranchSelectorProps {
 }
 
 export function LaundryBranchSelector({ collapsed = false }: LaundryBranchSelectorProps) {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { 
     currentLaundry, 
     switchLaundry, 
@@ -73,6 +73,11 @@ export function LaundryBranchSelector({ collapsed = false }: LaundryBranchSelect
     // "all" means no filter (null)
     setSelectedBranchId(branchId === 'all' ? null : branchId);
   };
+
+  // Don't render until auth is fully loaded - prevents flickering/disappearing
+  if (authLoading) {
+    return null;
+  }
 
   // Branch admins and other staff don't see any selectors
   if (isBranchAdmin || (!isOwnerOrTechnician && !isGeneralAdmin)) {
