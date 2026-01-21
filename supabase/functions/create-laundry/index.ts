@@ -14,6 +14,71 @@ interface CreateLaundryRequest {
   address?: string;
 }
 
+// Default configurations for new laundries
+const DEFAULT_CATEGORIES = [
+  { id: '1', name: 'Lavado', order: 0, isActive: true },
+  { id: '2', name: 'Planchado', order: 1, isActive: true },
+  { id: '3', name: 'Especializado', order: 2, isActive: true },
+  { id: '4', name: 'Ropa Superior', order: 3, isActive: true },
+  { id: '5', name: 'Ropa Inferior', order: 4, isActive: true },
+  { id: '6', name: 'Hogar', order: 5, isActive: true },
+];
+
+const DEFAULT_OPERATIONS = [
+  { id: '1', key: 'pending_pickup', name: 'Pendiente de Recogida', icon: 'Clock', color: 'bg-amber-500', isActive: true, isRequired: true, order: 0 },
+  { id: '2', key: 'in_store', name: 'En Local', icon: 'Store', color: 'bg-blue-500', isActive: true, isRequired: true, order: 1 },
+  { id: '3', key: 'washing', name: 'Lavando', icon: 'Waves', color: 'bg-cyan-500', isActive: true, isRequired: false, order: 2 },
+  { id: '4', key: 'drying', name: 'Secando', icon: 'Wind', color: 'bg-purple-500', isActive: true, isRequired: false, order: 3 },
+  { id: '5', key: 'ironing', name: 'Terminación', icon: 'Flame', color: 'bg-orange-500', isActive: true, isRequired: false, order: 4 },
+  { id: '6', key: 'ready_delivery', name: 'Listo para Entrega', icon: 'Package', color: 'bg-emerald-500', isActive: true, isRequired: true, order: 5 },
+  { id: '7', key: 'in_transit', name: 'En Camino', icon: 'Truck', color: 'bg-indigo-500', isActive: true, isRequired: false, order: 6 },
+  { id: '8', key: 'delivered', name: 'Entregado', icon: 'CheckCircle', color: 'bg-green-600', isActive: true, isRequired: true, order: 7 },
+];
+
+const DEFAULT_ZONES = [
+  { id: '1', name: 'Centro', price: 0, isActive: true },
+  { id: '2', name: 'Zona Norte', price: 25, isActive: true },
+  { id: '3', name: 'Zona Sur', price: 30, isActive: true },
+];
+
+const DEFAULT_EXTRAS = [
+  { id: '1', name: 'Desmanchado', price: 3.00, isActive: true },
+  { id: '2', name: 'Suavizante Premium', price: 2.00, isActive: true },
+  { id: '3', name: 'Express (24h)', price: 10.00, isActive: true },
+];
+
+const DEFAULT_PAYMENTS = [
+  { id: '1', name: 'Efectivo', isActive: true, commission: 0 },
+  { id: '2', name: 'Tarjeta de Crédito', isActive: true, commission: 3.5 },
+  { id: '3', name: 'Transferencia', isActive: true, commission: 0 },
+];
+
+const DEFAULT_TICKET_SETTINGS = {
+  logoUrl: '',
+  showLogo: false,
+  showPrices: true,
+  showQR: true,
+  qrContent: 'ticket_code',
+  customQrUrl: '',
+  footerText: 'Conserve este ticket para recoger su pedido',
+  showFooter: true,
+  thankYouMessage: '¡Gracias por su preferencia!',
+};
+
+// Default services for new laundries
+const DEFAULT_SERVICES = [
+  { name: 'Lavado por Libra', category: 'Lavado', price: 50, unit: 'lb', description: 'Lavado estándar por peso' },
+  { name: 'Lavado Delicado', category: 'Lavado', price: 80, unit: 'lb', description: 'Para prendas delicadas' },
+  { name: 'Planchado por Pieza', category: 'Planchado', price: 25, unit: 'pieza', description: 'Planchado profesional' },
+  { name: 'Lavado en Seco', category: 'Especializado', price: 150, unit: 'pieza', description: 'Limpieza en seco' },
+];
+
+// Default example articles for new laundries
+const DEFAULT_ARTICLES = [
+  { name: 'Detergente Líquido', category: 'Insumos', price: 250, cost: 180, stock: 10, min_stock: 3, description: 'Detergente concentrado', track_inventory: true },
+  { name: 'Suavizante', category: 'Insumos', price: 150, cost: 100, stock: 8, min_stock: 2, description: 'Suavizante de telas', track_inventory: true },
+];
+
 const handler = async (req: Request): Promise<Response> => {
   console.log("Create laundry function called");
 
@@ -130,7 +195,7 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    // Link user to laundry
+    // Link user to laundry (owner/technician don't have laundry_id in profile)
     const { error: linkError } = await adminClient
       .from("laundry_users")
       .insert({
@@ -145,11 +210,8 @@ const handler = async (req: Request): Promise<Response> => {
       console.log("User linked to laundry");
     }
 
-    // Update user's profile with laundry_id
-    await adminClient
-      .from("profiles")
-      .update({ laundry_id: laundry.id })
-      .eq("id", user.id);
+    // NOTE: Do NOT set laundry_id on owner/technician profiles
+    // They access laundries through laundry_users table and should not appear as employees
 
     // Create default branch for the laundry
     const { error: branchError } = await adminClient
@@ -167,6 +229,59 @@ const handler = async (req: Request): Promise<Response> => {
     } else {
       console.log("Default branch created");
     }
+
+    // Create default system configuration for the new laundry
+    const defaultConfigs = [
+      { key: 'categories', value: DEFAULT_CATEGORIES, laundry_id: laundry.id },
+      { key: 'operations', value: DEFAULT_OPERATIONS, laundry_id: laundry.id },
+      { key: 'delivery_zones', value: DEFAULT_ZONES, laundry_id: laundry.id },
+      { key: 'extra_services', value: DEFAULT_EXTRAS, laundry_id: laundry.id },
+      { key: 'payment_methods', value: DEFAULT_PAYMENTS, laundry_id: laundry.id },
+      { key: 'business', value: { 
+        name: requestData.name, 
+        slogan: '', 
+        phone: requestData.phone || '', 
+        email: requestData.email || '', 
+        address: requestData.address || '',
+        website: '',
+        openTime: '08:00',
+        closeTime: '20:00',
+        workDays: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+        taxRate: 18,
+        currency: 'DOP',
+      }, laundry_id: laundry.id },
+      { key: 'ticket_settings', value: DEFAULT_TICKET_SETTINGS, laundry_id: laundry.id },
+    ];
+
+    for (const config of defaultConfigs) {
+      const { error: configError } = await adminClient
+        .from("system_config")
+        .insert(config);
+      if (configError) {
+        console.error(`Error creating ${config.key} config:`, configError);
+      }
+    }
+    console.log("Default configuration created");
+
+    // Create default services
+    for (const service of DEFAULT_SERVICES) {
+      await adminClient.from("catalog_services").insert({
+        ...service,
+        laundry_id: laundry.id,
+        is_active: true,
+      });
+    }
+    console.log("Default services created");
+
+    // Create example articles
+    for (const article of DEFAULT_ARTICLES) {
+      await adminClient.from("catalog_articles").insert({
+        ...article,
+        laundry_id: laundry.id,
+        is_active: true,
+      });
+    }
+    console.log("Example articles created");
 
     console.log("Laundry created successfully:", laundry.id);
 

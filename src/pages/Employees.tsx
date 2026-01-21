@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { useCurrentLaundryId } from '@/contexts/LaundryContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -29,6 +30,8 @@ import { AttendanceManagement } from '@/components/employees/AttendanceManagemen
 import { TimeOffManagement } from '@/components/employees/TimeOffManagement';
 import { LoanManagement } from '@/components/employees/LoanManagement';
 
+// Local type for roles - technician filtered out before reaching Employee type
+type LocalAppRole = 'owner' | 'technician' | 'admin' | 'cajero' | 'operador' | 'delivery' | 'cliente';
 type AppRole = 'owner' | 'admin' | 'cajero' | 'operador' | 'delivery' | 'cliente';
 
 const ROLE_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
@@ -41,6 +44,7 @@ const ROLE_CONFIG: Record<string, { label: string; color: string; icon: React.El
 
 export default function Employees() {
   const { user: currentUser } = useAuth();
+  const laundryId = useCurrentLaundryId();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [activeTab, setActiveTab] = useState('list');
@@ -48,45 +52,73 @@ export default function Employees() {
   const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'owner';
 
   const fetchEmployees = async () => {
+    if (!laundryId) {
+      setEmployees([]);
+      setIsLoadingData(false);
+      return;
+    }
+
     try {
       setIsLoadingData(true);
       
+      // Get profiles that belong to this laundry (employees have laundry_id set)
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
+        .eq('laundry_id', laundryId)
         .order('created_at', { ascending: false });
       
       if (profilesError) throw profilesError;
+
+      if (!profiles || profiles.length === 0) {
+        setEmployees([]);
+        setIsLoadingData(false);
+        return;
+      }
       
+      const profileIds = profiles.map(p => p.id);
+      
+      // Get roles only for profiles in this laundry
       const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
-        .select('*');
+        .select('*')
+        .in('user_id', profileIds);
       
       if (rolesError) throw rolesError;
       
+      // Get permissions only for profiles in this laundry
       const { data: permissions, error: permissionsError } = await supabase
         .from('user_permissions')
-        .select('*');
+        .select('*')
+        .in('user_id', profileIds);
       
       if (permissionsError) throw permissionsError;
       
-      const employeesData: Employee[] = (profiles || []).map(profile => {
-        const userRole = roles?.find(r => r.user_id === profile.id);
-        const userPermissions = permissions?.filter(p => p.user_id === profile.id) || [];
-        
-        return {
-          id: profile.id,
-          name: profile.name,
-          email: profile.email,
-          phone: profile.phone || undefined,
-          avatar_url: profile.avatar_url || undefined,
-          is_active: profile.is_active ?? true,
-          hire_date: profile.hire_date || profile.created_at,
-          last_login: profile.last_login || undefined,
-          role: (userRole?.role as AppRole) || 'cajero',
-          permissions: userPermissions.map(p => p.module_key),
-        };
-      });
+      // Filter out owner and technician roles (they shouldn't appear in employee list)
+      const employeesData: Employee[] = (profiles || [])
+        .filter(profile => {
+          // Filter out owner/technician users before mapping
+          const userRole = roles?.find(r => r.user_id === profile.id);
+          const role = userRole?.role as LocalAppRole;
+          return role !== 'owner' && role !== 'technician';
+        })
+        .map(profile => {
+          const userRole = roles?.find(r => r.user_id === profile.id);
+          const userPermissions = permissions?.filter(p => p.user_id === profile.id) || [];
+          
+          return {
+            id: profile.id,
+            name: profile.name,
+            email: profile.email,
+            phone: profile.phone || undefined,
+            avatar_url: profile.avatar_url || undefined,
+            is_active: profile.is_active ?? true,
+            hire_date: profile.hire_date || profile.created_at,
+            last_login: profile.last_login || undefined,
+            role: (userRole?.role as AppRole) || 'cajero',
+            permissions: userPermissions.map(p => p.module_key),
+          };
+        });
       
       setEmployees(employeesData);
     } catch (error) {
@@ -101,7 +133,7 @@ export default function Employees() {
     if (isAdmin) {
       fetchEmployees();
     }
-  }, [isAdmin]);
+  }, [isAdmin, laundryId]);
 
   const stats = useMemo(() => ({
     total: employees.length,
