@@ -69,6 +69,7 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { TechnicianManagement } from '@/components/owner/TechnicianManagement';
 import { SystemMaintenanceTools } from '@/components/owner/SystemMaintenanceTools';
+import { DeleteLaundryDialog } from '@/components/owner/DeleteLaundryDialog';
 import { TechnicianMonitoringDashboard } from '@/components/owner/TechnicianMonitoringDashboard';
 
 interface Laundry {
@@ -138,6 +139,8 @@ export default function OwnerPanel() {
   const [resetConfirmText, setResetConfirmText] = useState('');
   const [branchOrderCount, setBranchOrderCount] = useState<number | null>(null);
   const [loadingOrderCount, setLoadingOrderCount] = useState(false);
+  const [deletingLaundry, setDeletingLaundry] = useState<Laundry | null>(null);
+  const [isDeleteLaundryDialogOpen, setIsDeleteLaundryDialogOpen] = useState(false);
   
   // Form data
   const [laundryForm, setLaundryForm] = useState({
@@ -953,9 +956,25 @@ export default function OwnerPanel() {
                             e.stopPropagation();
                             handleOpenLaundryDialog(laundry);
                           }}
+                          title="Editar"
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
+                        {user?.role === 'owner' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingLaundry(laundry);
+                              setIsDeleteLaundryDialogOpen(true);
+                            }}
+                            title="Eliminar lavandería"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -1726,6 +1745,17 @@ export default function OwnerPanel() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Delete Laundry Dialog */}
+      <DeleteLaundryDialog
+        laundry={deletingLaundry}
+        open={isDeleteLaundryDialogOpen}
+        onOpenChange={setIsDeleteLaundryDialogOpen}
+        onDeleted={() => {
+          setDeletingLaundry(null);
+          fetchLaundries();
+        }}
+      />
     </div>
   );
 }
