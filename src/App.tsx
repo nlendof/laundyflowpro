@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { ConfigProvider } from "./contexts/ConfigContext";
 import { NewOrdersProvider } from "./contexts/NewOrdersContext";
 import { LaundryProvider } from "./contexts/LaundryContext";
+import { SubscriptionProvider } from "./components/subscription/SubscriptionProvider";
 import { AppLayout } from "./components/layout/AppLayout";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -282,13 +283,15 @@ const App = () => (
       <LaundryProvider>
         <ConfigProvider>
           <NewOrdersProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
-                <AppRoutes />
-              </BrowserRouter>
-            </TooltipProvider>
+            <SubscriptionProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <BrowserRouter>
+                  <AppRoutes />
+                </BrowserRouter>
+              </TooltipProvider>
+            </SubscriptionProvider>
           </NewOrdersProvider>
         </ConfigProvider>
       </LaundryProvider>

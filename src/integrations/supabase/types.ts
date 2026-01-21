@@ -262,6 +262,99 @@ export type Database = {
           },
         ]
       }
+      branch_subscriptions: {
+        Row: {
+          billing_anchor_day: number | null
+          billing_interval: Database["public"]["Enums"]["billing_interval"]
+          branch_id: string
+          cancelled_at: string | null
+          created_at: string | null
+          created_by: string | null
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          last_payment_at: string | null
+          next_payment_due: string | null
+          past_due_since: string | null
+          plan_id: string
+          preferred_payment_method:
+            | Database["public"]["Enums"]["payment_method_type"]
+            | null
+          status: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          suspended_at: string | null
+          trial_ends_at: string | null
+          trial_started_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          billing_anchor_day?: number | null
+          billing_interval?: Database["public"]["Enums"]["billing_interval"]
+          branch_id: string
+          cancelled_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          last_payment_at?: string | null
+          next_payment_due?: string | null
+          past_due_since?: string | null
+          plan_id: string
+          preferred_payment_method?:
+            | Database["public"]["Enums"]["payment_method_type"]
+            | null
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          suspended_at?: string | null
+          trial_ends_at?: string | null
+          trial_started_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          billing_anchor_day?: number | null
+          billing_interval?: Database["public"]["Enums"]["billing_interval"]
+          branch_id?: string
+          cancelled_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          last_payment_at?: string | null
+          next_payment_due?: string | null
+          past_due_since?: string | null
+          plan_id?: string
+          preferred_payment_method?:
+            | Database["public"]["Enums"]["payment_method_type"]
+            | null
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          suspended_at?: string | null
+          trial_ends_at?: string | null
+          trial_started_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "branch_subscriptions_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: true
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "branch_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       branches: {
         Row: {
           address: string | null
@@ -1653,6 +1746,286 @@ export type Database = {
           },
         ]
       }
+      subscription_invoices: {
+        Row: {
+          billing_address: string | null
+          billing_name: string | null
+          billing_tax_id: string | null
+          branch_id: string
+          created_at: string | null
+          currency: string | null
+          due_date: string | null
+          id: string
+          invoice_number: string
+          paid_at: string | null
+          payment_id: string | null
+          pdf_url: string | null
+          period_end: string
+          period_start: string
+          status: string | null
+          subscription_id: string
+          subtotal: number
+          tax_amount: number | null
+          total: number
+          updated_at: string | null
+        }
+        Insert: {
+          billing_address?: string | null
+          billing_name?: string | null
+          billing_tax_id?: string | null
+          branch_id: string
+          created_at?: string | null
+          currency?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_number: string
+          paid_at?: string | null
+          payment_id?: string | null
+          pdf_url?: string | null
+          period_end: string
+          period_start: string
+          status?: string | null
+          subscription_id: string
+          subtotal: number
+          tax_amount?: number | null
+          total: number
+          updated_at?: string | null
+        }
+        Update: {
+          billing_address?: string | null
+          billing_name?: string | null
+          billing_tax_id?: string | null
+          branch_id?: string
+          created_at?: string | null
+          currency?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_number?: string
+          paid_at?: string | null
+          payment_id?: string | null
+          pdf_url?: string | null
+          period_end?: string
+          period_start?: string
+          status?: string | null
+          subscription_id?: string
+          subtotal?: number
+          tax_amount?: number | null
+          total?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_invoices_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_invoices_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_invoices_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "branch_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscription_notifications: {
+        Row: {
+          body: string | null
+          branch_id: string
+          channel: string
+          created_at: string | null
+          id: string
+          notification_type: string
+          recipient_email: string | null
+          recipient_user_id: string | null
+          sent_at: string | null
+          status: string | null
+          subject: string | null
+          subscription_id: string
+        }
+        Insert: {
+          body?: string | null
+          branch_id: string
+          channel: string
+          created_at?: string | null
+          id?: string
+          notification_type: string
+          recipient_email?: string | null
+          recipient_user_id?: string | null
+          sent_at?: string | null
+          status?: string | null
+          subject?: string | null
+          subscription_id: string
+        }
+        Update: {
+          body?: string | null
+          branch_id?: string
+          channel?: string
+          created_at?: string | null
+          id?: string
+          notification_type?: string
+          recipient_email?: string | null
+          recipient_user_id?: string | null
+          sent_at?: string | null
+          status?: string | null
+          subject?: string | null
+          subscription_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_notifications_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_notifications_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "branch_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscription_payments: {
+        Row: {
+          amount: number
+          bank_reference: string | null
+          branch_id: string
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string | null
+          currency: string | null
+          id: string
+          invoice_number: string | null
+          invoice_url: string | null
+          metadata: Json | null
+          notes: string | null
+          payment_method: Database["public"]["Enums"]["payment_method_type"]
+          period_end: string
+          period_start: string
+          status: string
+          stripe_invoice_id: string | null
+          stripe_payment_intent_id: string | null
+          subscription_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          bank_reference?: string | null
+          branch_id: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          invoice_number?: string | null
+          invoice_url?: string | null
+          metadata?: Json | null
+          notes?: string | null
+          payment_method: Database["public"]["Enums"]["payment_method_type"]
+          period_end: string
+          period_start: string
+          status?: string
+          stripe_invoice_id?: string | null
+          stripe_payment_intent_id?: string | null
+          subscription_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          bank_reference?: string | null
+          branch_id?: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          invoice_number?: string | null
+          invoice_url?: string | null
+          metadata?: Json | null
+          notes?: string | null
+          payment_method?: Database["public"]["Enums"]["payment_method_type"]
+          period_end?: string
+          period_start?: string
+          status?: string
+          stripe_invoice_id?: string | null
+          stripe_payment_intent_id?: string | null
+          subscription_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_payments_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_payments_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "branch_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscription_plans: {
+        Row: {
+          created_at: string | null
+          currency: string | null
+          description: string | null
+          features: Json | null
+          grace_period_days: number | null
+          id: string
+          is_active: boolean | null
+          name: string
+          price_annual: number
+          price_monthly: number
+          trial_days: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          features?: Json | null
+          grace_period_days?: number | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          price_annual: number
+          price_monthly: number
+          trial_days?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          features?: Json | null
+          grace_period_days?: number | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          price_annual?: number
+          price_monthly?: number
+          trial_days?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       system_config: {
         Row: {
           id: string
@@ -1830,6 +2203,16 @@ export type Database = {
         Args: { _branch_id: string; _user_id: string }
         Returns: boolean
       }
+      check_branch_subscription_status: {
+        Args: { p_branch_id: string }
+        Returns: {
+          can_operate: boolean
+          days_until_suspension: number
+          is_in_grace_period: boolean
+          message: string
+          status: Database["public"]["Enums"]["subscription_status"]
+        }[]
+      }
       cleanup_expired_deletion_codes: { Args: never; Returns: undefined }
       get_user_branch_id: { Args: { _user_id: string }; Returns: string }
       get_user_laundry_id: { Args: never; Returns: string }
@@ -1869,6 +2252,7 @@ export type Database = {
         | "cliente"
         | "owner"
         | "technician"
+      billing_interval: "monthly" | "annual"
       expense_category: "rent" | "utilities" | "payroll" | "supplies" | "other"
       inventory_category: "detergent" | "softener" | "stain_remover" | "other"
       item_type: "weight" | "piece"
@@ -1881,6 +2265,13 @@ export type Database = {
         | "ready_delivery"
         | "in_transit"
         | "delivered"
+      payment_method_type: "card" | "bank_transfer"
+      subscription_status:
+        | "trial"
+        | "active"
+        | "past_due"
+        | "suspended"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2017,6 +2408,7 @@ export const Constants = {
         "owner",
         "technician",
       ],
+      billing_interval: ["monthly", "annual"],
       expense_category: ["rent", "utilities", "payroll", "supplies", "other"],
       inventory_category: ["detergent", "softener", "stain_remover", "other"],
       item_type: ["weight", "piece"],
@@ -2029,6 +2421,14 @@ export const Constants = {
         "ready_delivery",
         "in_transit",
         "delivered",
+      ],
+      payment_method_type: ["card", "bank_transfer"],
+      subscription_status: [
+        "trial",
+        "active",
+        "past_due",
+        "suspended",
+        "cancelled",
       ],
     },
   },

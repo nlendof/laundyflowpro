@@ -70,6 +70,7 @@ import { NotificationSettings } from '@/components/settings/NotificationSettings
 import { BranchSettings } from '@/components/settings/BranchSettings';
 import { AdminDiscountCodes } from '@/components/settings/AdminDiscountCodes';
 import { AppearanceSettings } from '@/components/settings/AppearanceSettings';
+import { SubscriptionSettings } from '@/components/settings/SubscriptionSettings';
 
 // ServiceItem is local to Settings (not in context yet)
 interface ServiceItem {
@@ -444,6 +445,12 @@ export default function SettingsPage() {
             <Database className="w-4 h-4" />
             Backup
           </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="subscription" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <CreditCard className="w-4 h-4" />
+              Suscripción
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Business Settings */}
@@ -1248,6 +1255,13 @@ export default function SettingsPage() {
           <BackupScheduleSettings />
           <BackupSettings />
         </TabsContent>
+
+        {/* Subscription Settings */}
+        {isAdmin && (
+          <TabsContent value="subscription" className="space-y-6">
+            <SubscriptionSettings />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Edit Service Dialog */}
