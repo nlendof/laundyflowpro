@@ -5,6 +5,55 @@ import { toast } from 'sonner';
 
 type AppRole = 'owner' | 'technician' | 'admin' | 'cajero' | 'operador' | 'delivery' | 'cliente';
 
+const ROLE_PRIORITY: AppRole[] = [
+  'owner',
+  'technician',
+  'admin',
+  'cajero',
+  'operador',
+  'delivery',
+  'cliente',
+];
+
+const ALL_APP_PERMISSIONS = [
+  'dashboard',
+  'pos',
+  'orders',
+  'operations',
+  'deliveries',
+  'cash_register',
+  'customers',
+  'inventory',
+  'purchases',
+  'catalog',
+  'reports',
+  'employees',
+  'audit',
+  'settings',
+];
+
+const DEFAULT_PERMISSIONS_BY_ROLE: Record<AppRole, string[]> = {
+  owner: ALL_APP_PERMISSIONS,
+  technician: ALL_APP_PERMISSIONS,
+  admin: ALL_APP_PERMISSIONS,
+  cajero: ['dashboard', 'pos', 'orders', 'customers', 'cash_register'],
+  operador: ['dashboard', 'orders', 'operations', 'inventory'],
+  delivery: ['dashboard', 'orders', 'deliveries'],
+  cliente: [],
+};
+
+function pickHighestRole(roles: unknown): AppRole | null {
+  if (!Array.isArray(roles) || roles.length === 0) return null;
+  const normalized = roles
+    .map((r) => (typeof r === 'string' ? r : (r as any)?.role))
+    .filter((r): r is string => typeof r === 'string');
+
+  for (const role of ROLE_PRIORITY) {
+    if (normalized.includes(role)) return role;
+  }
+  return null;
+}
+
 interface Profile {
   id: string;
   name: string;
@@ -69,16 +118,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return null;
       }
 
-      // Fetch role
-      const { data: roleData, error: roleError } = await supabase
+      // Fetch roles (can be multiple)
+      const { data: rolesData, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', userId)
-        .maybeSingle();
+        .eq('user_id', userId);
 
-      if (roleError) {
-        console.error('Error fetching role:', roleError);
-      }
+      if (roleError) console.error('Error fetching role(s):', roleError);
 
       // Fetch permissions
       const { data: permissionsData, error: permissionsError } = await supabase
@@ -90,8 +136,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('Error fetching permissions:', permissionsError);
       }
 
-      const role = (roleData?.role as AppRole) || 'cajero';
-      const permissions = permissionsData?.map(p => p.module_key) || [];
+      const roleFromDb = pickHighestRole(rolesData) as AppRole | null;
+      const role = roleFromDb || 'cajero';
+
+      // If permissions can't be loaded (RLS/network) or are empty, fall back to role defaults
+      const loadedPermissions = permissionsData?.map(p => p.module_key).filter(Boolean) || [];
+      const permissions = loadedPermissions.length > 0 ? loadedPermissions : DEFAULT_PERMISSIONS_BY_ROLE[role];
 
       return {
         id: profile.id,
@@ -117,6 +167,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
+
+        // Avoid duplicate initial load: we already call getSession() below.
+        if (event === 'INITIAL_SESSION') {
+          return;
+        }
         
         if (session?.user) {
           // Defer data fetch to avoid deadlock
