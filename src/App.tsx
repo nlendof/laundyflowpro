@@ -279,23 +279,23 @@ function AppRoutes() {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <LaundryProvider>
-        <ConfigProvider>
-          <NewOrdersProvider>
-            <SubscriptionProvider>
-              <TooltipProvider>
-                <Toaster />
-                <Sonner />
-                <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
+        <LaundryProvider>
+          <ConfigProvider>
+            <NewOrdersProvider>
+              <SubscriptionProvider>
+                <TooltipProvider>
+                  <Toaster />
+                  <Sonner />
                   <AppRoutes />
-                </BrowserRouter>
-              </TooltipProvider>
-            </SubscriptionProvider>
-          </NewOrdersProvider>
-        </ConfigProvider>
-      </LaundryProvider>
-    </AuthProvider>
+                </TooltipProvider>
+              </SubscriptionProvider>
+            </NewOrdersProvider>
+          </ConfigProvider>
+        </LaundryProvider>
+      </AuthProvider>
+    </BrowserRouter>
   </QueryClientProvider>
 );
 
