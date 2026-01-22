@@ -13,9 +13,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, UserPlus, Copy, Check, Eye, EyeOff, Building2 } from 'lucide-react';
+import { Loader2, UserPlus, Copy, Check, Eye, EyeOff, Building2, AlertTriangle } from 'lucide-react';
 import { z } from 'zod';
 import { Badge } from '@/components/ui/badge';
+import { validateDeliveryLaundryAssignment, DEFAULT_PERMISSIONS_BY_ROLE } from '@/lib/roles';
 
 type AppRole = 'admin' | 'cajero' | 'operador' | 'delivery';
 
@@ -26,12 +27,7 @@ const ROLE_CONFIG: Record<AppRole, { label: string; description: string }> = {
   delivery: { label: 'Repartidor', description: 'Recogidas y entregas a domicilio' },
 };
 
-const DEFAULT_PERMISSIONS: Record<AppRole, string[]> = {
-  admin: ['dashboard', 'pos', 'orders', 'operations', 'deliveries', 'cash_register', 'inventory', 'catalog', 'reports', 'employees', 'settings'],
-  cajero: ['dashboard', 'pos', 'orders', 'cash_register'],
-  operador: ['dashboard', 'orders', 'operations'],
-  delivery: ['dashboard', 'deliveries'],
-};
+// Use centralized permissions from lib/roles.ts
 
 const employeeSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
@@ -97,6 +93,13 @@ export function CreateEmployeeModal({ isOpen, onClose, onSuccess }: CreateEmploy
       return;
     }
 
+    // Validate delivery role has laundry assignment
+    const deliveryValidation = validateDeliveryLaundryAssignment(formData.role, laundryId);
+    if (!deliveryValidation.isValid) {
+      toast.error(deliveryValidation.message || 'Error de validación');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -115,7 +118,7 @@ export function CreateEmployeeModal({ isOpen, onClose, onSuccess }: CreateEmploy
           name: formData.name,
           phone: formData.phone || undefined,
           role: formData.role,
-          permissions: DEFAULT_PERMISSIONS[formData.role],
+          permissions: DEFAULT_PERMISSIONS_BY_ROLE[formData.role] || [],
           laundry_id: laundryId,
           branch_id: selectedBranchId || undefined,
         },
