@@ -73,6 +73,7 @@ import { SystemMaintenanceTools } from '@/components/owner/SystemMaintenanceTool
 import { DeleteLaundryDialog } from '@/components/owner/DeleteLaundryDialog';
 import { TechnicianMonitoringDashboard } from '@/components/owner/TechnicianMonitoringDashboard';
 import { SubscriptionManagement } from '@/components/owner/SubscriptionManagement';
+import { RoleAuditPanel } from '@/components/owner/RoleAuditPanel';
 
 interface Laundry {
   id: string;
@@ -186,7 +187,7 @@ export default function OwnerPanel() {
 
   // Check if user is owner or technician
   const isOwner = user?.role === 'owner' || user?.role === 'technician';
-  const [activeMainTab, setActiveMainTab] = useState<'laundries' | 'subscriptions' | 'monitoring' | 'technicians' | 'maintenance'>('laundries');
+  const [activeMainTab, setActiveMainTab] = useState<'laundries' | 'subscriptions' | 'monitoring' | 'technicians' | 'maintenance' | 'audit'>('laundries');
 
   useEffect(() => {
     if (!isOwner) {
@@ -855,7 +856,7 @@ export default function OwnerPanel() {
         {/* Main Tabs - Only show when no laundry is selected */}
         {!selectedLaundry ? (
           <Tabs value={activeMainTab} onValueChange={(v) => setActiveMainTab(v as any)} className="space-y-6">
-            <TabsList className="grid w-full max-w-2xl grid-cols-5">
+            <TabsList className="grid w-full max-w-3xl grid-cols-6">
               <TabsTrigger value="laundries" className="gap-2">
                 <Building2 className="w-4 h-4" />
                 <span className="hidden sm:inline">Lavanderías</span>
@@ -875,6 +876,10 @@ export default function OwnerPanel() {
               <TabsTrigger value="maintenance" className="gap-2">
                 <Settings className="w-4 h-4" />
                 <span className="hidden sm:inline">Mantenimiento</span>
+              </TabsTrigger>
+              <TabsTrigger value="audit" className="gap-2">
+                <Users className="w-4 h-4" />
+                <span className="hidden sm:inline">Auditoría</span>
               </TabsTrigger>
             </TabsList>
 
@@ -1004,6 +1009,10 @@ export default function OwnerPanel() {
 
             <TabsContent value="maintenance">
               <SystemMaintenanceTools />
+            </TabsContent>
+
+            <TabsContent value="audit">
+              <RoleAuditPanel />
             </TabsContent>
           </Tabs>
         ) : (
