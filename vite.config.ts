@@ -18,6 +18,11 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
+      // En desarrollo, deshabilitamos SW para evitar UI “fantasma” por caché mientras iteramos.
+      // En producción, se mantiene PWA pero con una estrategia de actualización más agresiva.
+      devOptions: {
+        enabled: false,
+      },
       includeAssets: ['favicon.ico', 'robots.txt'],
       manifest: {
         name: 'Luis Cap Lavandería',
@@ -51,6 +56,10 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB limit
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Evita que queden caches viejos activos y reduce el “a veces veo versión anterior”.
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,

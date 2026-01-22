@@ -39,6 +39,7 @@ import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 import CustomerPortal from "./pages/CustomerPortal";
 import DriverPortal from "./pages/DriverPortal";
+import { PwaUpdatePrompt } from "@/components/pwa/PwaUpdatePrompt";
 
 const queryClient = new QueryClient();
 
@@ -288,6 +289,7 @@ const App = () => (
                 <TooltipProvider>
                   <Toaster />
                   <Sonner />
+                  <PwaUpdatePrompt />
                   <AppRoutes />
                 </TooltipProvider>
               </SubscriptionProvider>
