@@ -191,6 +191,13 @@ export function CustomerFormModal({
         });
         toast.success('Cliente actualizado');
       } else {
+        // Validate laundry_id is present for new customers
+        if (!laundryId) {
+          toast.error('No hay lavandería seleccionada. Por favor seleccione una lavandería.');
+          setIsSaving(false);
+          return;
+        }
+
         const { data, error } = await supabase
           .from('customers')
           .insert({
