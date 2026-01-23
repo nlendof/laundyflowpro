@@ -55,7 +55,9 @@ export default defineConfig(({ mode }) => ({
       },
       workbox: {
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB limit
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Importante: evitar cachear HTML para que el shell (index.html) siempre venga fresco.
+        // Esto reduce casos donde el usuario abre la app y ve una versión anterior.
+        globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
         // Evita que queden caches viejos activos y reduce el “a veces veo versión anterior”.
         cleanupOutdatedCaches: true,
         clientsClaim: true,
@@ -63,17 +65,9 @@ export default defineConfig(({ mode }) => ({
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'supabase-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24, // 24 hours
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
+            // Máxima consistencia: NO cachear respuestas del backend.
+            // El cache de 24h podía devolver datos/estados antiguos.
+            handler: 'NetworkOnly',
           },
           {
             urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
