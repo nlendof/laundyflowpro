@@ -22,6 +22,7 @@ export function PwaUpdatePrompt() {
   const [offlineReady, setOfflineReady] = useState(false);
   const [needRefresh, setNeedRefresh] = useState(false);
   const updateSWRef = useRef<null | ((reloadPage?: boolean) => Promise<void> | void)>(null);
+  const attemptedAutoUpdateRef = useRef(false);
 
   useEffect(() => {
     // registerSW devuelve una función para disparar el update.
@@ -32,11 +33,40 @@ export function PwaUpdatePrompt() {
       },
       onNeedRefresh() {
         setNeedRefresh(true);
+
+        // Máxima consistencia: si detectamos una versión nueva, forzamos el update y recargamos.
+        // Esto evita que el usuario “entre” y vea una versión anterior.
+        if (!attemptedAutoUpdateRef.current) {
+          attemptedAutoUpdateRef.current = true;
+          toast.message("Actualizando a la última versión…", {
+            description: "Recargaremos automáticamente para aplicar el build más reciente.",
+          });
+          window.setTimeout(() => {
+            void updateSWRef.current?.(true);
+          }, 300);
+        }
       },
       onRegisterError(error) {
         console.error("[PWA] Error registrando Service Worker:", error);
       },
     });
+  }, []);
+
+  // Cuando el usuario vuelve a la pestaña (después de un rato), revisamos updates.
+  useEffect(() => {
+    const checkForUpdates = () => {
+      if (document.visibilityState === "visible") {
+        void updateSWRef.current?.();
+      }
+    };
+
+    document.addEventListener("visibilitychange", checkForUpdates);
+    window.addEventListener("focus", checkForUpdates);
+
+    return () => {
+      document.removeEventListener("visibilitychange", checkForUpdates);
+      window.removeEventListener("focus", checkForUpdates);
+    };
   }, []);
 
   useEffect(() => {
