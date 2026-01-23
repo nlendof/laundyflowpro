@@ -61,7 +61,7 @@ const navItems: NavItem[] = [
 export function AppSidebar() {
   const { user, logout, isLoading: authLoading } = useAuth();
   const { newOrderCount, clearCount } = useNewOrders();
-  const { isOwnerOrTechnician, isGeneralAdmin, isBranchAdmin } = useLaundryContext();
+  const { isOwnerOrTechnician, isGeneralAdmin, isBranchAdmin, isFullyLoaded } = useLaundryContext();
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
@@ -71,8 +71,9 @@ export function AppSidebar() {
   const roleConfig = ROLE_CONFIG[user.role];
   const filteredNavItems = navItems.filter(item => user.permissions.includes(item.permissionKey));
   
-  // Show selectors for owner/technician and general admin only - wait for auth to finish loading
-  const showSelectors = !authLoading && (isOwnerOrTechnician || isGeneralAdmin);
+  // Show selectors for owner/technician and general admin only
+  // Wait for FULL loading (auth + laundry) to prevent flicker
+  const showSelectors = isFullyLoaded && (isOwnerOrTechnician || isGeneralAdmin);
 
   return (
     <aside

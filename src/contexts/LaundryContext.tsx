@@ -31,6 +31,8 @@ interface LaundryContextType {
   isBranchAdmin: boolean;
   effectiveLaundryId: string | null;
   effectiveBranchId: string | null;
+  // Combined loading state - true until BOTH auth AND laundry data are ready
+  isFullyLoaded: boolean;
 }
 
 const LaundryContext = createContext<LaundryContextType | undefined>(undefined);
@@ -142,6 +144,15 @@ export function LaundryProvider({ children }: { children: ReactNode }) {
     window.dispatchEvent(new CustomEvent('branchChanged', { detail: { branchId } }));
   }, [laundryData.currentLaundry?.id, user?.laundryId, isOwnerOrTechnician, isBranchAdmin]);
 
+  // Combined loading state: auth must be done AND laundry data must be loaded
+  // For owners/technicians, we also need laundryData to be ready
+  const isFullyLoaded = !authLoading && !laundryData.loading && (
+    // Non-owner roles: just need auth
+    !isOwnerOrTechnician || 
+    // Owner/technician: need laundry data loaded (even if empty)
+    laundryData.userLaundries !== undefined
+  );
+
   return (
     <LaundryContext.Provider value={{
       ...laundryData,
@@ -154,6 +165,7 @@ export function LaundryProvider({ children }: { children: ReactNode }) {
       isBranchAdmin,
       effectiveLaundryId,
       effectiveBranchId,
+      isFullyLoaded,
     }}>
       {children}
     </LaundryContext.Provider>
