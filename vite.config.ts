@@ -58,6 +58,9 @@ export default defineConfig(({ mode }) => ({
         // Importante: evitar cachear HTML para que el shell (index.html) siempre venga fresco.
         // Esto reduce casos donde el usuario abre la app y ve una versión anterior.
         globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
+        // Consistencia > offline: NO servir navegaciones desde precache.
+        // Esto evita que el Service Worker devuelva un index.html viejo (ni siquiera con Ctrl+Shift+R).
+        navigateFallbackDenylist: [/./],
         // Evita que queden caches viejos activos y reduce el “a veces veo versión anterior”.
         cleanupOutdatedCaches: true,
         clientsClaim: true,

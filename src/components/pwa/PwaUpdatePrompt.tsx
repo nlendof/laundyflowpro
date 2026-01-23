@@ -56,7 +56,9 @@ export function PwaUpdatePrompt() {
   useEffect(() => {
     const checkForUpdates = () => {
       if (document.visibilityState === "visible") {
-        void updateSWRef.current?.();
+        // Si hay una versión nueva esperando, aplicarla y recargar automáticamente.
+        // Nota: si no hay update disponible, esto no hace nada.
+        void updateSWRef.current?.(true);
       }
     };
 
