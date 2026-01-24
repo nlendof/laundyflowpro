@@ -74,6 +74,7 @@ import { DeleteLaundryDialog } from '@/components/owner/DeleteLaundryDialog';
 import { TechnicianMonitoringDashboard } from '@/components/owner/TechnicianMonitoringDashboard';
 import { SubscriptionManagement } from '@/components/owner/SubscriptionManagement';
 import { RoleAuditPanel } from '@/components/owner/RoleAuditPanel';
+import { PaymentApprovalPanel } from '@/components/owner/PaymentApprovalPanel';
 
 interface Laundry {
   id: string;
@@ -187,7 +188,7 @@ export default function OwnerPanel() {
 
   // Check if user is owner or technician
   const isOwner = user?.role === 'owner' || user?.role === 'technician';
-  const [activeMainTab, setActiveMainTab] = useState<'laundries' | 'subscriptions' | 'monitoring' | 'technicians' | 'maintenance' | 'audit'>('laundries');
+  const [activeMainTab, setActiveMainTab] = useState<'laundries' | 'subscriptions' | 'payments' | 'monitoring' | 'technicians' | 'maintenance' | 'audit'>('laundries');
 
   useEffect(() => {
     if (!isOwner) {
@@ -856,7 +857,7 @@ export default function OwnerPanel() {
         {/* Main Tabs - Only show when no laundry is selected */}
         {!selectedLaundry ? (
           <Tabs value={activeMainTab} onValueChange={(v) => setActiveMainTab(v as any)} className="space-y-6">
-            <TabsList className="grid w-full max-w-3xl grid-cols-6">
+            <TabsList className="grid w-full max-w-4xl grid-cols-7">
               <TabsTrigger value="laundries" className="gap-2">
                 <Building2 className="w-4 h-4" />
                 <span className="hidden sm:inline">Lavanderías</span>
@@ -864,6 +865,10 @@ export default function OwnerPanel() {
               <TabsTrigger value="subscriptions" className="gap-2">
                 <CreditCard className="w-4 h-4" />
                 <span className="hidden sm:inline">Suscripciones</span>
+              </TabsTrigger>
+              <TabsTrigger value="payments" className="gap-2">
+                <CreditCard className="w-4 h-4" />
+                <span className="hidden sm:inline">Pagos</span>
               </TabsTrigger>
               <TabsTrigger value="monitoring" className="gap-2">
                 <Activity className="w-4 h-4" />
@@ -997,6 +1002,10 @@ export default function OwnerPanel() {
 
             <TabsContent value="subscriptions">
               <SubscriptionManagement />
+            </TabsContent>
+
+            <TabsContent value="payments">
+              <PaymentApprovalPanel />
             </TabsContent>
 
             <TabsContent value="technicians">
