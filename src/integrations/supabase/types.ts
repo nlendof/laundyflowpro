@@ -1929,6 +1929,7 @@ export type Database = {
       }
       subscription_payments: {
         Row: {
+          admin_notes: string | null
           amount: number
           bank_reference: string | null
           branch_id: string
@@ -1944,13 +1945,19 @@ export type Database = {
           payment_method: Database["public"]["Enums"]["payment_method_type"]
           period_end: string
           period_start: string
+          receipt_uploaded_at: string | null
+          receipt_url: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
           status: string
           stripe_invoice_id: string | null
           stripe_payment_intent_id: string | null
           subscription_id: string
           updated_at: string | null
+          uploaded_by: string | null
         }
         Insert: {
+          admin_notes?: string | null
           amount: number
           bank_reference?: string | null
           branch_id: string
@@ -1966,13 +1973,19 @@ export type Database = {
           payment_method: Database["public"]["Enums"]["payment_method_type"]
           period_end: string
           period_start: string
+          receipt_uploaded_at?: string | null
+          receipt_url?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           status?: string
           stripe_invoice_id?: string | null
           stripe_payment_intent_id?: string | null
           subscription_id: string
           updated_at?: string | null
+          uploaded_by?: string | null
         }
         Update: {
+          admin_notes?: string | null
           amount?: number
           bank_reference?: string | null
           branch_id?: string
@@ -1988,11 +2001,16 @@ export type Database = {
           payment_method?: Database["public"]["Enums"]["payment_method_type"]
           period_end?: string
           period_start?: string
+          receipt_uploaded_at?: string | null
+          receipt_url?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           status?: string
           stripe_invoice_id?: string | null
           stripe_payment_intent_id?: string | null
           subscription_id?: string
           updated_at?: string | null
+          uploaded_by?: string | null
         }
         Relationships: [
           {

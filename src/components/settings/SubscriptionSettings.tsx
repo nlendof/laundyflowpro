@@ -17,10 +17,12 @@ import {
   CheckCircle2,
   Clock,
   Mail,
-  Phone
+  Phone,
+  Upload
 } from 'lucide-react';
 import { SubscriptionCard } from '@/components/subscription/SubscriptionCard';
 import { PaymentHistoryTable } from '@/components/subscription/PaymentHistoryTable';
+import { PaymentReceiptUpload } from '@/components/subscription/PaymentReceiptUpload';
 import { useSubscription, useSubscriptionPlans } from '@/hooks/useSubscription';
 import { usePaymentService } from '@/hooks/usePaymentService';
 import { useLaundryContext } from '@/contexts/LaundryContext';
@@ -277,6 +279,9 @@ export function SubscriptionSettings() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Upload Receipt Section */}
+            <PaymentReceiptUpload />
 
             {/* Card Payment - Coming Soon */}
             <Card className="opacity-60">
