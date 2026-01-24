@@ -31,6 +31,7 @@ import { useState } from 'react';
 import { LaundryBranchSelector } from './LaundryBranchSelector';
 import { CurrentBranchIndicator } from './CurrentBranchIndicator';
 import { useLaundryContext } from '@/contexts/LaundryContext';
+import { DevResetButton } from '@/components/dev/DevResetButton';
 
 
 interface NavItem {
@@ -219,17 +220,21 @@ export function AppSidebar() {
 
       {/* Logout */}
       <div className="p-4 border-t border-sidebar-border">
-        <Button
-          variant="ghost"
-          onClick={logout}
-          className={cn(
-            'w-full justify-start text-sidebar-foreground hover:bg-destructive/10 hover:text-destructive',
-            collapsed && 'justify-center px-2'
-          )}
-        >
-          <LogOut className="w-5 h-5" />
-          {!collapsed && <span className="ml-3">Cerrar Sesión</span>}
-        </Button>
+        <div className={cn('flex items-center gap-2', collapsed ? 'flex-col' : 'justify-between')}>
+          <Button
+            variant="ghost"
+            onClick={logout}
+            className={cn(
+              'flex-1 justify-start text-sidebar-foreground hover:bg-destructive/10 hover:text-destructive',
+              collapsed && 'justify-center px-2 w-full'
+            )}
+          >
+            <LogOut className="w-5 h-5" />
+            {!collapsed && <span className="ml-3">Cerrar Sesión</span>}
+          </Button>
+          {/* DEV ONLY: Remove DevResetButton import and this line for production */}
+          <DevResetButton />
+        </div>
       </div>
     </aside>
   );
