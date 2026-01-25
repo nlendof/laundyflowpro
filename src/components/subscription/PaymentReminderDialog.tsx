@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, forwardRef } from 'react';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, CreditCard, Clock } from 'lucide-react';
-import { useSubscription, SubscriptionCheckResult } from '@/hooks/useSubscription';
+import { SubscriptionCheckResult } from '@/hooks/useSubscription';
 import { useNavigate } from 'react-router-dom';
 
 interface PaymentReminderDialogProps {
@@ -19,12 +19,8 @@ interface PaymentReminderDialogProps {
   checkResult: SubscriptionCheckResult;
 }
 
-export function PaymentReminderDialog({
-  open,
-  onClose,
-  onProceed,
-  checkResult
-}: PaymentReminderDialogProps) {
+export const PaymentReminderDialog = forwardRef<HTMLDivElement, PaymentReminderDialogProps>(
+  function PaymentReminderDialog({ open, onClose, onProceed, checkResult }, ref) {
   const navigate = useNavigate();
   const [acknowledged, setAcknowledged] = useState(false);
 
@@ -122,4 +118,6 @@ export function PaymentReminderDialog({
       </AlertDialogContent>
     </AlertDialog>
   );
-}
+});
+
+PaymentReminderDialog.displayName = 'PaymentReminderDialog';
