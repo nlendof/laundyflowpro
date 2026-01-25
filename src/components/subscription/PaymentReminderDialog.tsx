@@ -1,4 +1,4 @@
-import { useState, forwardRef } from 'react';
+import { useState } from 'react';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -19,8 +19,12 @@ interface PaymentReminderDialogProps {
   checkResult: SubscriptionCheckResult;
 }
 
-export const PaymentReminderDialog = forwardRef<HTMLDivElement, PaymentReminderDialogProps>(
-  function PaymentReminderDialog({ open, onClose, onProceed, checkResult }, ref) {
+export function PaymentReminderDialog({
+  open,
+  onClose,
+  onProceed,
+  checkResult
+}: PaymentReminderDialogProps) {
   const navigate = useNavigate();
   const [acknowledged, setAcknowledged] = useState(false);
 
@@ -118,6 +122,4 @@ export const PaymentReminderDialog = forwardRef<HTMLDivElement, PaymentReminderD
       </AlertDialogContent>
     </AlertDialog>
   );
-});
-
-PaymentReminderDialog.displayName = 'PaymentReminderDialog';
+}
